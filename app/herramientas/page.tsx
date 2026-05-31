@@ -1,18 +1,16 @@
+'use client';
+
 import React from 'react';
+import Link from 'next/link';
 
 // --- Interfaces ---
 interface Tool {
   id: string;
   title: string;
   description: string;
-  colorTheme: 'lavender' | 'sage' | 'blue';
-  icon: React.ReactNode;
-}
-
-interface NavItem {
-  id: string;
-  label: string;
-  isActive: boolean;
+  badge?: string;
+  iconBg: string;
+  iconColor: string;
   icon: React.ReactNode;
 }
 
@@ -23,169 +21,92 @@ const ChevronRight = () => (
   </svg>
 );
 
-const MeditationIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm5.5 12c-1.25-2.05-3.23-3.5-5.5-3.5s-4.25 1.45-5.5 3.5c1.41 1.55 3.35 2.5 5.5 2.5s4.09-.95 5.5-2.5z" />
-  </svg>
+const NavIconHome = ({ active }: { active: boolean }) => (
+  <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={active ? 1.5 : 2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+);
+const NavIconWellness = ({ active }: { active: boolean }) => (
+  <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={active ? 1.5 : 2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+);
+const NavIconTools = ({ active }: { active: boolean }) => (
+  <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={active ? 1.5 : 2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 );
 
-const StressIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m0-16c-2 0-4 1.5-4 3.5S10 11 12 11m0-7c2 0 4 1.5 4 3.5S14 11 12 11m0 0c-2.5 0-4.5 2-4.5 4.5S9.5 20 12 20m0-9c2.5 0 4.5 2 4.5 4.5S14.5 20 12 20" />
-  </svg>
-);
-
-const BodyScanIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    <circle cx="12" cy="10" r="1.5" fill="currentColor" />
-  </svg>
-);
-
-const MuscleIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-4.879-4.879a3 3 0 10-4.242-4.242 3 3 0 004.242 4.242zM9.879 9.879L5 5" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 9l-6 6" />
-  </svg>
-);
-
-const HeartIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-  </svg>
-);
-
-const AlertIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-  </svg>
-);
-
-const HomeNavIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
-const EvalNavIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const ResourcesNavIcon = () => (
-  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-  </svg>
-);
-
-const ProfileNavIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-  </svg>
-);
-
-// --- Dummy Data ---
 const toolsData: Tool[] = [
   {
-    id: '1',
-    title: 'Meditación y respiración',
-    description: 'Ejercicios para calmar tu mente',
-    colorTheme: 'lavender',
-    icon: <MeditationIcon />,
+    id: 'meditacion_1',
+    title: 'Respiración 4-7-8',
+    description: 'Técnica para reducir la ansiedad rápida',
+    badge: 'Offline',
+    iconBg: 'bg-indigo-100',
+    iconColor: 'text-indigo-600',
+    icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
   },
   {
-    id: '2',
-    title: 'Tips anti-estrés',
-    description: 'Pequeñas acciones, grandes cambios',
-    colorTheme: 'sage',
-    icon: <StressIcon />,
+    id: 'meditacion_2',
+    title: 'Atención Plena (Mindfulness)',
+    description: 'Audio guiado de 5 minutos',
+    badge: 'Offline',
+    iconBg: 'bg-emerald-100',
+    iconColor: 'text-emerald-600',
+    icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
   },
   {
-    id: '3',
-    title: 'Escaneo corporal',
-    description: 'Conecta con tu cuerpo',
-    colorTheme: 'blue',
-    icon: <BodyScanIcon />,
+    id: 'triaje_1',
+    title: 'Triaje Psicológico',
+    description: 'Test de riesgo (No es diagnóstico clínico)',
+    iconBg: 'bg-rose-100',
+    iconColor: 'text-rose-600',
+    icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
   },
   {
-    id: '4',
-    title: 'Relajación muscular progresiva',
-    description: 'Libera la tensión',
-    colorTheme: 'lavender',
-    icon: <MuscleIcon />,
-  },
-  {
-    id: '5',
-    title: 'Frases motivacionales',
-    description: 'Inspírate cada día',
-    colorTheme: 'sage',
-    icon: <HeartIcon />,
-  },
-  {
-    id: '6',
-    title: 'Modo crisis',
-    description: 'Si necesitas ayuda inmediata',
-    colorTheme: 'lavender',
-    icon: <AlertIcon />,
-  },
+    id: 'apoyo_1',
+    title: 'Mapa de Apoyo UCV',
+    description: 'Ubicaciones físicas de asistencia',
+    iconBg: 'bg-amber-100',
+    iconColor: 'text-amber-600',
+    icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+  }
 ];
 
-const navData: NavItem[] = [
-  { id: 'inicio', label: 'Inicio', isActive: false, icon: <HomeNavIcon /> },
-  { id: 'evaluacion', label: 'Evaluación', isActive: false, icon: <EvalNavIcon /> },
-  { id: 'recursos', label: 'Recursos', isActive: true, icon: <ResourcesNavIcon /> },
-  { id: 'perfil', label: 'Perfil', isActive: false, icon: <ProfileNavIcon /> },
-];
+export default function HerramientasView() {
+  // Solución del error ts(2367): Tipado explícito a 'string'
+  const currentPath: string = '/herramientas';
 
-// --- Theme Mapping Helpers ---
-const getCardBgColor = (theme: Tool['colorTheme']) => {
-  switch (theme) {
-    case 'lavender': return 'bg-[#CDB4DB]/15';
-    case 'sage': return 'bg-[#B8C4BB]/15';
-    case 'blue': return 'bg-[#A2D2FF]/15';
-  }
-};
-
-const getIconBgColor = (theme: Tool['colorTheme']) => {
-  switch (theme) {
-    case 'lavender': return 'bg-[#CDB4DB]/40 text-[#4A4E69]';
-    case 'sage': return 'bg-[#B8C4BB]/40 text-[#4A4E69]';
-    case 'blue': return 'bg-[#A2D2FF]/40 text-[#4A4E69]';
-  }
-};
-
-// --- Main Component ---
-export default function ToolsScreen() {
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center items-center p-4">
-      {/* Mobile Device Container */}
-      <div className="w-full max-w-[400px] h-[850px] max-h-[100vh] bg-[#F9F7F2] rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col border-[6px] border-white">
+    <div className="min-h-screen bg-gray-100 flex justify-center">
+      <div className="w-full max-w-md bg-[#F9F7F2] min-h-screen relative shadow-lg overflow-hidden flex flex-col">
         
-        {/* Header Section */}
-        <div className="px-6 pt-12 pb-4">
-          <h1 className="text-2xl font-bold text-[#4A4E69] tracking-tight">Herramientas</h1>
-          <p className="text-[#4A4E69] opacity-80 mt-1 text-sm font-medium">Para tu bienestar diario</p>
-        </div>
+        {/* Header */}
+        <header className="px-6 pt-12 pb-6">
+          <h1 className="text-3xl font-extrabold text-[#4A4E69]">Recursos</h1>
+          <p className="text-sm text-[#4A4E69]/70 mt-1">Biblioteca de autogestión y meditación</p>
+        </header>
 
-        {/* Scrollable Tools List */}
-        <div className="flex-1 overflow-y-auto px-6 pb-24 no-scrollbar">
-          <div className="space-y-3">
+        {/* Content */}
+        <main className="flex-1 px-6 overflow-y-auto pb-24">
+          <div className="space-y-4">
             {toolsData.map((tool) => (
               <button 
                 key={tool.id}
-                className={`w-full flex items-center p-3 rounded-2xl transition-transform active:scale-[0.98] ${getCardBgColor(tool.colorTheme)}`}
+                className="w-full bg-white rounded-2xl p-4 flex items-center shadow-sm border border-gray-100 hover:shadow-md transition-shadow active:scale-[0.98] text-left"
               >
-                {/* Icon Container */}
-                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center mr-4 ${getIconBgColor(tool.colorTheme)}`}>
+                {/* Icon */}
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 ${tool.iconBg} ${tool.iconColor}`}>
                   {tool.icon}
                 </div>
                 
                 {/* Text Content */}
-                <div className="flex-1 text-left">
-                  <h3 className="text-[#4A4E69] font-bold text-[15px] leading-tight mb-0.5">
-                    {tool.title}
-                  </h3>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="text-[#4A4E69] font-bold text-[15px] leading-tight">
+                      {tool.title}
+                    </h3>
+                    {tool.badge && (
+                      <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-bold uppercase rounded-md">
+                        {tool.badge}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[#4A4E69] opacity-70 text-xs">
                     {tool.description}
                   </p>
@@ -198,24 +119,25 @@ export default function ToolsScreen() {
               </button>
             ))}
           </div>
-        </div>
+        </main>
 
-        {/* Bottom Navigation */}
-        <div className="absolute bottom-0 w-full bg-[#F9F7F2] border-t border-[#4A4E69]/10 px-6 py-4 pb-8 flex justify-between items-center rounded-b-[2.5rem]">
-          {navData.map((item) => (
-            <button 
-              key={item.id} 
-              className="flex flex-col items-center justify-center space-y-1 w-16"
-            >
-              <div className={`${item.isActive ? 'text-[#4A4E69]' : 'text-[#4A4E69]/40'}`}>
-                {item.icon}
-              </div>
-              <span className={`text-[10px] font-semibold ${item.isActive ? 'text-[#4A4E69]' : 'text-[#4A4E69]/50'}`}>
-                {item.label}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* BOTTOM NAVIGATION */}
+        <nav className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50">
+          <Link href="/homepage" className={`flex flex-col items-center justify-center space-y-1 w-16 transition-colors ${currentPath === '/homepage' ? 'text-[#4A4E69]' : 'text-gray-400 hover:text-[#4A4E69]/70'}`}>
+            <NavIconHome active={currentPath === '/homepage'} />
+            <span className="text-[10px] font-bold">Inicio</span>
+          </Link>
+          
+          <Link href="/bienestar" className={`flex flex-col items-center justify-center space-y-1 w-16 transition-colors ${currentPath === '/bienestar' ? 'text-[#4A4E69]' : 'text-gray-400 hover:text-[#4A4E69]/70'}`}>
+            <NavIconWellness active={currentPath === '/bienestar'} />
+            <span className="text-[10px] font-bold">Bienestar</span>
+          </Link>
+
+          <Link href="/herramientas" className={`flex flex-col items-center justify-center space-y-1 w-16 transition-colors ${currentPath === '/herramientas' ? 'text-[#4A4E69]' : 'text-gray-400 hover:text-[#4A4E69]/70'}`}>
+            <NavIconTools active={currentPath === '/herramientas'} />
+            <span className="text-[10px] font-bold">Recursos</span>
+          </Link>
+        </nav>
 
       </div>
     </div>

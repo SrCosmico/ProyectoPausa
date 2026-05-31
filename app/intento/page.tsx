@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 // ==========================================
 // --- TYPES & INTERFACES ---
@@ -201,6 +201,15 @@ interface ScreenProps {
 }
 
 function ScreenInicio({ navigate, selectedMood, setSelectedMood }: ScreenProps) {
+  const [userEmail, setUserEmail] = useState('');
+
+  useEffect(() => {
+    const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('registroEmail') : null;
+    if (storedEmail) {
+      setUserEmail(storedEmail);
+    }
+  }, []);
+
   const quickAccessItems: QuickAccessItem[] = [
     {
       id: 'respira',
@@ -223,7 +232,9 @@ function ScreenInicio({ navigate, selectedMood, setSelectedMood }: ScreenProps) 
   return (
     <div className="px-6 pt-10 pb-4 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#2B2D42] tracking-tight">Hola, Comunidad Ucevista</h1>
+        <h1 className="text-2xl font-bold text-[#2B2D42] tracking-tight">
+          Hola, {userEmail ? userEmail : 'Comunidad Ucevista'}
+        </h1>
         <p className="text-sm text-[#4A4E69]/70 mt-0.5">¿Cómo calificarías tu estado de ánimo actual?</p>
       </div>
 
