@@ -1,5 +1,5 @@
 // Ejemplo de importación en tu componente de React / Next.js
-import { Leyenda, NivelLeyenda, Pausa, feeltoday } from '@/models/home';
+import { Leyenda, NivelLeyenda, Pausa, feeltoday } from '../../../../Cosas/models/home';
 
 export default function HomePage() {
   
