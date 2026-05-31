@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 // === TYPES & INTERFACES ===
 interface Leyenda {
@@ -63,8 +64,16 @@ const quickAccess: QuickAccessItem[] = [
 ];
 
 export default function HomeView() {
-  // Solución del error ts(2367): Tipado explícito a 'string'
-  const currentPath: string = '/homepage'; 
+  const currentPath: string = '/homepage';
+  const router = useRouter();
+
+  // Protección de ruta: redirige al login si no hay sesión
+  useEffect(() => {
+    const sesion = localStorage.getItem('sesionActiva');
+    if (sesion !== 'true') {
+      router.push('/login');
+    }
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
@@ -141,6 +150,14 @@ export default function HomeView() {
           <Link href="/herramientas" className={`flex flex-col items-center justify-center space-y-1 w-16 transition-colors ${currentPath === '/herramientas' ? 'text-[#4A4E69]' : 'text-gray-400 hover:text-[#4A4E69]/70'}`}>
             <ToolsIcon active={currentPath === '/herramientas'} />
             <span className="text-[10px] font-bold">Recursos</span>
+          </Link>
+
+          {/* Botón Perfil */}
+          <Link href="/perfil" className={`flex flex-col items-center justify-center space-y-1 w-16 transition-colors text-gray-400 hover:text-[#4A4E69]/70`}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span className="text-[10px] font-bold">Perfil</span>
           </Link>
         </nav>
 
