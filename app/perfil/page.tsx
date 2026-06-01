@@ -12,10 +12,16 @@ export default function ProfileView() {
   const [foto, setFoto] = useState<string | null>(null);
 
   useEffect(() => {
+    const sesion = localStorage.getItem('sesionActiva');
+    if (sesion !== 'true') {
+      router.push('/login');
+      return;
+    }
+
     setNombre(localStorage.getItem('alumnoNombre') || 'Valeria López');
     setCorreo(localStorage.getItem('alumnoEmail') || 'valeria@ucv.ve');
     setFoto(localStorage.getItem('userAvatar'));
-  }, []);
+  }, [router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -39,7 +45,7 @@ export default function ProfileView() {
       <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-gray-100 p-6 relative">
         
         {/* Botón de volver */}
-        <button onClick={() => router.push('/homepage')} className="mb-6 text-gray-800">
+        <button onClick={() => router.push('/home.2')} className="mb-6 text-gray-800">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>

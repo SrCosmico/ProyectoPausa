@@ -1,5 +1,3 @@
-// Pantalla 7 — Tu bienestar (monitoreo)
-
 export type TipoSentimiento = "excelente" | "bien" | "neutral" | "bajo" | "mal";
 export type DiaSemana = "L" | "M" | "X" | "J" | "V" | "S" | "D";
 export type TabNavegacionId = "inicio" | "evaluacion" | "recursos" | "perfil";
@@ -7,7 +5,7 @@ export type TabNavegacionId = "inicio" | "evaluacion" | "recursos" | "perfil";
 export interface PuntoHistorial {
   dia: DiaSemana;
   estado: TipoSentimiento;
-  valorNumerico: number;   // 1–5
+  valorNumerico: number;
 }
 
 export interface ItemNavegacion {
@@ -23,18 +21,18 @@ export interface PantallaBienestar {
     avatarUrl?: string;
   };
   estadoActual: {
-    titulo: string;              // "Bien"
-    mensajeInspirador: string;   // "¡Vas por buen camino!"
+    titulo: string;
+    mensajeInspirador: string;
     emoji: string;
   };
   historialEmocional: {
-    titulo: string;              // "Historial emocional"
-    rango: string;               // "Últimos 7 días"
+    titulo: string;
+    rango: string;
     puntos: PuntoHistorial[];
     expandido: boolean;
   };
   recomendacionHoy: {
-    titulo: string;              // "Recomendación para hoy"
+    titulo: string;
     descripcion: string;
     ilustracionUrl?: string;
   };

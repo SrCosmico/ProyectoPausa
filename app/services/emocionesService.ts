@@ -1,6 +1,8 @@
 // app/services/emocionesService.ts
-import { supabase } from '@/lib/supabase'; 
+import { createClient } from '@/lib/supabase';
 import { RegistroEmocion } from '@/app/types';
+
+const supabase = createClient();
 
 /**
  * FUNCIÓN 1: Guardar una nueva emoción en Supabase

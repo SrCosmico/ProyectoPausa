@@ -246,7 +246,7 @@ export default function MonitoreoPage() {
           {[
             { id: "inicio", label: "Inicio", ruta: "/home.2", activo: false },
             { id: "evaluacion", label: "Evaluación", ruta: "/evaluacion.2", activo: false },
-            { id: "perfil", label: "Perfil", ruta: "/perfil.2", activo: false }
+            { id: "perfil", label: "Perfil", ruta: "/perfil", activo: false }
           ].map((tab) => (
             <button
               key={tab.id}

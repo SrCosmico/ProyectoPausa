@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FormEvent, useState, useEffect } from 'react'; // 1. Importé useEffect
+import React, { FormEvent, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginView() {
@@ -9,11 +9,11 @@ export default function LoginView() {
   const [correo, setCorreo] = useState('');
   const [clave, setClave] = useState('');
 
-  // 2. Nueva lógica: Si ya hay sesión, redirigir al inicio automáticamente
+  // Redirige al usuario logueado directamente al home real de la app
   useEffect(() => {
     const sesion = localStorage.getItem('sesionActiva');
     if (sesion === 'true') {
-      router.push('/homepage');
+      router.push('/home.2');
     }
   }, [router]);
 
@@ -35,7 +35,7 @@ export default function LoginView() {
     }
 
     localStorage.setItem('sesionActiva', 'true');
-    router.push('/homepage');
+    router.push('/home.2');
   };
 
   return (

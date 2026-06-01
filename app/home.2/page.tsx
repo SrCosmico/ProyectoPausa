@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 // ==========================================
@@ -44,10 +44,10 @@ export const accesoRapidoData: AccesoRapido[] = [
   { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                  ruta: "/meditacion.2" },
   { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios",  ruta: "/monitoreo.2" },
   { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                  ruta: "/cronograma.2" },
-  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/monitoreo.2" },
-  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",        ruta: "/mapa.2" },
+  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/contrasena.2" },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",        ruta: "" },
   { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",              ruta: "/contrasena.2" },
-  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",      ruta: "/ia" }, // <-- AHORA ESTÁ AL ÚLTIMO
+  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",      ruta: "" },
 ];
 
 export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
@@ -69,10 +69,22 @@ const mapeoIconosHerramientas: Record<string, string> = {
 
 export default function HomePage() {
   const router = useRouter();
+  const [usuarioNombre, setUsuarioNombre] = useState('Carlos');
+
+  useEffect(() => {
+    const sesion = localStorage.getItem('sesionActiva');
+    if (sesion !== 'true') {
+      router.push('/login');
+      return;
+    }
+
+    const nombre = localStorage.getItem('alumnoNombre') || localStorage.getItem('alumnoEmail') || 'Carlos';
+    setUsuarioNombre(nombre);
+  }, [router]);
 
   const datosHome = {
     usuario: {
-      nombre: "Carlos",
+      nombre: usuarioNombre,
     },
     saludo: "Nos alegra que estés aquí",
     registroEmocional: {
@@ -158,15 +170,21 @@ export default function HomePage() {
             <div className="grid grid-cols-1 gap-3">
               {datosHome.accesoRapido.map((item) => {
                 const esCrisis = item.id === 'crisis';
+                const esIA = item.id === 'ia';
+                const tienelNavegacion = item.ruta !== '';
                 return (
                   <button
                     key={item.id}
-                    onClick={() => router.push(item.ruta)}
+                    onClick={() => {
+                      if (tienelNavegacion) {
+                        router.push(item.ruta);
+                      }
+                    }}
                     className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-150 active:scale-[0.99] group shadow-sm ${
-                      esCrisis 
+                      esCrisis || esIA
                         ? 'bg-rose-50/60 border-rose-100 hover:bg-rose-50' 
                         : 'bg-white border-slate-100 hover:bg-slate-50'
-                    }`}
+                    } ${!tienelNavegacion ? 'cursor-default opacity-75' : 'cursor-pointer'}`}
                   >
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform ${
                       esCrisis ? 'bg-rose-100' : 'bg-slate-50 group-hover:bg-purple-50'
@@ -202,8 +220,8 @@ export default function HomePage() {
             const rutasMenu = {
               inicio: "/home.2",
               evaluacion: "/evaluacion.2",
-              perfil: "/perfil.2",
-              recursos: "/recursos.2"
+              perfil: "/perfil",
+              recursos: "/herramientas"
             };
 
             return (

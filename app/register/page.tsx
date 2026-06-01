@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FormEvent, useState } from 'react';
+import React, { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface AlumnoRegistro {
@@ -24,6 +24,13 @@ export default function RegisterView() {
     terminos: false
   });
 
+  useEffect(() => {
+    const sesion = localStorage.getItem('sesionActiva');
+    if (sesion === 'true') {
+      router.push('/home.2');
+    }
+  }, [router]);
+
   const handleRegistro = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -43,8 +50,8 @@ export default function RegisterView() {
     localStorage.setItem('alumnoNombre', formData.nombre.trim());
     localStorage.setItem('sesionActiva', 'true');
     
-    // Redirigimos al usuario a la página de inicio ya logueado
-    router.push('/homepage');
+    // Redirigimos al usuario nuevo a la pantalla de bienvenida
+    router.push('/bienvenida.2');
   };
 
   return (
