@@ -1,0 +1,244 @@
+"use client";
+
+import React from 'react';
+import { useRouter } from 'next/navigation';
+
+// ==========================================
+// INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO
+// ==========================================
+
+export type NivelEmocional = "Muy mal" | "Mal" | "Regular" | "Bien" | "Muy bien";
+
+export type TabNavegacionId = "inicio" | "evaluacion" | "recursos" | "perfil";
+
+export interface EmojiEstado {
+  estado: NivelEmocional;
+  emoji: string;
+}
+
+export interface AccesoRapido {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  icono?: string;
+  ruta: string;
+}
+
+export interface ItemNavegacion {
+  id: TabNavegacionId;
+  label: string;
+  icono?: string;
+  activo: boolean;
+}
+
+export const emojiEstadosData: EmojiEstado[] = [
+  { estado: "Muy mal",  emoji: "😩" },
+  { estado: "Mal",      emoji: "😔" },
+  { estado: "Regular",  emoji: "😐" },
+  { estado: "Bien",     emoji: "😊" },
+  { estado: "Muy bien", emoji: "🤩" },
+];
+
+export const accesoRapidoData: AccesoRapido[] = [
+  { id: "evaluacion",  titulo: "Evaluación rápida",         descripcion: "Conoce tu bienestar",                 ruta: "/evaluacion.2" },
+  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                  ruta: "/meditacion.2" },
+  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios",  ruta: "/monitoreo.2" },
+  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                  ruta: "/cronograma.2" },
+  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/monitoreo.2" },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",        ruta: "/mapa.2" },
+  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",              ruta: "/contrasena.2" },
+  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",      ruta: "/ia" }, // <-- AHORA ESTÁ AL ÚLTIMO
+];
+
+export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
+  { id: "inicio",      label: "Inicio" },
+  { id: "evaluacion",  label: "Evaluación" },
+  { id: "perfil",      label: "Perfil" },
+];
+
+const mapeoIconosHerramientas: Record<string, string> = {
+  evaluacion: "📊",
+  meditacion: "🧘",
+  antistres: "💡",
+  cronograma: "📅",
+  registro: "❤️",
+  crisis: "🚨",
+  diario: "🔐",
+  ia: "💬" // Icono del chat de IA
+};
+
+export default function HomePage() {
+  const router = useRouter();
+
+  const datosHome = {
+    usuario: {
+      nombre: "Carlos",
+    },
+    saludo: "Nos alegra que estés aquí",
+    registroEmocional: {
+      pregunta: "¿Cómo te sientes hoy?",
+      descripcion: "Registra tu estado emocional",
+      opcionesEmoji: emojiEstadosData
+    },
+    accesoRapido: accesoRapidoData,
+    navegacion: navegacionData.map(item => ({
+      ...item,
+      activo: item.id === "inicio"
+    }))
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
+      
+      {/* Contenedor Mobile-First con alto fijo y desbordamiento controlado */}
+      <div className="w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
+        
+        {/* ÁREA SCROLLABLE */}
+        <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
+          
+          {/* SECCIÓN SUPERIOR: Perfil y Saludo */}
+          <div className="p-6 bg-white rounded-b-[32px] shadow-sm border-b border-slate-100">
+            <div className="flex items-center gap-4">
+              
+              {/* Avatar Ilustrado con gradiente */}
+              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-500 via-indigo-400 to-blue-400 p-0.5 shadow-md flex-shrink-0 flex items-center justify-center">
+                <div className="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-indigo-400 translate-y-1">
+                    <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-xl font-bold text-[#2A3B50]">
+                  Hola, {datosHome.usuario.nombre}
+                </h2>
+                <p className="text-xs font-medium text-[#8C9BAE]">
+                  {datosHome.saludo}
+                </p>
+              </div>
+            </div>
+
+            {/* CHECK-IN EMOCIONAL */}
+            <div className="mt-6 bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 text-center">
+              <h3 className="text-sm font-bold text-[#334155]">
+                {datosHome.registroEmocional.pregunta}
+              </h3>
+              <p className="text-[11px] text-[#8C9BAE] mt-0.5">
+                {datosHome.registroEmocional.descripcion}
+              </p>
+              
+              {/* Fila de Emojis */}
+              <div className="flex justify-between items-center gap-1 mt-4 px-1">
+                {datosHome.registroEmocional.opcionesEmoji.map((item) => (
+                  <button
+                    key={item.estado}
+                    onClick={() => router.push('/comoTeSientesHoy.2')}
+                    className="flex flex-col items-center group focus:outline-none"
+                    title={item.estado}
+                  >
+                    <span className="text-3xl sm:text-4xl transition-all duration-300 transform group-hover:scale-125 group-hover:animate-bounce cursor-pointer select-none active:scale-90 block">
+                      {item.emoji}
+                    </span>
+                    <span className="text-[9px] font-bold text-[#A0AEC0] mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      {item.estado}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* CUERPO CENTRAL: Grid de Herramientas */}
+          <div className="p-6">
+            <h4 className="text-xs font-bold text-[#8C9BAE] tracking-widest uppercase mb-4">
+              Herramientas recomendadas
+            </h4>
+
+            <div className="grid grid-cols-1 gap-3">
+              {datosHome.accesoRapido.map((item) => {
+                const esCrisis = item.id === 'crisis';
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => router.push(item.ruta)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-150 active:scale-[0.99] group shadow-sm ${
+                      esCrisis 
+                        ? 'bg-rose-50/60 border-rose-100 hover:bg-rose-50' 
+                        : 'bg-white border-slate-100 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform ${
+                      esCrisis ? 'bg-rose-100' : 'bg-slate-50 group-hover:bg-purple-50'
+                    }`}>
+                      {mapeoIconosHerramientas[item.id] || "✨"}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h5 className={`text-sm font-bold truncate ${esCrisis ? 'text-rose-700' : 'text-[#334155]'}`}>
+                        {item.titulo}
+                      </h5>
+                      <p className="text-xs text-[#8C9BAE] truncate mt-0.5">
+                        {item.descripcion}
+                      </p>
+                    </div>
+
+                    <div className={`text-slate-300 group-hover:translate-x-1 transition-transform ${esCrisis ? 'text-rose-300' : ''}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+
+        {/* NAVEGACIÓN INFERIOR TOTALMENTE FIJA */}
+        <div className="bg-white border-t border-slate-100 px-6 py-3.5 flex justify-around items-center sm:rounded-b-[40px] z-30 shadow-[0_-6px_20px_rgba(0,0,0,0.03)] flex-shrink-0">
+          {datosHome.navegacion.map((tab) => {
+            const rutasMenu = {
+              inicio: "/home.2",
+              evaluacion: "/evaluacion.2",
+              perfil: "/perfil.2",
+              recursos: "/recursos.2"
+            };
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => router.push(rutasMenu[tab.id as keyof typeof rutasMenu])}
+                className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl transition-all active:scale-95 ${
+                  tab.activo ? 'text-[#4A72A6]' : 'text-[#8C9BAE] hover:text-[#4A72A6]'
+                }`}
+              >
+                {tab.id === 'inicio' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path d="M11.47 3.822a.75.75 0 0 1 1.06 0l8.69 8.69a.75.75 0 0 1-1.06 1.06L20 13.061v6.189a1.75 1.75 0 0 1-1.75 1.75H15.25a.75.75 0 0 1-.75-.75V16.5a.5.5 0 0 0-.5-.5h-2a.5.5 0 0 0-.5.5v3.75a.75.75 0 0 1-.75.75H5.75A1.75 1.75 0 0 1 4 19.25v-6.19l-.56.56a.75.75 0 0 1-1.06-1.06l8.69-8.69Z" />
+                  </svg>
+                )}
+                {tab.id === 'evaluacion' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path d="M10.5 3.75a.75.75 0 0 0-1.5 0v16.5a.75.75 0 0 0 1.5 0V3.75ZM6 6.75a.75.75 0 0 0-1.5 0v10.5a.75.75 0 0 0 1.5 0V6.75ZM19.5 9.75a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5ZM15 8.25a.75.75 0 0 0-1.5 0v7.5a.75.75 0 0 0 1.5 0v-7.5Z" />
+                  </svg>
+                )}
+                {tab.id === 'perfil' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
+                  </svg>
+                )}
+                
+                <span className="text-[10px] font-bold tracking-wide">
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+      </div>
+    </div>
+  );
+}
