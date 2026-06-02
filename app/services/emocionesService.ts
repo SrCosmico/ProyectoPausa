@@ -1,6 +1,6 @@
 // app/services/emocionesService.ts
 import { createClient } from '@/lib/supabase';
-import { RegistroEmocion } from '@/app/types';
+import { RegistroEmocion, Recomendacion } from '@/app/types';
 
 const supabase = createClient();
 
@@ -36,4 +36,21 @@ export const obtenerHistorialUsuario = async (userId: string) => {
     return [];
   }
   return data as RegistroEmocion[];
+};
+
+/**
+ * FUNCIÓN 3: Obtener recomendaciones basadas en el estado de ánimo actual
+ */
+export const obtenerRecomendacionPorAnimo = async (estadoAnimo: string) => {
+  const { data, error } = await supabase
+    .from('recomendaciones')
+    .select('*')
+    .eq('estado_animo', estadoAnimo)
+    .limit(1); // Trae solo una recomendación que coincida
+
+  if (error) {
+    console.error('Error al obtener la recomendación:', error.message);
+    return null;
+  }
+  return data && data.length > 0 ? (data[0] as Recomendacion) : null;
 };

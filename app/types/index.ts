@@ -6,3 +6,10 @@ export interface RegistroEmocion {
   estado: string;           // Ejemplo: "bien", "excelente", "neutral"
   valor_numerico: number;   // Ejemplo: 7, 10, 5
 }
+
+export interface Recomendacion {
+  id?: number;
+  created_at?: string;
+  estado_animo: string; // "triste", "ansioso", "feliz", "cansado"
+  consejo: string;      // Las frases que guardamos en Supabase
+}
