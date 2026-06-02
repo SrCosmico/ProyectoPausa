@@ -24,6 +24,8 @@ export interface ItemNavegacion {
   activo: boolean;
 }
 
+//hacer la interface de register
+//hacer más preguntas si no es fija la pregunta de como te sientes hoy
 export interface PantallaHome {
   usuario: {
     nombre: string;
