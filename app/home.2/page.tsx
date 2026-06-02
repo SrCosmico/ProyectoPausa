@@ -44,7 +44,7 @@ export const accesoRapidoData: AccesoRapido[] = [
   { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                  ruta: "/meditacion.2" },
   { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios",  ruta: "/monitoreo.2" },
   { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                  ruta: "/cronograma.2" },
-  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/contrasena.2" },
+  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/monitoreo.2" },
   { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",        ruta: "" },
   { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",              ruta: "/contrasena.2" },
   { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",      ruta: "" },
