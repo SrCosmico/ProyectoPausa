@@ -40,14 +40,14 @@ export const emojiEstadosData: EmojiEstado[] = [
 ];
 
 export const accesoRapidoData: AccesoRapido[] = [
-  { id: "evaluacion",  titulo: "Evaluación rápida",         descripcion: "Conoce tu bienestar",                 ruta: "/evaluacion.2" },
-  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                  ruta: "/meditacion.2" },
-  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios",  ruta: "/monitoreo.2" },
-  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                  ruta: "/cronograma.2" },
-  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/monitoreo.2" },
-  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",        ruta: "" },
-  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",              ruta: "/contrasena.2" },
-  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",      ruta: "" },
+  { id: "evaluacion",  titulo: "Evaluación rápida",        descripcion: "Conoce tu bienestar",               ruta: "/evaluacion.2" },
+  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",               ruta: "/meditacion.2" },
+  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios", ruta: "/monitoreo.2" },
+  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",               ruta: "/cronograma.2" },
+  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",              ruta: "/monitoreo.2" },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "" },
+  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2" },
+  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: "" },
 ];
 
 export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
@@ -64,12 +64,13 @@ const mapeoIconosHerramientas: Record<string, string> = {
   registro: "❤️",
   crisis: "🚨",
   diario: "🔐",
-  ia: "💬" // Icono del chat de IA
+  ia: "💬"
 };
 
 export default function HomePage() {
   const router = useRouter();
   const [usuarioNombre, setUsuarioNombre] = useState('Carlos');
+  const [yaRegistroHoy, setYaRegistroHoy] = useState(false);
 
   useEffect(() => {
     const sesion = localStorage.getItem('sesionActiva');
@@ -80,6 +81,13 @@ export default function HomePage() {
 
     const nombre = localStorage.getItem('alumnoNombre') || localStorage.getItem('alumnoEmail') || 'Carlos';
     setUsuarioNombre(nombre);
+
+    // Verificamos si existe registro previo hoy
+    const registroFecha = localStorage.getItem('fechaUltimoRegistro');
+    const hoy = new Date().toLocaleDateString();
+    if (registroFecha === hoy) {
+      setYaRegistroHoy(true);
+    }
   }, [router]);
 
   const datosHome = {
@@ -88,7 +96,7 @@ export default function HomePage() {
     },
     saludo: "Nos alegra que estés aquí",
     registroEmocional: {
-      pregunta: "¿Cómo te sientes hoy?",
+      pregunta: yaRegistroHoy ? "¿Cómo te sientes ahora?" : "¿Cómo te sientes hoy?",
       descripcion: "Registra tu estado emocional",
       opcionesEmoji: emojiEstadosData
     },
@@ -102,17 +110,13 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
       
-      {/* Contenedor Mobile-First con alto fijo y desbordamiento controlado */}
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
         
-        {/* ÁREA SCROLLABLE */}
         <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
           
-          {/* SECCIÓN SUPERIOR: Perfil y Saludo */}
           <div className="p-6 bg-white rounded-b-[32px] shadow-sm border-b border-slate-100">
             <div className="flex items-center gap-4">
               
-              {/* Avatar Ilustrado con gradiente */}
               <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-500 via-indigo-400 to-blue-400 p-0.5 shadow-md flex-shrink-0 flex items-center justify-center">
                 <div className="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-indigo-400 translate-y-1">
@@ -131,7 +135,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* CHECK-IN EMOCIONAL */}
             <div className="mt-6 bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 text-center">
               <h3 className="text-sm font-bold text-[#334155]">
                 {datosHome.registroEmocional.pregunta}
@@ -140,12 +143,15 @@ export default function HomePage() {
                 {datosHome.registroEmocional.descripcion}
               </p>
               
-              {/* Fila de Emojis */}
               <div className="flex justify-between items-center gap-1 mt-4 px-1">
                 {datosHome.registroEmocional.opcionesEmoji.map((item) => (
                   <button
                     key={item.estado}
-                    onClick={() => router.push('/comoTeSientesHoy.2')}
+                    onClick={() => {
+                        // Guardamos fecha de hoy al hacer clic
+                        localStorage.setItem('fechaUltimoRegistro', new Date().toLocaleDateString());
+                        router.push('/comoTeSientesHoy.2');
+                    }}
                     className="flex flex-col items-center group focus:outline-none"
                     title={item.estado}
                   >
@@ -161,7 +167,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* CUERPO CENTRAL: Grid de Herramientas */}
           <div className="p-6">
             <h4 className="text-xs font-bold text-[#8C9BAE] tracking-widest uppercase mb-4">
               Herramientas recomendadas
@@ -211,10 +216,8 @@ export default function HomePage() {
               })}
             </div>
           </div>
-
         </div>
 
-        {/* NAVEGACIÓN INFERIOR TOTALMENTE FIJA */}
         <div className="bg-white border-t border-slate-100 px-6 py-3.5 flex justify-around items-center sm:rounded-b-[40px] z-30 shadow-[0_-6px_20px_rgba(0,0,0,0.03)] flex-shrink-0">
           {datosHome.navegacion.map((tab) => {
             const rutasMenu = {

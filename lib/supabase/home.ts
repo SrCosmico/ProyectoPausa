@@ -1,19 +1,4 @@
-//U
-
-// Función exclusiva para UPDATE
-// @ts-ignore
-const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
-
-function createClient() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('SUPABASE_URL and SUPABASE_KEY must be defined');
-  }
-
-  return createSupabaseClient(supabaseUrl, supabaseKey);
-}
+import { createClient } from '../supabase';
 
 async function actualizarRegistroEmocional(registroId: string, nuevoEstado: string, nuevaDescripcion: string) {
   const supabase = createClient();
@@ -26,6 +11,24 @@ async function actualizarRegistroEmocional(registroId: string, nuevoEstado: stri
       descripcion: nuevaDescripcion 
     })
     .eq('id', registroId); //
+    
+  return { data, error };
+}
+
+// Función de UPDATE para actualizar la foto de perfil
+
+async function actualizarFotoPerfil(userId: string, newAvatarUrl: string) {
+  const supabase = createClient();
+  
+  // CRÍTICO: Usamos el .eq('id', userId) para modificar SOLO el perfil de este usuario.
+  // Esto asegura que la foto se actualice correctamente en la base de datos, 
+  // permitiendo que tu pantalla principal (Home) refleje el cambio al recargar los datos.
+  const { data, error } = await supabase
+    .from('perfiles')
+    .update({ 
+      avatar_url: newAvatarUrl 
+    })
+    .eq('id', userId); 
     
   return { data, error };
 }

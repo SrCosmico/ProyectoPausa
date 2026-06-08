@@ -17,3 +17,4 @@ export interface PantallaBienvenida {
   };
   avisoPrivacidad: string;     // "Tu información está segura y nunca será compartida"
 }
+

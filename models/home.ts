@@ -1,4 +1,6 @@
-// Pantalla 4 — Home (principal)
+// ==========================================
+// INTERFACES
+// ==========================================
 
 export type NivelEmocional = "Muy mal" | "Mal" | "Regular" | "Bien" | "Muy bien";
 
@@ -24,22 +26,9 @@ export interface ItemNavegacion {
   activo: boolean;
 }
 
-//hacer la interface de register
-//hacer más preguntas si no es fija la pregunta de como te sientes hoy
-export interface PantallaHome {
-  usuario: {
-    nombre: string;
-    avatarUrl?: string;
-  };
-  saludo: string;           // "Nos alegra que estés aquí"
-  registroEmocional: {
-    pregunta: string;       // "¿Cómo te sientes hoy?"
-    descripcion: string;    // "Registra tu estado emocional"
-    opcionesEmoji: EmojiEstado[];
-  };
-  accesoRapido: AccesoRapido[];
-  navegacion: ItemNavegacion[];
-}
+// ==========================================
+// DATOS ADMINISTRADOS POR EL USUARIO
+// ==========================================
 
 export const emojiEstadosData: EmojiEstado[] = [
   { estado: "Muy mal",  emoji: "😩" },
@@ -50,16 +39,18 @@ export const emojiEstadosData: EmojiEstado[] = [
 ];
 
 export const accesoRapidoData: AccesoRapido[] = [
-  { id: "evaluacion",  titulo: "Evaluación rápida",         descripcion: "Conoce tu bienestar",                 ruta: "/evaluacion" },
-  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                  ruta: "/herramientas/meditacion" },
-  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios",  ruta: "/herramientas/tips" },
-  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                  ruta: "/cronograma" },
-  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/bienestar" },
+  { id: "evaluacion",  titulo: "Evaluación rápida",        descripcion: "Conoce tu bienestar",               ruta: "/evaluacion.2" },
+  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",               ruta: "/meditacion.2" },
+  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios", ruta: "/monitoreo.2" },
+  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",               ruta: "/cronograma.2" },
+  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",              ruta: "/monitoreo.2" },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "" },
+  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2" },
+  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: "" },
 ];
 
 export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
   { id: "inicio",      label: "Inicio" },
   { id: "evaluacion",  label: "Evaluación" },
-  { id: "recursos",    label: "Recursos" },
   { id: "perfil",      label: "Perfil" },
 ];
