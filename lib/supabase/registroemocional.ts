@@ -74,13 +74,11 @@ async function yahizoregistroemocionalhoy (usuarioId: string) {
 //llamar si ya hizo un registro emocional hoy, si no lo hizo, preguntar, si ya hay un registro, preguntar algo nuevo (UPDATE)
 //crear una funcion del como te sientes ahora
 
-async function actualizarRegistroEmocional (registroId: string, nuevoEstado: string, nuevaDescripcion: string) {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('registros_emocionales')
+export async function actualizarRegistroEmocional(registroId: string, nuevoEstado: string, nuevaDescripcion: string) {
+  const supabase = createClient();
+  return await supabase.from('registros_emocionales')
     .update({ estado: nuevoEstado, descripcion: nuevaDescripcion })
-    .eq('id', registroId)
-  return { data, error }
+    .eq('id', registroId);
 }
 
 //mostrarle a la ia lo que queremos hacer con las pantallas y si las interface cumple
