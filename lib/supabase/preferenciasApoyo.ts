@@ -1,5 +1,10 @@
 // pantalla preferencias de apoyo
 import { createClient } from "../supabase";
+import {
+  opcionesPreferenciasData,
+  mapeoIconos as iconosPreferencias,
+  type OpcionPreferencia,
+} from "@/models/preferenciasApoyo";
 /**
  * LETRA C: PANTALLA PREFERENCIAS DE APOYO
  * Registra los tipos de apoyo seleccionados por el estudiante
@@ -25,3 +30,18 @@ export const insertarPreferenciasApoyo = async (
   }
   return data;
 };
+
+// ============================================================
+// CRUD: Letra "R" pantalla de preferenciasApoyo
+// ============================================================
+
+/** Devuelve las preferencias de apoyo con emoji y estado de selección. */
+export function leerOpcionesPreferenciasApoyo(
+  seleccionados: Record<string, boolean>
+): OpcionPreferencia[] {
+  return opcionesPreferenciasData.map((item) => ({
+    ...item,
+    icono: iconosPreferencias[item.id],
+    seleccionado: seleccionados[item.id] ?? false,
+  }));
+}
