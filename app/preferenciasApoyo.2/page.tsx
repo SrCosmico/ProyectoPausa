@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+// DELATE
+import { deleteItem } from '@/lib/supabase/preferenciasApoyo';
 
 // ==========================================
 // INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO

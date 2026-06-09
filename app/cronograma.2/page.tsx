@@ -2,6 +2,10 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+// DELATE
+import { deleteSelectedDay } from '@/lib/supabase/cronograma';
+import { deleteSelectedActivity } from '@/lib/supabase/cronograma';
+import { deleteCronogramaActivity } from '@/lib/supabase/cronograma';
 
 // ==========================================
 // INTERFACES Y CONFIGURACIÓN DE DATOS

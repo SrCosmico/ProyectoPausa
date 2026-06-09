@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+//DELATE
+import { deleteItem } from '@/lib/supabase/motivos';
 
 // ==========================================
 // INTERFACES Y MODELOS DE DATOS DE LA APP

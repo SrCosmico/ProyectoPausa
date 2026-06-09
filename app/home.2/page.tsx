@@ -2,13 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-// ==========================================
-// INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO
-// ==========================================
+import { useQuizState } from '@/hooks/useQuizState';
+import { obtenerNombreUsuarioLocal } from '@/lib/supabase/home';
 
 export type NivelEmocional = "Muy mal" | "Mal" | "Regular" | "Bien" | "Muy bien";
-
 export type TabNavegacionId = "inicio" | "evaluacion" | "recursos" | "perfil";
 
 export interface EmojiEstado {
@@ -64,12 +61,17 @@ const mapeoIconosHerramientas: Record<string, string> = {
   registro: "❤️",
   crisis: "🚨",
   diario: "🔐",
-  ia: "💬" // Icono del chat de IA
+  ia: "💬"
 };
 
 export default function HomePage() {
   const router = useRouter();
-  const [usuarioNombre, setUsuarioNombre] = useState('Carlos');
+  const [usuarioNombre, setUsuarioNombre] = useState('Valeria');
+  const {
+    preguntaActual,
+    mostrarCheckin,
+    guardarEmocionTemporal,
+  } = useQuizState();
 
   useEffect(() => {
     const sesion = localStorage.getItem('sesionActiva');
@@ -78,17 +80,19 @@ export default function HomePage() {
       return;
     }
 
-    const nombre = localStorage.getItem('alumnoNombre') || localStorage.getItem('alumnoEmail') || 'Carlos';
-    setUsuarioNombre(nombre);
+    setUsuarioNombre(obtenerNombreUsuarioLocal());
   }, [router]);
 
+  const manejarClickEmoji = (item: EmojiEstado) => {
+    guardarEmocionTemporal(item.estado, item.emoji);
+    router.push('/registroEmocional.2');
+  };
+
   const datosHome = {
-    usuario: {
-      nombre: usuarioNombre,
-    },
+    usuario: { nombre: usuarioNombre },
     saludo: "Nos alegra que estés aquí",
     registroEmocional: {
-      pregunta: "¿Cómo te sientes hoy?",
+      pregunta: preguntaActual,
       descripcion: "Registra tu estado emocional",
       opcionesEmoji: emojiEstadosData
     },
@@ -99,20 +103,18 @@ export default function HomePage() {
     }))
   };
 
+  const mostrarCheckinEmocional = mostrarCheckin;
+
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
       
-      {/* Contenedor Mobile-First con alto fijo y desbordamiento controlado */}
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
         
-        {/* ÁREA SCROLLABLE */}
         <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
           
-          {/* SECCIÓN SUPERIOR: Perfil y Saludo */}
           <div className="p-6 bg-white rounded-b-[32px] shadow-sm border-b border-slate-100">
             <div className="flex items-center gap-4">
               
-              {/* Avatar Ilustrado con gradiente */}
               <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-500 via-indigo-400 to-blue-400 p-0.5 shadow-md flex-shrink-0 flex items-center justify-center">
                 <div className="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-indigo-400 translate-y-1">
@@ -131,37 +133,36 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* CHECK-IN EMOCIONAL */}
-            <div className="mt-6 bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 text-center">
-              <h3 className="text-sm font-bold text-[#334155]">
-                {datosHome.registroEmocional.pregunta}
-              </h3>
-              <p className="text-[11px] text-[#8C9BAE] mt-0.5">
-                {datosHome.registroEmocional.descripcion}
-              </p>
-              
-              {/* Fila de Emojis */}
-              <div className="flex justify-between items-center gap-1 mt-4 px-1">
-                {datosHome.registroEmocional.opcionesEmoji.map((item) => (
-                  <button
-                    key={item.estado}
-                    onClick={() => router.push('/comoTeSientesHoy.2')}
-                    className="flex flex-col items-center group focus:outline-none"
-                    title={item.estado}
-                  >
-                    <span className="text-3xl sm:text-4xl transition-all duration-300 transform group-hover:scale-125 group-hover:animate-bounce cursor-pointer select-none active:scale-90 block">
-                      {item.emoji}
-                    </span>
-                    <span className="text-[9px] font-bold text-[#A0AEC0] mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      {item.estado}
-                    </span>
-                  </button>
-                ))}
+            {mostrarCheckinEmocional && (
+              <div className="mt-6 bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 text-center">
+                <h3 className="text-sm font-bold text-[#334155]">
+                  {datosHome.registroEmocional.pregunta}
+                </h3>
+                <p className="text-[11px] text-[#8C9BAE] mt-0.5">
+                  {datosHome.registroEmocional.descripcion}
+                </p>
+                
+                <div className="flex justify-between items-center gap-1 mt-4 px-1">
+                  {datosHome.registroEmocional.opcionesEmoji.map((item) => (
+                    <button
+                      key={item.estado}
+                      onClick={() => manejarClickEmoji(item)}
+                      className="flex flex-col items-center group focus:outline-none"
+                      title={item.estado}
+                    >
+                      <span className="text-3xl sm:text-4xl transition-all duration-300 transform group-hover:scale-125 group-hover:animate-bounce cursor-pointer select-none active:scale-90 block">
+                        {item.emoji}
+                      </span>
+                      <span className="text-[9px] font-bold text-[#A0AEC0] mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        {item.estado}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* CUERPO CENTRAL: Grid de Herramientas */}
           <div className="p-6">
             <h4 className="text-xs font-bold text-[#8C9BAE] tracking-widest uppercase mb-4">
               Herramientas recomendadas
@@ -214,7 +215,6 @@ export default function HomePage() {
 
         </div>
 
-        {/* NAVEGACIÓN INFERIOR TOTALMENTE FIJA */}
         <div className="bg-white border-t border-slate-100 px-6 py-3.5 flex justify-around items-center sm:rounded-b-[40px] z-30 shadow-[0_-6px_20px_rgba(0,0,0,0.03)] flex-shrink-0">
           {datosHome.navegacion.map((tab) => {
             const rutasMenu = {
