@@ -13,3 +13,8 @@ export interface Recomendacion {
   estado_animo: string; // "triste", "ansioso", "feliz", "cansado"
   consejo: string;      // Las frases que guardamos en Supabase
 }
+export interface TipAntiestres {
+  id: number;
+  contenido: string;
+  categoria?: string;
+}

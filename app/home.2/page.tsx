@@ -37,14 +37,14 @@ export const emojiEstadosData: EmojiEstado[] = [
 ];
 
 export const accesoRapidoData: AccesoRapido[] = [
-  { id: "evaluacion",  titulo: "Evaluación rápida",         descripcion: "Conoce tu bienestar",                 ruta: "/evaluacion.2" },
-  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                  ruta: "/meditacion.2" },
-  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios",  ruta: "/monitoreo.2" },
-  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                  ruta: "/cronograma.2" },
-  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",                 ruta: "/monitoreo.2" },
-  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",        ruta: "" },
-  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",              ruta: "/contrasena.2" },
-  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",      ruta: "" },
+  { id: "evaluacion",  titulo: "Evaluación rápida",        descripcion: "Conoce tu bienestar",               ruta: "/evaluacion.2" },
+  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",               ruta: "/meditacion.2" },
+  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios", ruta: "/monitoreo.2" },
+  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",               ruta: "/cronograma.2" },
+  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",              ruta: "/monitoreo.2" },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "" },
+  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2" },
+  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: "" },
 ];
 
 export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
@@ -67,6 +67,7 @@ const mapeoIconosHerramientas: Record<string, string> = {
 export default function HomePage() {
   const router = useRouter();
   const [usuarioNombre, setUsuarioNombre] = useState('Valeria');
+  const [yaRegistroHoy, setYaRegistroHoy] = useState(false);
   const {
     preguntaActual,
     mostrarCheckin,
@@ -81,18 +82,30 @@ export default function HomePage() {
     }
 
     setUsuarioNombre(obtenerNombreUsuarioLocal());
+
+    const registroFecha = localStorage.getItem('fechaUltimoRegistro');
+    const hoy = new Date().toLocaleDateString();
+    if (registroFecha === hoy) {
+      setYaRegistroHoy(true);
+    }
   }, [router]);
 
   const manejarClickEmoji = (item: EmojiEstado) => {
     guardarEmocionTemporal(item.estado, item.emoji);
+    localStorage.setItem('fechaUltimoRegistro', new Date().toLocaleDateString());
+    setYaRegistroHoy(true);
     router.push('/registroEmocional.2');
   };
+
+  const preguntaCheckin =
+    preguntaActual ||
+    (yaRegistroHoy ? '¿Cómo te sientes ahora?' : '¿Cómo te sientes hoy?');
 
   const datosHome = {
     usuario: { nombre: usuarioNombre },
     saludo: "Nos alegra que estés aquí",
     registroEmocional: {
-      pregunta: preguntaActual,
+      pregunta: preguntaCheckin,
       descripcion: "Registra tu estado emocional",
       opcionesEmoji: emojiEstadosData
     },
@@ -212,7 +225,6 @@ export default function HomePage() {
               })}
             </div>
           </div>
-
         </div>
 
         <div className="bg-white border-t border-slate-100 px-6 py-3.5 flex justify-around items-center sm:rounded-b-[40px] z-30 shadow-[0_-6px_20px_rgba(0,0,0,0.03)] flex-shrink-0">

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import type { TipAntiestres } from '@/types';
+import { getRandomTip } from '@/lib/supabase';
 
 // ==========================================
 // INTERFACES Y DATOS DE SIMULACIÓN
@@ -13,13 +15,6 @@ interface RegistroHistorico {
   nivel: number; // Del 1 al 5
   emoji: string;
   estado: string;
-}
-
-interface TipAntiEstres {
-  id: number;
-  titulo: string;
-  descripcion: string;
-  icono: string;
 }
 
 // Historial de la semana actual (Gráfico)
@@ -42,26 +37,36 @@ const registrosAnterioresSimulados: RegistroHistorico[] = [
   { dia: "Mié", fecha: "20 Mayo", nivel: 2, emoji: "😔", estado: "Mal" },
 ];
 
-const bcoTipsAntiEstres: TipAntiEstres[] = [
-  { id: 1, titulo: "Toma un respiro 4-7-8", descripcion: "Inhala durante 4 segundos, mantén 7 y exhala completamente en 8 segundos para calmar tu sistema nervioso.", icono: "🌬️" },
-  { id: 2, titulo: "Estiramiento rápido", descripcion: "Levántate de la silla, estira tus brazos hacia el techo y rota los hombros hacia atrás durante 1 minuto.", icono: "🧘‍♀️" },
-  { id: 3, titulo: "Desconexión digital", descripcion: "Aparta la vista de todas tus pantallas por los próximos 10 minutos. Deja que tus ojos y mente descansen.", icono: "📴" },
-  { id: 4, titulo: "Un sorbo de calma", descripcion: "Bebe un vaso de agua despacio, saboreándolo y enfocándote únicamente en esa sensación física de hidratación.", icono: "💧" },
-  { id: 5, titulo: "Escucha el entorno", descripcion: "Cierra los ojos e intenta identificar 3 sonidos diferentes a tu alrededor que normalmente ignoras.", icono: "🎧" }
-];
-
 export default function MonitoreoPage() {
   const router = useRouter();
-  const [tipDelDia, setTipDelDia] = useState<TipAntiEstres>(bcoTipsAntiEstres[0]);
+  const [tipDelDia, setTipDelDia] = useState<TipAntiestres>({
+    id: 0,
+    contenido: 'Cargando tip anti-estrés...',
+    categoria: 'Relajación',
+  });
   const [mostrarAnteriores, setMostrarAnteriores] = useState(false);
 
   useEffect(() => {
-    cambiarTipAleatorio();
+    void cargarTipDelDia();
   }, []);
 
-  const cambiarTipAleatorio = () => {
-    const indiceAleatorio = Math.floor(Math.random() * bcoTipsAntiEstres.length);
-    setTipDelDia(bcoTipsAntiEstres[indiceAleatorio]);
+  const cargarTipDelDia = async () => {
+    const tip = await getRandomTip();
+    if (tip) {
+      setTipDelDia(tip);
+    }
+  };
+
+  const obtenerIconoTip = (tip: TipAntiestres) => {
+    const categoria = tip.categoria?.toLowerCase() ?? '';
+
+    if (categoria.includes('respir')) return '🌬️';
+    if (categoria.includes('estir')) return '🧘‍♀️';
+    if (categoria.includes('digital') || categoria.includes('desconex')) return '📴';
+    if (categoria.includes('agua') || categoria.includes('hidra')) return '💧';
+    if (categoria.includes('escuch')) return '🎧';
+
+    return '💡';
   };
 
   // Mapeo preciso de alturas porcentuales para posicionar el emoji en el eje Y
@@ -213,7 +218,7 @@ export default function MonitoreoPage() {
                 </div>
                 
                 <button 
-                  onClick={cambiarTipAleatorio}
+                  onClick={cargarTipDelDia}
                   className="p-1.5 bg-white text-purple-600 hover:text-purple-800 rounded-full shadow-sm hover:shadow active:scale-95 transition-all"
                   title="Mostrar otro tip"
                 >
@@ -225,12 +230,14 @@ export default function MonitoreoPage() {
 
               <div className="bg-white/90 backdrop-blur-sm border border-white rounded-2xl p-4 flex items-start gap-4 relative z-10 transition-all duration-300">
                 <span className="text-3xl p-2 bg-purple-50 rounded-xl flex-shrink-0 shadow-sm">
-                  {tipDelDia.icono}
+                  {obtenerIconoTip(tipDelDia)}
                 </span>
                 <div className="space-y-0.5">
-                  <h5 className="text-xs font-bold text-[#2A3B50]">{tipDelDia.titulo}</h5>
+                  <h5 className="text-xs font-bold text-[#2A3B50]">
+                    {tipDelDia.categoria ?? 'Tip anti-estrés'}
+                  </h5>
                   <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                    {tipDelDia.descripcion}
+                    {tipDelDia.contenido}
                   </p>
                 </div>
               </div>

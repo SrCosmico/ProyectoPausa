@@ -1,8 +1,13 @@
-import { createBrowserClient } from '@supabase/ssr'
+import type { TipAntiestres } from '@/types'
+import { bcoTipsAntiEstres } from '@/models/monitoreo'
 
-export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+const tipsLocales: TipAntiestres[] = bcoTipsAntiEstres.map((tip) => ({
+  id: tip.id,
+  contenido: tip.descripcion,
+  categoria: tip.titulo,
+}))
+
+export const getRandomTip = async (): Promise<TipAntiestres | null> => {
+  if (tipsLocales.length === 0) return null
+  return tipsLocales[Math.floor(Math.random() * tipsLocales.length)]
 }

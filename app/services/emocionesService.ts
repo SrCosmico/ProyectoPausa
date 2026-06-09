@@ -1,56 +1,62 @@
 // app/services/emocionesService.ts
-import { createClient } from '@/lib/supabase';
 import { RegistroEmocion, Recomendacion } from '@/app/types';
 
-const supabase = createClient();
+const HISTORIAL_KEY = 'historial_emociones_local';
+const RECOMENDACIONES_DUMMY: Recomendacion[] = [
+  { estado_animo: 'bien', consejo: '¡Vas por buen camino! Sigue con tus hábitos de bienestar.' },
+  { estado_animo: 'regular', consejo: 'Prueba una respiración consciente de 5 minutos.' },
+  { estado_animo: 'mal', consejo: 'Tómate un momento para descansar y hablar con alguien de confianza.' },
+  { estado_animo: 'triste', consejo: 'Escribe en tu diario lo que sientes. Liberar emociones ayuda.' },
+  { estado_animo: 'ansioso', consejo: 'Realiza el ejercicio 4-7-8 para calmar tu sistema nervioso.' },
+];
+
+function leerHistorialStorage(): RegistroEmocion[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem(HISTORIAL_KEY) ?? '[]') as RegistroEmocion[];
+  } catch {
+    return [];
+  }
+}
 
 /**
- * FUNCIÓN 1: Guardar una nueva emoción en Supabase
- * (La usará tu equipo cuando el usuario registre cómo se siente)
+ * FUNCIÓN 1: Guardar una nueva emoción en almacenamiento local
  */
 export const guardarEmocion = async (emocion: RegistroEmocion) => {
-  const { data, error } = await supabase
-    .from('historial_emociones') // Nombre exacto con el que guardaste la tabla en Supabase
-    .insert([emocion]);
-
-  if (error) {
-    console.error('Error al guardar en Supabase:', error.message);
-    return { success: false, error };
+  if (typeof window === 'undefined') {
+    return { success: false, error: { message: 'Almacenamiento no disponible' } };
   }
-  return { success: true, data };
+
+  const historial = leerHistorialStorage();
+  const registro: RegistroEmocion = {
+    ...emocion,
+    id: Date.now(),
+    created_at: new Date().toISOString(),
+  };
+  historial.push(registro);
+  localStorage.setItem(HISTORIAL_KEY, JSON.stringify(historial));
+  return { success: true, data: [registro] };
 };
 
 /**
  * FUNCIÓN 2: Obtener todo el historial de un usuario específico
- * (La usará tu equipo para pintar las gráficas y el calendario)
  */
 export const obtenerHistorialUsuario = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('historial_emociones') // Nombre exacto con el que guardaste la tabla en Supabase
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true }); // Ordena del más antiguo al más reciente
-
-  if (error) {
-    console.error('Error al obtener el historial:', error.message);
-    return [];
-  }
-  return data as RegistroEmocion[];
+  return leerHistorialStorage()
+    .filter((r) => r.user_id === userId)
+    .sort((a, b) => {
+      const fechaA = a.created_at ?? '';
+      const fechaB = b.created_at ?? '';
+      return fechaA.localeCompare(fechaB);
+    });
 };
 
 /**
  * FUNCIÓN 3: Obtener recomendaciones basadas en el estado de ánimo actual
  */
 export const obtenerRecomendacionPorAnimo = async (estadoAnimo: string) => {
-  const { data, error } = await supabase
-    .from('recomendaciones')
-    .select('*')
-    .eq('estado_animo', estadoAnimo)
-    .limit(1); // Trae solo una recomendación que coincida
-
-  if (error) {
-    console.error('Error al obtener la recomendación:', error.message);
-    return null;
-  }
-  return data && data.length > 0 ? (data[0] as Recomendacion) : null;
+  const recomendacion = RECOMENDACIONES_DUMMY.find(
+    (r) => r.estado_animo === estadoAnimo.toLowerCase()
+  );
+  return recomendacion ?? RECOMENDACIONES_DUMMY[0];
 };
