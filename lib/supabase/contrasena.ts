@@ -30,6 +30,50 @@ export const insertarNotaDiario = async (
   return data;
 };
 
+import { type Nota } from "@/models/contrasena";
+
+// ============================================================
+// CRUD: Letra "R" pantalla de contrasena (diario personal)
+// ============================================================
+
+// Datos iniciales dummy — en producción arrancarán desde Supabase
+const _notasDiarioDummy: Nota[] = [
+  {
+    id: 1,
+    titulo: "Mi primer día en Pausa",
+    contenido:
+      "Hoy empecé a usar la app. Me siento con esperanza de mejorar mis hábitos de bienestar.",
+    fecha: new Date().toLocaleDateString(),
+    emoji: "💜",
+  },
+  {
+    id: 2,
+    titulo: "Semana de exámenes",
+    contenido:
+      "El estrés de los parciales es alto, pero intento respirar y mantenerme enfocado.",
+    fecha: new Date(Date.now() - 86_400_000).toLocaleDateString(),
+    emoji: "💛",
+  },
+];
+
+/**
+ * Devuelve las notas iniciales del diario (dummy).
+ * Se usa para inicializar el useState<Nota[]> en la page.
+ */
+export function leerNotasDiarioInicial(): Nota[] {
+  return _notasDiarioDummy;
+}
+
+/** Busca y devuelve una nota del diario por su ID. */
+export function leerNotaDiarioPorId(notas: Nota[], id: number): Nota | undefined {
+  return notas.find((n) => n.id === id);
+}
+
+/** Devuelve las notas ordenadas de más reciente a más antigua. */
+export function leerNotasDiarioOrdenadas(notas: Nota[]): Nota[] {
+  return [...notas].sort((a, b) => b.id - a.id);
+}
+
 
 //U
 // Función de UPDATE para una entrada del diario

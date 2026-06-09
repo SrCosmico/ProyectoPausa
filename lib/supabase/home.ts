@@ -1,6 +1,15 @@
 // pantalla home
 import { createClient } from "../supabase";
 import { NivelEmocional } from "@/models/home";
+import {
+  emojiEstadosData,
+  accesoRapidoData,
+  navegacionData,
+  type AccesoRapido,
+  type EmojiEstado,
+  type ItemNavegacion,
+} from "@/models/home";
+
 /**
  * LETRA C: PANTALLA HOME (CHECK-IN EMOCIONAL)
  * Registra de forma inmediata el estado de ánimo seleccionado por el usuario
@@ -41,6 +50,48 @@ async function actualizarRegistroEmocional(registroId: string, nuevoEstado: stri
     
   return { data, error };
 }
+
+// ============================================================
+// CRUD: Letra "R" pantalla de home
+// ============================================================
+
+/** Lee el nombre del usuario activo desde localStorage. */
+export function leerNombreUsuarioHome(): string {
+  if (typeof window === "undefined") return "Carlos";
+  return (
+    localStorage.getItem("alumnoNombre") ||
+    localStorage.getItem("alumnoEmail") ||
+    "Carlos"
+  );
+}
+
+/** Verifica si el usuario ya hizo un check-in emocional hoy. */
+export function leerYaRegistroHoy(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    localStorage.getItem("fechaUltimoRegistro") ===
+    new Date().toLocaleDateString()
+  );
+}
+
+/** Devuelve las opciones de emoji para el check-in emocional rápido del Home. */
+export function leerOpcionesEmojiHome(): EmojiEstado[] {
+  return emojiEstadosData;
+}
+
+/** Devuelve el listado de herramientas de acceso rápido del Home. */
+export function leerAccesoRapidoHome(): AccesoRapido[] {
+  return accesoRapidoData;
+}
+
+/** Devuelve los ítems de la barra de navegación inferior con "inicio" activo. */
+export function leerNavegacionHome(): ItemNavegacion[] {
+  return navegacionData.map((item) => ({
+    ...item,
+    activo: item.id === "inicio",
+  }));
+}
+
 
 // Función de UPDATE para actualizar la foto de perfil
 

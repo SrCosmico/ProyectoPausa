@@ -1,5 +1,13 @@
 // pantalla meditacion
 import { createClient } from '../supabase';
+import {
+  opcionesSesionData,
+  meditacionFrasesData,
+  duracionesDisponibles,
+  type OpcionSesion,
+  type FraseMeditacion,
+} from "@/models/meditacion";
+
 
 type SessionType = 'respiracion' | 'meditacion';
 /**
@@ -27,6 +35,33 @@ export async function insertarSesionBienestarCompletada(userId: string,
         throw new Error(error.message);
     }
     return data;
+}
+
+// ============================================================
+// CRUD: Letra "R" pantalla de meditacion
+// ============================================================
+
+/** Devuelve las opciones de tipo de sesión disponibles (respiración y meditación). */
+export function leerOpcionesSesionMeditacion(): OpcionSesion[] {
+  return opcionesSesionData;
+}
+
+/** Devuelve la configuración de sesión para el tipo indicado. */
+export function leerConfiguracionSesion(tipo: SessionType): OpcionSesion | undefined {
+  return opcionesSesionData.find((s) => s.id === tipo);
+}
+
+/** Devuelve los valores de duración disponibles para configurar una sesión. */
+export function leerDuracionesDisponibles(): number[] {
+  return duracionesDisponibles;
+}
+
+/**
+ * Devuelve la frase de meditación guiada correspondiente al índice de fase.
+ * Cicla automáticamente si el índice supera el total de frases.
+ */
+export function leerFraseMeditacionActual(indice: number): FraseMeditacion {
+  return meditacionFrasesData[indice % meditacionFrasesData.length];
 }
 
 

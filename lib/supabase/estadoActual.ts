@@ -1,5 +1,9 @@
 import { EstadoEmocionalId } from "@/models/estadoActual";
 import { createClient } from "../supabase";
+import {
+  opcionesEstadoData,
+  type OpcionEstadoActual,
+} from "@/models/estadoActual";
 
 //Pantalla estadoactual
 /**
@@ -27,3 +31,26 @@ export const insertarEstadoEmocionalActual = async (
   }
   return data;
 };
+
+// ============================================================
+// CRUD: Letra "R" pantalla de estadoActual
+// ============================================================
+
+/** Devuelve las opciones del estado emocional marcando cuál está seleccionada. */
+export function leerOpcionesEstadoActual(
+  seleccionadoId: EstadoEmocionalId
+): OpcionEstadoActual[] {
+  return opcionesEstadoData.map((opt) => ({
+    ...opt,
+    seleccionado: opt.id === seleccionadoId,
+  }));
+}
+
+/**
+ * Lee desde localStorage la selección de estado emocional previa del usuario.
+ * Útil para pre-seleccionar si el usuario regresa a la pantalla.
+ */
+export function leerSeleccionEstadoActualGuardada(): EstadoEmocionalId | null {
+  if (typeof window === "undefined") return null;
+  return (localStorage.getItem("estadoActualId") as EstadoEmocionalId) ?? null;
+}

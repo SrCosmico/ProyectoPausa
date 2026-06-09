@@ -2,6 +2,10 @@
 
 import { FactorId } from "@/models/factoresImpacto";
 import { createClient } from "../supabase";
+import {
+  opcionesFactoresData,
+  type OpcionFactor,
+} from "@/models/factoresImpacto";
 
 /**
  * LETRA C: PANTALLA FACTORES DE IMPACTO (PASO 3)
@@ -31,3 +35,29 @@ export const insertarFactoresImpactoBienestar = async (
   }
   return data;
 };
+
+// ============================================================
+// CRUD: Letra "R" pantalla de factoresImpacto
+// ============================================================
+
+const _iconosFactores: Record<string, string> = {
+  estres_academico: "🎓",
+  sobrecarga_tareas: "📝",
+  falta_tiempo: "⏳",
+  problemas_personales: "👥",
+  ansiedad: "🧠",
+  motivacion_baja: "📉",
+  otro: "✏️",
+};
+
+/** Devuelve los factores de impacto con emoji y estado de selección. */
+export function leerOpcionesFactoresImpacto(
+  seleccionados: Record<string, boolean>
+): OpcionFactor[] {
+  return opcionesFactoresData.map((item) => ({
+    ...item,
+    icono: _iconosFactores[item.id] ?? "❓",
+    seleccionado: seleccionados[item.id] ?? false,
+  }));
+}
+
