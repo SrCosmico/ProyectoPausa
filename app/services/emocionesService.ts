@@ -54,4 +54,3 @@ export const obtenerRecomendacionPorAnimo = async (estadoAnimo: string) => {
   }
   return data && data.length > 0 ? (data[0] as Recomendacion) : null;
 };
-sss
