@@ -1,4 +1,31 @@
-import { createClient } from '../supabase';
+// pantalla home
+import { createClient } from "../supabase";
+import { NivelEmocional } from "@/models/home";
+/**
+ * LETRA C: PANTALLA HOME (CHECK-IN EMOCIONAL)
+ * Registra de forma inmediata el estado de ánimo seleccionado por el usuario
+ * desde los accesos rápidos del Dashboard para el monitoreo diario.
+ */
+export const insertarCheckInEmocionalHome = async (
+  userId: string,
+  estadoEmocional: NivelEmocional
+) => {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from('registro_emocional_diario') // Tabla recomendada para el trackeo de estados de ánimo históricos
+    .insert({
+      user_id: userId,
+      estado: estadoEmocional,         // "Muy mal", "Mal", "Regular", "Bien", "Muy bien"
+      registrado_at: new Date().toISOString()
+    })
+    .select();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
+};
 
 async function actualizarRegistroEmocional(registroId: string, nuevoEstado: string, nuevaDescripcion: string) {
   const supabase = createClient();
