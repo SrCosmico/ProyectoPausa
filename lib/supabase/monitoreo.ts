@@ -1,4 +1,47 @@
-//tiene delate si se edita el historial (verificar)
+// ============================================================
+// CRUD: Letras C, U y D - pantalla de monitoreo emocional
+// Tabla: historial_emociones
+// ============================================================
+
+import { createClient } from '@/lib/supabase/client'
+import type { RegistroHistorico } from '@/models/monitoreo'
+
+const supabase = createClient()
+
+/**
+ * Ajusta este tipo según los campos reales de tu tabla.
+ * Si tu tabla tiene más columnas, agrégalas aquí.
+ */
+type NuevoRegistroEmocional = Omit<RegistroHistorico, 'id'>
+type ActualizarRegistroEmocional = Partial<NuevoRegistroEmocional>
+
+/**
+ * ============================================================
+ * C - CREATE
+ * Crear un nuevo registro emocional
+ * ============================================================
+ */
+export async function crearRegistroEmocional(
+  nuevoRegistro: NuevoRegistroEmocional
+): Promise<RegistroHistorico | null> {
+  try {
+    const { data, error } = await supabase
+      .from('historial_emociones')
+      .insert([nuevoRegistro])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error al crear el registro emocional:', error.message)
+      return null
+    }
+
+    return data as RegistroHistorico
+  } catch (error) {
+    console.error('Error inesperado al crear el registro emocional:', error)
+    return null
+  }
+}
 
 // ============================================================
 // CRUD: Letra "R" pantalla de monitoreo
@@ -8,7 +51,6 @@ import {
   historialEmocionalInicial,
   registrosAnterioresSimulados,
   bcoTipsAntiEstres,
-  type RegistroHistorico,
   type TipAntiEstres,
 } from '@/models/monitoreo'
 
@@ -32,4 +74,64 @@ export function leerTipAntiEstresAleatorio(): TipAntiEstres {
 /** Devuelve el estado emocional más reciente del historial semanal. */
 export function leerEstadoEmocionalActual(): RegistroHistorico {
   return historialEmocionalInicial[historialEmocionalInicial.length - 1]
+}
+
+
+/**
+ * ============================================================
+ * U - UPDATE
+ * Actualizar un registro emocional existente
+ * IMPORTANTE: usar .eq('id', registroId)
+ * ============================================================
+ */
+export async function actualizarRegistroEmocional(
+  registroId: string | number,
+  cambios: ActualizarRegistroEmocional
+): Promise<RegistroHistorico | null> {
+  try {
+    const { data, error } = await supabase
+      .from('historial_emociones')
+      .update(cambios)
+      .eq('id', registroId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error al actualizar el registro emocional:', error.message)
+      return null
+    }
+
+    return data as RegistroHistorico
+  } catch (error) {
+    console.error('Error inesperado al actualizar el registro emocional:', error)
+    return null
+  }
+}
+
+/**
+ * ============================================================
+ * D - DELETE
+ * Eliminar un registro emocional específico
+ * IMPORTANTE: usar .eq('id', registroId)
+ * ============================================================
+ */
+export async function eliminarRegistroEmocional(
+  registroId: string | number
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('historial_emociones')
+      .delete()
+      .eq('id', registroId)
+
+    if (error) {
+      console.error('Error al eliminar el registro emocional:', error.message)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error inesperado al eliminar el registro emocional:', error)
+    return false
+  }
 }
