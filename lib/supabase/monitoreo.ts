@@ -1,5 +1,4 @@
 // ============================================================
-// CRUD: Letras C, U y D - pantalla de monitoreo emocional
 // Tabla: historial_emociones
 // ============================================================
 
@@ -8,17 +7,12 @@ import type { RegistroHistorico } from '@/models/monitoreo'
 
 const supabase = createClient()
 
-/**
- * Ajusta este tipo según los campos reales de tu tabla.
- * Si tu tabla tiene más columnas, agrégalas aquí.
- */
 type NuevoRegistroEmocional = Omit<RegistroHistorico, 'id'>
 type ActualizarRegistroEmocional = Partial<NuevoRegistroEmocional>
 
 /**
  * ============================================================
  * C - CREATE
- * Crear un nuevo registro emocional
  * ============================================================
  */
 export async function crearRegistroEmocional(
@@ -43,45 +37,32 @@ export async function crearRegistroEmocional(
   }
 }
 
-// ============================================================
-// CRUD: Letra "R" pantalla de monitoreo
-// ============================================================
+/**
+ * ============================================================
+ * R - READ (Conectado a Supabase)
+ * ============================================================
+ */
+export async function leerHistorialEmocionalSemanal(): Promise<RegistroHistorico[]> {
+  try {
+    const { data, error } = await supabase
+      .from('historial_emociones')
+      .select('*')
+      .order('fecha', { ascending: false })
 
-import {
-  historialEmocionalInicial,
-  registrosAnterioresSimulados,
-  bcoTipsAntiEstres,
-  type TipAntiEstres,
-} from '@/models/monitoreo'
-
-/** Devuelve el historial emocional de los últimos 7 días. */
-export function leerHistorialEmocionalSemanal(): RegistroHistorico[] {
-  return historialEmocionalInicial
+    if (error) {
+      console.error('Error al leer historial:', error.message)
+      return []
+    }
+    return data as RegistroHistorico[] || []
+  } catch (error) {
+    console.error('Error inesperado al leer historial:', error)
+    return []
+  }
 }
-
-/** Devuelve los registros emocionales anteriores a la semana actual. */
-export function leerRegistrosAnteriores(): RegistroHistorico[] {
-  return registrosAnterioresSimulados
-}
-
-/** Devuelve un tip anti-estrés aleatorio del banco de tips. */
-export function leerTipAntiEstresAleatorio(): TipAntiEstres {
-  return bcoTipsAntiEstres[
-    Math.floor(Math.random() * bcoTipsAntiEstres.length)
-  ]
-}
-
-/** Devuelve el estado emocional más reciente del historial semanal. */
-export function leerEstadoEmocionalActual(): RegistroHistorico {
-  return historialEmocionalInicial[historialEmocionalInicial.length - 1]
-}
-
 
 /**
  * ============================================================
  * U - UPDATE
- * Actualizar un registro emocional existente
- * IMPORTANTE: usar .eq('id', registroId)
  * ============================================================
  */
 export async function actualizarRegistroEmocional(
@@ -111,8 +92,6 @@ export async function actualizarRegistroEmocional(
 /**
  * ============================================================
  * D - DELETE
- * Eliminar un registro emocional específico
- * IMPORTANTE: usar .eq('id', registroId)
  * ============================================================
  */
 export async function eliminarRegistroEmocional(

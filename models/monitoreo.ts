@@ -3,11 +3,15 @@
 // ==========================================
 
 export interface RegistroHistorico {
-  dia: string;
-  fecha: string;
-  nivel: number; // Del 1 al 5
-  emoji: string;
-  estado: string;
+  id?: string | number;
+  dia?: string;
+  fecha: string; // ISO o representación corta según uso
+  nivel?: number; // Del 1 al 5
+  emoji?: string;
+  estado?: string;
+  emocion_1?: string | null;
+  emocion_2?: string | null;
+  nota?: string | null;
 }
 
 export interface TipAntiEstres {
