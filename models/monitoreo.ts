@@ -3,14 +3,13 @@
 // ==========================================
 
 export interface RegistroHistorico {
-  id?: string | number;
-  dia?: string;
-  fecha: string; // ISO o representación corta según uso
-  nivel?: number; // Del 1 al 5
-  emoji?: string;
-  estado?: string;
-  emocion_1?: string | null;
-  emocion_2?: string | null;
+  id?: string | number; // Supabase usa bigint o uuid
+  user_id?: string;     // Obligatorio para filtrar
+  dia?: string;         // Esto es la fecha en formato string (ej: "2026-06-12")
+  fecha?: string;       // Mantén esto si lo usas para el renderizado visual
+  nivel?: number;       // Mapea a 'valor_numerico' de Supabase
+  emoji?: string;       
+  estado?: string;      // Mapea a 'estado' de Supabase
   nota?: string | null;
 }
 

@@ -37,6 +37,20 @@ export async function crearRegistroEmocional(
   }
 }
 
+export async function insertarRegistro(registro: Record<string, unknown>) {
+  try {
+    const { data, error } = await supabase
+      .from('historial_emociones')
+      .insert([registro])
+      .select()
+
+    return { data, error }
+  } catch (error) {
+    console.error('Error inesperado al insertar registro:', error)
+    return { data: null, error }
+  }
+}
+
 /**
  * ============================================================
  * R - READ (Conectado a Supabase)

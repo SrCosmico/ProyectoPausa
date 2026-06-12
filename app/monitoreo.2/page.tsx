@@ -1,15 +1,13 @@
 "use client";
-
+import { useEffect } from 'react';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
 import { 
-  leerHistorialEmocionalSemanal, 
-  crearRegistroEmocional, 
-  actualizarRegistroEmocional, 
+  leerHistorialEmocionalSemanal,
   eliminarRegistroEmocional 
-} from '@/lib/supabase/monitoreo';
-
+} from '@/app/services/emocionesService';
+import supabase from '@/lib/supabase';
+import { insertarRegistros } from '@/app/services/emocionesService'
 
 
 interface RegistroHistorico {
@@ -26,13 +24,6 @@ interface TipAntiestres {
   contenido: string;
   categoria: string;
 }
-
-// Datos simulados para arrancar
-const datosIniciales: RegistroHistorico[] = [
-  { id: '1', fecha: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0], nivel: 2, emoji: "😔", estado: "Mal", nota: "Mucho estrés por un parcial" },
-  { id: '2', fecha: new Date(Date.now() - 86400000 * 1).toISOString().split('T')[0], nivel: 4, emoji: "😊", estado: "Bien", nota: "Pude descansar mejor" },
-  { id: '3', fecha: new Date().toISOString().split('T')[0], nivel: 5, emoji: "🤩", estado: "Muy bien", nota: "Entregué el proyecto" },
-];
 
 const opcionesEmociones = [
   { n: 1, e: '😩', s: 'Muy mal' },
@@ -51,7 +42,23 @@ const bancoTips: TipAntiestres[] = [
 
 export default function MonitoreoPage() {
   const router = useRouter();
+  
   const [registros, setRegistros] = useState<RegistroHistorico[]>([]);
+
+useEffect(() => {
+  const cargarDatos = async () => {
+    try {
+      const datos = await leerHistorialEmocionalSemanal('TU_USER_ID');
+      
+      setRegistros(datos as RegistroHistorico[]);
+      
+    } catch (err) {
+      console.error("Error al cargar:", err);
+    }
+  };
+
+  cargarDatos();
+}, []);
   
   // Estados para el Modal
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -92,24 +99,33 @@ export default function MonitoreoPage() {
     setModalAbierto(true);
   };
 
-  const guardarRegistro = () => {
-    if (registroEditando) {
-      setRegistros(registros.map(r => r.id === registroEditando.id ? {
-        ...r, nivel: emocionSeleccionada.n, emoji: emocionSeleccionada.e, estado: emocionSeleccionada.s, nota: notaActual
-      } : r));
-    } else {
-      const nuevo: RegistroHistorico = {
-        id: Date.now().toString(),
-        fecha: fechaSeleccionada,
-        nivel: emocionSeleccionada.n,
-        emoji: emocionSeleccionada.e,
-        estado: emocionSeleccionada.s,
-        nota: notaActual
-      };
-      setRegistros([...registros, nuevo]);
-    }
-    setModalAbierto(false);
+const guardarRegistro = async () => {
+  // 1. Obtener la sesión del usuario actual
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert("Error: Debes iniciar sesión para registrar emociones.");
+    return;
+  }
+
+  const nuevoRegistro = {
+    user_id: user.id, // <--- AQUÍ USAS EL ID REAL DEL USUARIO
+    fecha: fechaSeleccionada,
+    nivel: emocionSeleccionada.n,
+    // ... resto de tus campos
   };
+
+  const { data, error } = await insertarRegistros(nuevoRegistro);
+
+  if (error) {
+    // Esto te dará la razón exacta del error, no un objeto vacío
+    console.error("Error al guardar en Supabase:", JSON.stringify(error, null, 2));
+    alert("Error al guardar: " + error.message);
+    return;
+  }
+  
+  // ... resto de tu lógica
+};
 
   const eliminarRegistro = async (id: string) => {
   const exito = await eliminarRegistroEmocional(id);
