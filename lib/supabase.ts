@@ -1,5 +1,9 @@
 import type { TipAntiestres } from '@/types'
 import { bcoTipsAntiEstres } from '@/models/monitoreo'
+import { createClient } from './supabase/client';
+// createClient in ./supabase/client expects no arguments (already configured there)
+const supabase = createClient();
+export default supabase; // O simplemente "export { supabase }"
 
 const tipsLocales: TipAntiestres[] = bcoTipsAntiEstres.map((tip) => ({
   id: tip.id,
