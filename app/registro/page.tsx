@@ -2,6 +2,8 @@
 
 import React, { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import supabase from '@/lib/supabase'; // Importa tu cliente para verificar la sesión
+import { registrarUsuario } from '@/app/services/authService';
 
 interface AlumnoRegistro {
   nombre: string;
@@ -14,6 +16,7 @@ interface AlumnoRegistro {
 
 export default function RegisterView() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState<AlumnoRegistro>({
     nombre: '',
@@ -24,14 +27,18 @@ export default function RegisterView() {
     terminos: false
   });
 
+  // Reemplazamos localStorage por la validación real de sesión de Supabase
   useEffect(() => {
-    const sesion = localStorage.getItem('sesionActiva');
-    if (sesion === 'true') {
-      router.push('/home.2');
-    }
+    const verificarSesion = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/home.2');
+      }
+    };
+    verificarSesion();
   }, [router]);
 
-  const handleRegistro = (e: FormEvent<HTMLFormElement>) => {
+  const handleRegistro = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (formData.clave !== formData.confirmarClave) {
@@ -39,26 +46,44 @@ export default function RegisterView() {
       return;
     }
 
-    if (formData.terminos === false) {
+    if (formData.clave.length < 6) {
+      alert('Por seguridad, la contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (!formData.terminos) {
       alert('Debes aceptar los términos y condiciones.');
       return;
     }
 
-    // Guardamos los datos en localStorage y activamos la sesión de inmediato
-    localStorage.setItem('alumnoEmail', formData.correo.trim());
-    localStorage.setItem('alumnoClave', formData.clave.trim());
-    localStorage.setItem('alumnoNombre', formData.nombre.trim());
-    localStorage.setItem('sesionActiva', 'true');
-    
-    // Redirigimos al usuario nuevo a la pantalla de bienvenida
-    router.push('/bienvenida.2');
+    setLoading(true);
+
+    // Conexión real con el servicio de Supabase
+    const { data, error } = await registrarUsuario(
+      formData.correo.trim(),
+      formData.clave.trim(),
+      formData.nombre.trim(),
+      formData.facultad
+    );
+
+    setLoading(false);
+
+    if (error) {
+      alert(`Error al registrarse: ${error.message}`);
+      return;
+    }
+
+    // Si todo sale bien, redirigimos a la pantalla de bienvenida
+    if (data?.user) {
+      router.push('/bienvenida.2');
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] flex justify-center items-center p-4 font-sans text-[#1E293B]">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-gray-100 p-6 relative">
         
-        <button onClick={() => router.back()} className="mb-6 text-gray-800">
+        <button onClick={() => router.back()} className="mb-6 text-gray-800" disabled={loading}>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
@@ -76,8 +101,9 @@ export default function RegisterView() {
             <input
               type="text"
               required
+              disabled={loading}
               placeholder="Ej: Valeria López"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.nombre}
               onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
             />
@@ -88,8 +114,9 @@ export default function RegisterView() {
             <input
               type="email"
               required
+              disabled={loading}
               placeholder="ejemplo@ucv.ve"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.correo}
               onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
             />
@@ -100,7 +127,8 @@ export default function RegisterView() {
             <div className="relative">
               <select
                 required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm appearance-none"
+                disabled={loading}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm appearance-none disabled:opacity-50"
                 value={formData.facultad}
                 onChange={(e) => setFormData({ ...formData, facultad: e.target.value })}
               >
@@ -130,8 +158,9 @@ export default function RegisterView() {
             <input
               type="password"
               required
+              disabled={loading}
               placeholder="********"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.clave}
               onChange={(e) => setFormData({ ...formData, clave: e.target.value })}
             />
@@ -142,8 +171,9 @@ export default function RegisterView() {
             <input
               type="password"
               required
+              disabled={loading}
               placeholder="********"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.confirmarClave}
               onChange={(e) => setFormData({ ...formData, confirmarClave: e.target.value })}
             />
@@ -152,7 +182,8 @@ export default function RegisterView() {
           <div className="flex items-start gap-2 pt-2 pb-2">
             <input
               type="checkbox"
-              className="mt-1 w-4 h-4 rounded border-gray-300 accent-[#5B7A9A]"
+              disabled={loading}
+              className="mt-1 w-4 h-4 rounded border-gray-300 accent-[#5B7A9A] disabled:opacity-50"
               checked={formData.terminos}
               onChange={(e) => setFormData({ ...formData, terminos: e.target.checked })}
             />
@@ -163,9 +194,10 @@ export default function RegisterView() {
 
           <button
             type="submit"
-            className="w-full bg-[#5B7A9A] hover:bg-[#4A6480] text-white font-semibold py-3.5 rounded-full transition-all mt-2"
+            disabled={loading}
+            className="w-full bg-[#5B7A9A] hover:bg-[#4A6480] text-white font-semibold py-3.5 rounded-full transition-all mt-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Crear cuenta
+            {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
 
         </form>

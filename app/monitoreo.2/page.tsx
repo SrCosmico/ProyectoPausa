@@ -1,17 +1,17 @@
 "use client";
-import { useEffect } from 'react';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; 
 import { useRouter } from 'next/navigation';
 import { 
   leerHistorialEmocionalSemanal,
-  eliminarRegistroEmocional 
+  eliminarRegistroEmocional,
+  actualizarRegistroEmocional,
+  insertarRegistros
 } from '@/app/services/emocionesService';
 import supabase from '@/lib/supabase';
-import { insertarRegistros } from '@/app/services/emocionesService'
 
-
+// 1. Añadimos soporte para que el ID pueda ser string o number dependiendo de cómo lo devuelva Supabase
 interface RegistroHistorico {
-  id?: string;
+  id?: string | number;
   fecha: string; 
   nivel: number; 
   emoji: string;
@@ -40,49 +40,45 @@ const bancoTips: TipAntiestres[] = [
   { id: 4, contenido: 'Toma un vaso de agua fresca. La hidratación mejora la concentración y alivia la tensión.', categoria: 'Hábitos saludables' },
 ];
 
+// Función para obtener la fecha formateada en la zona horaria del cliente local
+const obtenerFechaLocal = (fechaBase = new Date()) => {
+  const offset = fechaBase.getTimezoneOffset() * 60000;
+  return new Date(fechaBase.getTime() - offset).toISOString().split('T')[0];
+};
+
 export default function MonitoreoPage() {
   const router = useRouter();
-  
   const [registros, setRegistros] = useState<RegistroHistorico[]>([]);
-
-useEffect(() => {
-  const cargarDatos = async () => {
-    try {
-      const datos = await leerHistorialEmocionalSemanal('TU_USER_ID');
-      
-      setRegistros(datos as RegistroHistorico[]);
-      
-    } catch (err) {
-      console.error("Error al cargar:", err);
-    }
-  };
-
-  cargarDatos();
-}, []);
   
   // Estados para el Modal
   const [modalAbierto, setModalAbierto] = useState(false);
   const [registroEditando, setRegistroEditando] = useState<RegistroHistorico | null>(null);
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(obtenerFechaLocal());
   const [emocionSeleccionada, setEmocionSeleccionada] = useState(opcionesEmociones[3]);
   const [notaActual, setNotaActual] = useState("");
-
   const [tipDelDia, setTipDelDia] = useState<TipAntiestres>(bancoTips[0]);
 
-  const estadoActual = registros.find(r => r.fecha === new Date().toISOString().split('T')[0]);
-
-  // Generar lista de los últimos 14 días
-  const generarDiasCalendario = () => {
-    const dias = [];
-    for (let i = 0; i < 14; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const fechaStr = d.toISOString().split('T')[0];
-      const registro = registros.find(r => r.fecha === fechaStr);
-      dias.push({ fecha: fechaStr, registro });
+  const refrescarDatos = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const datosCrudos = await leerHistorialEmocionalSemanal(user.id);
+        const datosFormateados = datosCrudos.map((item: any) => ({
+          ...item,
+          fecha: item.dia 
+        }));
+        setRegistros(datosFormateados as RegistroHistorico[]);
+      }
+    } catch (err) {
+      console.error("Error al refrescar:", err);
     }
-    return dias;
-  };
+  }, []);
+
+  useEffect(() => {
+    refrescarDatos();
+  }, [refrescarDatos]);
+
+  const estadoActual = registros.find(r => r.fecha === obtenerFechaLocal());
 
   const abrirModal = (fecha: string, registroExistente?: RegistroHistorico) => {
     setFechaSeleccionada(fecha);
@@ -99,43 +95,69 @@ useEffect(() => {
     setModalAbierto(true);
   };
 
-const guardarRegistro = async () => {
-  // 1. Obtener la sesión del usuario actual
-  const { data: { user } } = await supabase.auth.getUser();
+  const guardarRegistro = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    alert("Error: Debes iniciar sesión para registrar emociones.");
-    return;
-  }
+    if (!user) {
+      alert("Error: Debes iniciar sesión para registrar emociones.");
+      return;
+    }
 
-  const nuevoRegistro = {
-    user_id: user.id, // <--- AQUÍ USAS EL ID REAL DEL USUARIO
-    fecha: fechaSeleccionada,
-    nivel: emocionSeleccionada.n,
-    // ... resto de tus campos
+    const datos = {
+      user_id: user.id,
+      fecha: fechaSeleccionada,
+      nivel: emocionSeleccionada.n,
+      estado: emocionSeleccionada.s, 
+      emoji: emocionSeleccionada.e,  
+      nota: notaActual              
+    };
+
+    // Control inteligente de duplicados: buscamos si ya existe un registro para esa fecha en el estado
+    const registroExistenteEnFecha = registros.find(r => r.fecha === fechaSeleccionada);
+    const idParaActualizar = registroEditando?.id || registroExistenteEnFecha?.id;
+
+    if (idParaActualizar) {
+      await actualizarRegistroEmocional(String(idParaActualizar), datos);
+    } else {
+      await insertarRegistros(datos);
+    }
+
+    await refrescarDatos(); 
+    setModalAbierto(false);
+    alert(idParaActualizar ? "¡Emoción actualizada!" : "¡Emoción guardada con éxito!");
   };
 
-  const { data, error } = await insertarRegistros(nuevoRegistro);
+  // 2. Blindamos la función de eliminar, verificamos el ID y pedimos confirmación
+  const eliminarRegistro = async (id?: string | number) => {
+    if (!id) {
+      alert("Error: No se puede identificar el registro para eliminar.");
+      return;
+    }
 
-  if (error) {
-    // Esto te dará la razón exacta del error, no un objeto vacío
-    console.error("Error al guardar en Supabase:", JSON.stringify(error, null, 2));
-    alert("Error al guardar: " + error.message);
-    return;
-  }
-  
-  // ... resto de tu lógica
-};
+    const confirmar = window.confirm("¿Estás seguro de que deseas eliminar este registro de emoción?");
+    if (!confirmar) return;
 
-  const eliminarRegistro = async (id: string) => {
-  const exito = await eliminarRegistroEmocional(id);
-  if (exito) {
-    // Si se borró en BD, lo quitamos de la vista localmente
-    setRegistros(registros.filter(r => r.id !== id));
-  } else {
-    alert("No se pudo eliminar el registro");
-  }
-};
+    // Convertimos explícitamente a string por si Supabase lo envía como numérico
+    const exito = await eliminarRegistroEmocional(String(id));
+    
+    if (exito) {
+      await refrescarDatos(); 
+    } else {
+      alert("Hubo un problema al contactar con la base de datos. No se pudo eliminar el registro.");
+    }
+  };
+
+  const generarDiasCalendario = () => {
+    const dias = [];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const fechaStr = obtenerFechaLocal(d);
+      const registro = registros.find(r => r.fecha === fechaStr);
+      dias.push({ fecha: fechaStr, registro });
+    }
+    return dias;
+  };
 
   const formatearFechaCorto = (fechaStr: string) => {
     const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -149,14 +171,13 @@ const guardarRegistro = async () => {
     setTipDelDia(nuevoTip);
   };
 
-  // Función para asignar color según el nivel de emoción
   const obtenerColorBarra = (nivel: number) => {
     switch (nivel) {
-      case 5: return 'bg-emerald-500'; // Verde oscuro (Muy bien)
-      case 4: return 'bg-lime-400';    // Verde claro/amarillento (Bien)
-      case 3: return 'bg-yellow-400';  // Amarillo (Regular)
-      case 2: return 'bg-orange-400';  // Naranja (Mal)
-      case 1: return 'bg-rose-500';    // Rojo (Muy mal)
+      case 5: return 'bg-emerald-500';
+      case 4: return 'bg-lime-400';
+      case 3: return 'bg-yellow-400';
+      case 2: return 'bg-orange-400';
+      case 1: return 'bg-rose-500';
       default: return 'bg-slate-300';
     }
   };
@@ -166,7 +187,6 @@ const guardarRegistro = async () => {
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
         
         <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
-          {/* Header */}
           <div className="px-6 pt-5 pb-3 flex items-center justify-between bg-white z-10 border-b border-slate-100">
             <button onClick={() => router.push('/home.2')} className="p-2 -ml-2 text-slate-700 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-50">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
@@ -178,12 +198,10 @@ const guardarRegistro = async () => {
           </div>
 
           <div className="p-6 space-y-6">
-            
-            {/* Estado Actual */}
             <div>
               <div className="flex justify-between items-end">
                 <p className="text-xs font-bold text-[#8C9BAE] tracking-wider uppercase">Tu estado de hoy</p>
-                <button onClick={() => abrirModal(new Date().toISOString().split('T')[0], estadoActual)} className="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-3 py-1 rounded-full hover:bg-indigo-100">
+                <button onClick={() => abrirModal(obtenerFechaLocal(), estadoActual)} className="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-3 py-1 rounded-full hover:bg-indigo-100">
                   {estadoActual ? "✎ Editar hoy" : "+ Registrar hoy"}
                 </button>
               </div>
@@ -203,9 +221,8 @@ const guardarRegistro = async () => {
               )}
             </div>
 
-            {/* Gráfica de Barras Multicolores */}
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm space-y-4">
-              <h4 className="text-sm font-bold text-[#2A3B50]">Balance de los últimos 7 días</h4>
+              <h4 className="text-sm font-bold text-[#2A3B50]">Balance de los últimos 7 days</h4>
               <div className="h-48 w-full flex items-end justify-between gap-2 pt-4 border-b border-slate-100 pb-2 relative">
                 <div className="absolute w-full border-b border-dashed border-slate-200 top-4"></div>
                 <div className="absolute w-full border-b border-dashed border-slate-200 top-1/2"></div>
@@ -229,7 +246,6 @@ const guardarRegistro = async () => {
               </div>
             </div>
 
-            {/* Calendario / Historial */}
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
               <h4 className="text-sm font-bold text-[#2A3B50] mb-3">Calendario de Registros</h4>
               <div className="max-h-56 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
@@ -257,7 +273,7 @@ const guardarRegistro = async () => {
                       {dia.registro ? (
                         <>
                           <button onClick={() => abrirModal(dia.fecha, dia.registro)} className="p-1.5 text-blue-500 bg-blue-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" /></svg></button>
-                          <button onClick={() => eliminarRegistro(dia.registro!.id!)} className="p-1.5 text-red-500 bg-red-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg></button>
+                          <button onClick={() => eliminarRegistro(dia.registro?.id)} className="p-1.5 text-red-500 bg-red-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg></button>
                         </>
                       ) : (
                         <button onClick={() => abrirModal(dia.fecha)} className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200">Añadir</button>
@@ -268,7 +284,6 @@ const guardarRegistro = async () => {
               </div>
             </div>
 
-            {/* Tips Antiestrés Actualizable */}
             <div className="bg-gradient-to-br from-[#F6EDFA] to-[#EDF3FC] border border-purple-100/50 p-5 rounded-3xl shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between mb-3 relative z-10">
                 <h4 className="text-xs font-bold text-purple-900 uppercase tracking-wider">Tip anti-estrés para hoy</h4>
@@ -285,11 +300,9 @@ const guardarRegistro = async () => {
               </div>
               <div className="absolute -bottom-6 -right-6 text-7xl opacity-5 select-none pointer-events-none">💡</div>
             </div>
-
           </div>
         </div>
 
-        {/* Modal de Registro con Fecha y Notas */}
         {modalAbierto && (
           <div className="absolute inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
             <div className="bg-white w-full sm:max-w-sm rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-5 animate-slideUp">
@@ -306,8 +319,12 @@ const guardarRegistro = async () => {
               <div>
                 <label className="text-xs font-bold text-slate-500 block mb-2">¿Cómo te sientes?</label>
                 <div className="flex justify-between px-1">
-                  {opcionesEmociones.map(opcion => (
-                    <button key={opcion.n} onClick={() => setEmocionSeleccionada(opcion)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${emocionSeleccionada.n === opcion.n ? 'bg-indigo-50 ring-2 ring-indigo-500 scale-110' : 'hover:bg-slate-50 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'}`}>
+                  {opcionesEmociones.map((opcion) => (
+                    <button 
+                      key={opcion.n} 
+                      onClick={() => setEmocionSeleccionada(opcion)} 
+                      className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${emocionSeleccionada.n === opcion.n ? 'bg-indigo-50 ring-2 ring-indigo-500 scale-110' : 'hover:bg-slate-50 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'}`}
+                    >
                       <span className="text-2xl">{opcion.e}</span>
                       <span className={`text-[9px] font-bold ${emocionSeleccionada.n === opcion.n ? 'text-indigo-600' : 'text-slate-400'}`}>{opcion.s}</span>
                     </button>
@@ -327,7 +344,6 @@ const guardarRegistro = async () => {
           </div>
         )}
 
-        {/* Nav Inferior */}
         <div className="bg-white border-t border-slate-100 px-6 py-3.5 flex justify-around items-center sm:rounded-b-[40px] z-30 flex-shrink-0">
           <span className="text-[10px] font-bold text-[#4A72A6]">Inicio / Evaluación / Perfil</span>
         </div>
