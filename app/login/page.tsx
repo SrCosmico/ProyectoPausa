@@ -2,40 +2,45 @@
 
 import React, { FormEvent, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import supabase from '@/lib/supabase'; 
+import { iniciarSesion } from '@/app/services/authService';
 
 export default function LoginView() {
   const router = useRouter();
   
   const [correo, setCorreo] = useState('');
   const [clave, setClave] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Redirige al usuario logueado directamente al home real de la app
+  // Redirige al usuario si ya cuenta con una sesión activa en Supabase
   useEffect(() => {
-    const sesion = localStorage.getItem('sesionActiva');
-    if (sesion === 'true') {
-      router.push('/home.2');
-    }
+    const verificarSesion = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/home.2');
+      }
+    };
+    verificarSesion();
   }, [router]);
 
-  const handleLogin = (e: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
 
-    // 3. Usamos .trim() para evitar errores por espacios invisibles al escribir
-    const correoRegistrado = localStorage.getItem('alumnoEmail')?.trim();
-    const claveRegistrada = localStorage.getItem('alumnoClave')?.trim();
+    // Ejecuta la autenticación real en Supabase
+    const { data, error } = await iniciarSesion(correo.trim(), clave.trim());
 
-    if (correo.trim() !== correoRegistrado) {
-      alert('El correo no está registrado o es incorrecto.');
+    setLoading(false);
+
+    if (error) {
+      alert(`Error al iniciar sesión: ${error.message}`);
       return;
     }
 
-    if (clave.trim() !== claveRegistrada) {
-      alert('La contraseña es incorrecta.');
-      return;
+    // Si el usuario es válido, se le redirige al Home
+    if (data?.user) {
+      router.push('/home.2');
     }
-
-    localStorage.setItem('sesionActiva', 'true');
-    router.push('/home.2');
   };
 
   return (
@@ -43,12 +48,18 @@ export default function LoginView() {
       
       <div className="flex-1 flex flex-col px-6 pt-8 pb-20 max-w-md w-full mx-auto relative z-10">
         
-        <button onClick={() => router.back()} className="mb-8 text-gray-800 w-fit">
+        {/* BOTÓN REGRESAR */}
+        <button 
+          onClick={() => router.back()} 
+          className="mb-8 text-gray-800 w-fit disabled:opacity-50 active:scale-95 transition-transform"
+          disabled={loading}
+        >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
         </button>
 
+        {/* ENCABEZADO */}
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-3xl font-bold text-[#1E293B] mb-2">Bienvenido de nuevo</h1>
@@ -65,6 +76,7 @@ export default function LoginView() {
           </div>
         </div>
 
+        {/* FORMULARIO DE LOGUEO */}
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
@@ -73,8 +85,9 @@ export default function LoginView() {
             <input
               type="email"
               required
+              disabled={loading}
               placeholder="usuario@ucv.ve"
-              className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm"
+              className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
             />
@@ -88,8 +101,9 @@ export default function LoginView() {
               <input
                 type="password"
                 required
+                disabled={loading}
                 placeholder="********"
-                className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm"
+                className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
                 value={clave}
                 onChange={(e) => setClave(e.target.value)}
               />
@@ -98,22 +112,30 @@ export default function LoginView() {
 
           <button
             type="submit"
-            className="w-full bg-[#5B7A9A] hover:bg-[#4A6480] text-white font-semibold py-3.5 rounded-full transition-all mt-6 shadow-sm"
+            disabled={loading}
+            className="w-full bg-[#5B7A9A] hover:bg-[#4A6480] text-white font-semibold py-3.5 rounded-full transition-all mt-6 shadow-sm disabled:bg-gray-400 disabled:cursor-not-allowed active:scale-[0.99]"
           >
-            Iniciar sesión
+            {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
 
+        {/* SECCIÓN DE REGISTRO (CON SOLUCIÓN DE BLOQUEO) */}
         <div className="mt-8 text-center space-y-4">
           <p className="text-sm text-gray-500">¿No tienes cuenta?</p>
-          <button
-            onClick={() => router.push('/register')}
-            type="button"
-            className="w-full bg-transparent border-2 border-[#5B7A9A] text-[#5B7A9A] hover:bg-gray-50 font-semibold py-3.5 rounded-full transition-all"
+          
+          <a
+            href="/registro"
+            onClick={(e) => {
+              // Rompe cualquier congelamiento de Next.js forzando recarga nativa en el navegador
+              e.preventDefault();
+              window.location.href = '/registro'; 
+            }}
+            className="w-full block text-center bg-transparent border-2 border-[#5B7A9A] text-[#5B7A9A] hover:bg-[#5B7A9A] hover:text-white font-semibold py-3.5 rounded-full transition-all cursor-pointer relative z-50 shadow-sm active:scale-[0.99]"
           >
             Crear cuenta
-          </button>
+          </a>
         </div>
+
       </div>
     </div>
   );

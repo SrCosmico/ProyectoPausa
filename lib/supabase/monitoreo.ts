@@ -1,5 +1,4 @@
 // ============================================================
-// CRUD: Letras C, U y D - pantalla de monitoreo emocional
 // Tabla: historial_emociones
 // ============================================================
 
