@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { TipAntiestres } from '@/types';
-import { getRandomTip } from '@/lib/supabase';
+import type { TipAntiestres } from '@/types'; 
 
 // ==========================================
 // INTERFACES Y DATOS DE SIMULACIÓN
@@ -37,6 +36,22 @@ const registrosAnterioresSimulados: RegistroHistorico[] = [
   { dia: "Mié", fecha: "20 Mayo", nivel: 2, emoji: "😔", estado: "Mal" },
 ];
 
+const tipsAntiestresSimulados: TipAntiestres[] = [
+  { id: 1, contenido: 'Toma una pausa corta y respira profundamente durante 2 minutos.', categoria: 'Respiración' },
+  { id: 2, contenido: 'Estira tus hombros y cuello para liberar tensión acumulada.', categoria: 'Estiramiento' },
+  { id: 3, contenido: 'Apaga las pantallas por 10 minutos y desconéctate digitalmente.', categoria: 'Desconexión digital' },
+  { id: 4, contenido: 'Bebe un vaso de agua y mantente hidratado.', categoria: 'Hidratación' },
+  { id: 5, contenido: 'Escucha música suave o sonidos relajantes por un rato.', categoria: 'Escucha activa' },
+];
+
+const obtenerTipAleatorio = async (): Promise<TipAntiestres | null> => {
+  if (tipsAntiestresSimulados.length === 0) {
+    return null;
+  }
+  const indiceAleatorio = Math.floor(Math.random() * tipsAntiestresSimulados.length);
+  return tipsAntiestresSimulados[indiceAleatorio];
+};
+
 export default function MonitoreoPage() {
   const router = useRouter();
   const [tipDelDia, setTipDelDia] = useState<TipAntiestres>({
@@ -51,7 +66,7 @@ export default function MonitoreoPage() {
   }, []);
 
   const cargarTipDelDia = async () => {
-    const tip = await getRandomTip();
+    const tip = await obtenerTipAleatorio();
     if (tip) {
       setTipDelDia(tip);
     }
