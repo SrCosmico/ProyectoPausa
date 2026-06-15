@@ -86,7 +86,7 @@ export const eliminarRegistroEmocional = async (id: string) => {
     .eq('id', id);
 
   if (error) {
-    console.error("Error al eliminar registro:", error);
+    console.error("Error al eliminar registro:", JSON.stringify(error, null, 2));
     return false;
   }
   return true;
@@ -96,6 +96,7 @@ export const actualizarRegistroEmocional = async (id: string, cambios: any) => {
   const { data, error } = await supabase
     .from('historial_emociones')
     .update({
+      dia: cambios.fecha,   // <-- antes faltaba: si editabas la fecha, no se guardaba
       nivel: cambios.nivel,
       estado: cambios.estado,
       emoji: cambios.emoji,
@@ -104,6 +105,8 @@ export const actualizarRegistroEmocional = async (id: string, cambios: any) => {
     .eq('id', id)
     .select();
     
-  if (error) console.error("Error al actualizar:", error);
+  if (error) {
+    console.error("Error al actualizar:", JSON.stringify(error, null, 2));
+  }
   return { data, error };
 };
