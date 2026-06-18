@@ -7,6 +7,7 @@ import {
   actualizarRegistroEmocional,
   insertarRegistros
 } from '@/app/services/emocionesService';
+import { NivelBienestar } from '@/models/monitoreo';
 import supabase from '@/lib/supabase';
 
 // 1. Añadimos soporte para que el ID pueda ser string o number dependiendo de cómo lo devuelva Supabase
@@ -109,11 +110,9 @@ export default function MonitoreoPage() {
     const datos = {
       user_id: user.id,
       fecha: fechaSeleccionada,
-      // casteamos a any para compatibilidad con la firma del servicio (NivelBienestar)
-      nivel: (emocionSeleccionada.n as unknown) as any,
-      estado: emocionSeleccionada.s,
-      emoji: emocionSeleccionada.e,
-      nota: notaActual ?? null
+      nivel: emocionSeleccionada.n as NivelBienestar,
+      estado: emocionSeleccionada.s, 
+      nota: notaActual              
     };
 
     // Control inteligente de duplicados: buscamos si ya existe un registro para esa fecha en el estado
@@ -122,15 +121,7 @@ export default function MonitoreoPage() {
 
     let resultado;
     if (idParaActualizar) {
-      // ajustar payload para la función de actualización (no espera user_id ni emoji y nivel debe ser NivelBienestar)
-      const datosParaActualizar = {
-        fecha: datos.fecha,
-        nivel: (datos.nivel as unknown) as any,
-        estado: datos.estado,
-        nota: datos.nota ?? null
-      };
-
-      resultado = await actualizarRegistroEmocional(String(idParaActualizar), datosParaActualizar);
+      resultado = await actualizarRegistroEmocional(String(idParaActualizar), datos);
     } else {
       resultado = await insertarRegistros(datos);
     }
@@ -371,4 +362,4 @@ export default function MonitoreoPage() {
       </div>
     </div>
   );
-} 
+}
