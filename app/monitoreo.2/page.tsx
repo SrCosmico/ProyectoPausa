@@ -109,10 +109,11 @@ export default function MonitoreoPage() {
     const datos = {
       user_id: user.id,
       fecha: fechaSeleccionada,
-      nivel: emocionSeleccionada.n,
-      estado: emocionSeleccionada.s, 
-      emoji: emocionSeleccionada.e,  
-      nota: notaActual              
+      // casteamos a any para compatibilidad con la firma del servicio (NivelBienestar)
+      nivel: (emocionSeleccionada.n as unknown) as any,
+      estado: emocionSeleccionada.s,
+      emoji: emocionSeleccionada.e,
+      nota: notaActual ?? null
     };
 
     // Control inteligente de duplicados: buscamos si ya existe un registro para esa fecha en el estado
@@ -121,7 +122,15 @@ export default function MonitoreoPage() {
 
     let resultado;
     if (idParaActualizar) {
-      resultado = await actualizarRegistroEmocional(String(idParaActualizar), datos);
+      // ajustar payload para la función de actualización (no espera user_id ni emoji y nivel debe ser NivelBienestar)
+      const datosParaActualizar = {
+        fecha: datos.fecha,
+        nivel: (datos.nivel as unknown) as any,
+        estado: datos.estado,
+        nota: datos.nota ?? null
+      };
+
+      resultado = await actualizarRegistroEmocional(String(idParaActualizar), datosParaActualizar);
     } else {
       resultado = await insertarRegistros(datos);
     }
@@ -362,4 +371,4 @@ export default function MonitoreoPage() {
       </div>
     </div>
   );
-}
+} 
