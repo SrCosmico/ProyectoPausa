@@ -57,6 +57,7 @@ export default function MonitoreoPage() {
   const [emocionSeleccionada, setEmocionSeleccionada] = useState(opcionesEmociones[3]);
   const [notaActual, setNotaActual] = useState("");
   const [tipDelDia, setTipDelDia] = useState<TipAntiestres>(bancoTips[0]);
+  const [guardando, setGuardando] = useState(false);
 
   const refrescarDatos = useCallback(async () => {
     try {
@@ -103,6 +104,8 @@ export default function MonitoreoPage() {
       return;
     }
 
+    setGuardando(true);
+
     const datos = {
       user_id: user.id,
       fecha: fechaSeleccionada,
@@ -116,10 +119,19 @@ export default function MonitoreoPage() {
     const registroExistenteEnFecha = registros.find(r => r.fecha === fechaSeleccionada);
     const idParaActualizar = registroEditando?.id || registroExistenteEnFecha?.id;
 
+    let resultado;
     if (idParaActualizar) {
-      await actualizarRegistroEmocional(String(idParaActualizar), datos);
+      resultado = await actualizarRegistroEmocional(String(idParaActualizar), datos);
     } else {
-      await insertarRegistros(datos);
+      resultado = await insertarRegistros(datos);
+    }
+
+    setGuardando(false);
+
+    // 3. Verificamos si Supabase devolvió un error antes de celebrar
+    if (resultado?.error) {
+      alert("Hubo un problema al guardar tu registro en la base de datos. Intenta de nuevo.");
+      return;
     }
 
     await refrescarDatos(); 
@@ -222,7 +234,7 @@ export default function MonitoreoPage() {
             </div>
 
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm space-y-4">
-              <h4 className="text-sm font-bold text-[#2A3B50]">Balance de los últimos 7 days</h4>
+              <h4 className="text-sm font-bold text-[#2A3B50]">Balance de los últimos 7 días</h4>
               <div className="h-48 w-full flex items-end justify-between gap-2 pt-4 border-b border-slate-100 pb-2 relative">
                 <div className="absolute w-full border-b border-dashed border-slate-200 top-4"></div>
                 <div className="absolute w-full border-b border-dashed border-slate-200 top-1/2"></div>
@@ -337,8 +349,8 @@ export default function MonitoreoPage() {
                 <textarea value={notaActual} onChange={(e) => setNotaActual(e.target.value)} placeholder="¿Por qué te sientes así?" rows={2} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-500 resize-none"></textarea>
               </div>
 
-              <button onClick={guardarRegistro} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200">
-                Guardar Emoción
+              <button onClick={guardarRegistro} disabled={guardando} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                {guardando ? "Guardando..." : "Guardar Emoción"}
               </button>
             </div>
           </div>
