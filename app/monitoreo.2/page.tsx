@@ -7,6 +7,7 @@ import {
   actualizarRegistroEmocional,
   insertarRegistros
 } from '@/app/services/emocionesService';
+import { NivelBienestar } from '@/models/monitoreo';
 import supabase from '@/lib/supabase';
 
 // 1. Añadimos soporte para que el ID pueda ser string o number dependiendo de cómo lo devuelva Supabase
@@ -109,9 +110,8 @@ export default function MonitoreoPage() {
     const datos = {
       user_id: user.id,
       fecha: fechaSeleccionada,
-      nivel: emocionSeleccionada.n,
+      nivel: emocionSeleccionada.n as NivelBienestar,
       estado: emocionSeleccionada.s, 
-      emoji: emocionSeleccionada.e,  
       nota: notaActual              
     };
 
