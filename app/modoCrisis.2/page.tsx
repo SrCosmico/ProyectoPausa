@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // ==========================================
 // INTERFACES Y DATOS DE RECURSOS DE APOYO
@@ -143,11 +143,8 @@ function AccordionItem({ punto }: AccordionItemProps) {
 
   return (
     <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${
-      punto.esEmergencia
-        ? "border-rose-200 bg-white"
-        : "border-slate-100 bg-white"
+      punto.esEmergencia ? "border-rose-200 bg-white" : "border-slate-100 bg-white"
     }`}>
-      {/* Cabecera del acordeón */}
       <button
         onClick={() => setAbierto(!abierto)}
         className="w-full flex items-center justify-between px-4 py-3.5 text-left focus:outline-none group"
@@ -177,13 +174,11 @@ function AccordionItem({ punto }: AccordionItemProps) {
         </svg>
       </button>
 
-      {/* Contenido expandido */}
       {abierto && (
         <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3 animate-fadeIn">
           <p className="text-[11px] font-medium text-slate-600 leading-relaxed">
             {punto.descripcion}
           </p>
-
           <div className="space-y-2">
             {punto.ubicacion && (
               <div className="flex items-start gap-2">
@@ -234,18 +229,14 @@ function AccordionItem({ punto }: AccordionItemProps) {
 // COMPONENTE PRINCIPAL: MODO CRISIS
 // ==========================================
 
-interface ModoCrisisProps {
-  /** Si viene de la detección automática de puntuación baja */
-  desencadenadoAutomaticamente?: boolean;
-  /** Promedio de bienestar de los últimos 7 días (para mensajes contextuales) */
-  promedioBienestar?: number;
-}
-
-export default function ModoCrisisPage({
-  desencadenadoAutomaticamente = false,
-  promedioBienestar,
-}: ModoCrisisProps) {
+export default function ModoCrisisPage() {
   const router = useRouter();
+
+  // ✅ NUEVO: Leemos los parámetros que envía monitoreo al redirigir
+  const searchParams = useSearchParams();
+  const desencadenadoAutomaticamente = searchParams.get('auto') === 'true';
+  const promedioBienestar = parseFloat(searchParams.get('promedio') ?? '0') || undefined;
+
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>("emergencia");
 
   const mensajePrincipal = desencadenadoAutomaticamente
@@ -256,7 +247,7 @@ export default function ModoCrisisPage({
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans">
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
 
-        {/* HEADER ROJO DE CRISIS */}
+        {/* HEADER */}
         <div className={`px-6 pt-6 pb-5 ${
           desencadenadoAutomaticamente
             ? "bg-gradient-to-b from-rose-50 to-white border-b border-rose-100"
@@ -286,14 +277,12 @@ export default function ModoCrisisPage({
             </div>
           </div>
 
-          {/* Banner de alerta automática */}
-          {desencadenadoAutomaticamente && (
+          {/* ✅ Banner contextual: diferente si fue automático o manual */}
+          {desencadenadoAutomaticamente ? (
             <div className="mt-4 p-3.5 bg-rose-500 text-white rounded-2xl flex items-start gap-3">
               <span className="text-lg flex-shrink-0 mt-0.5">💙</span>
               <div>
-                <p className="text-xs font-bold leading-snug">
-                  {mensajePrincipal}
-                </p>
+                <p className="text-xs font-bold leading-snug">{mensajePrincipal}</p>
                 {promedioBienestar !== undefined && (
                   <p className="text-[10px] font-medium mt-1 opacity-90">
                     Tu bienestar promedio esta semana: {promedioBienestar.toFixed(1)}/5.0
@@ -301,9 +290,7 @@ export default function ModoCrisisPage({
                 )}
               </div>
             </div>
-          )}
-
-          {!desencadenadoAutomaticamente && (
+          ) : (
             <div className="mt-4 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex items-start gap-3">
               <span className="text-lg flex-shrink-0 mt-0.5">💜</span>
               <p className="text-xs font-medium text-slate-600 leading-snug">
@@ -315,14 +302,10 @@ export default function ModoCrisisPage({
 
         {/* CONTENIDO SCROLLABLE */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-
-          {/* SECCIONES DE ACORDEÓN */}
           {SECCIONES_APOYO.map((seccion) => {
             const estaAbierta = seccionAbierta === seccion.id;
             return (
               <div key={seccion.id} className={`rounded-3xl border overflow-hidden ${seccion.colorBg}`}>
-
-                {/* Cabecera de la sección */}
                 <button
                   onClick={() => setSeccionAbierta(estaAbierta ? null : seccion.id)}
                   className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
@@ -348,7 +331,6 @@ export default function ModoCrisisPage({
                   </svg>
                 </button>
 
-                {/* Lista de puntos de apoyo */}
                 {estaAbierta && (
                   <div className="px-4 pb-4 space-y-2.5 animate-fadeIn">
                     {seccion.puntos.map((punto) => (
@@ -360,7 +342,86 @@ export default function ModoCrisisPage({
             );
           })}
 
-          {/* MENSAJE FINAL DE ESPERANZA */}
+          {/* Mapa de puntos de apoyo UCV */}
+          {(() => {
+            const mapaAbierto = seccionAbierta === 'mapa';
+            return (
+              <div className="rounded-3xl border overflow-hidden bg-teal-50 border-teal-100">
+                <button
+                  onClick={() => setSeccionAbierta(mapaAbierto ? null : 'mapa')}
+                  className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
+                  aria-expanded={mapaAbierto}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">🗺️</span>
+                    <span className="text-xs font-extrabold uppercase tracking-wide text-teal-700">
+                      Puntos de apoyo en el campus
+                    </span>
+                  </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                    stroke="currentColor"
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${mapaAbierto ? "rotate-180" : ""}`}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+
+                {mapaAbierto && (
+                  <div className="px-4 pb-4 space-y-3 animate-fadeIn">
+
+                    {/* Leyenda de puntos */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { color: 'bg-[#4A72A6]', label: 'División de Bienestar Estudiantil' },
+                        { color: 'bg-violet-500',  label: 'Clínica Psicológica — Psicología' },
+                        { color: 'bg-emerald-500', label: 'Depto. Psiquiatría — Medicina' },
+                        { color: 'bg-rose-500',    label: 'Bomberos Universitarios UCV' },
+                      ].map((item) => (
+                        <div key={item.label} className="flex items-start gap-1.5 bg-white rounded-xl px-2.5 py-2 border border-teal-100">
+                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5 ${item.color}`} />
+                          <p className="text-[10px] text-slate-600 font-medium leading-tight">{item.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Iframe de Google Maps — Ciudad Universitaria UCV */}
+                    <div className="rounded-2xl overflow-hidden border border-teal-200 shadow-sm">
+                      <iframe
+                        title="Puntos de apoyo UCV"
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3923.6!2d-66.8897!3d10.4878!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8c2a589083d2f4c5%3A0x4d3c7b2c9e7e4a1!2sCiudad%20Universitaria%20de%20Caracas!5e0!3m2!1ses!2sve!4v1718900000000!5m2!1ses!2sve"
+                        width="100%"
+                        height="220"
+                        style={{ border: 0 }}
+                        allowFullScreen
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                    </div>
+
+                    {/* Botón abrir en Google Maps */}
+                    <a
+                      href="https://maps.google.com/?q=Ciudad+Universitaria+de+Caracas"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                      </svg>
+                      Abrir en Google Maps
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Mensaje final */}
           <div className="p-4 bg-purple-50 border border-purple-100 rounded-3xl flex items-start gap-3 mb-4">
             <span className="text-xl flex-shrink-0">✨</span>
             <div>
@@ -373,15 +434,7 @@ export default function ModoCrisisPage({
           </div>
         </div>
 
-        {/* BOTÓN INFERIOR FIJO: VOLVER AL HOME */}
-        <div className="bg-white border-t border-slate-100 p-4 sm:rounded-b-[40px] flex-shrink-0">
-          <button
-            onClick={() => router.push("/home.2")}
-            className="w-full py-3.5 bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold text-sm rounded-2xl transition-all active:scale-[0.99] shadow-sm"
-          >
-            Volver al inicio
-          </button>
-        </div>
+
       </div>
 
       <style jsx global>{`
