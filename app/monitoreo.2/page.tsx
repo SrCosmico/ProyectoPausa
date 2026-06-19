@@ -10,7 +10,8 @@ import {
 import { NivelBienestar } from '@/models/monitoreo';
 import supabase from '@/lib/supabase';
 
-// 1. Añadimos soporte para que el ID pueda ser string o number dependiendo de cómo lo devuelva Supabase
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
 interface RegistroHistorico {
   id?: string | number;
   fecha: string; 
@@ -25,6 +26,8 @@ interface TipAntiestres {
   contenido: string;
   categoria: string;
 }
+
+// ─── Datos constantes ─────────────────────────────────────────────────────────
 
 const opcionesEmociones = [
   { n: 1, e: '😩', s: 'Muy mal' },
@@ -41,11 +44,31 @@ const bancoTips: TipAntiestres[] = [
   { id: 4, contenido: 'Toma un vaso de agua fresca. La hidratación mejora la concentración y alivia la tensión.', categoria: 'Hábitos saludables' },
 ];
 
-// Función para obtener la fecha formateada en la zona horaria del cliente local
+// ─── Utilidades ───────────────────────────────────────────────────────────────
+
 const obtenerFechaLocal = (fechaBase = new Date()) => {
   const offset = fechaBase.getTimezoneOffset() * 60000;
   return new Date(fechaBase.getTime() - offset).toISOString().split('T')[0];
 };
+
+// ✅ NUEVO: Calcula el promedio de los últimos 7 días a partir del historial
+const calcularPromedioSemanal = (registros: RegistroHistorico[]): number | null => {
+  const ultimos7 = registros.slice(0, 7);
+  if (ultimos7.length === 0) return null;
+  const suma = ultimos7.reduce((acc, r) => acc + r.nivel, 0);
+  return suma / ultimos7.length;
+};
+
+const AnimoFeedback = ({ promedioAnimo }: { promedioAnimo: number }) => (
+  <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
+    <h4 className="text-sm font-bold text-[#2A3B50]">Mensaje motivacional</h4>
+    <p className="text-slate-600 text-xs leading-relaxed mt-2">
+      Tu ánimo promedio esta semana es de <strong>{promedioAnimo.toFixed(1)}/5.0</strong>. Sigue cuidando de ti mismo/a y mantén tus hábitos positivos.
+    </p>
+  </div>
+);
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function MonitoreoPage() {
   const router = useRouter();
@@ -70,15 +93,20 @@ export default function MonitoreoPage() {
           fecha: item.dia 
         }));
         setRegistros(datosFormateados as RegistroHistorico[]);
+
+        // ✅ El promedio se calcula en el estado derivado, sin redirección automática
       }
     } catch (err) {
       console.error("Error al refrescar:", err);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     refrescarDatos();
   }, [refrescarDatos]);
+
+  // ✅ NUEVO: Derivamos el promedio del estado actual para pasarlo a AnimoFeedback
+  const promedioAnimo = calcularPromedioSemanal(registros);
 
   const estadoActual = registros.find(r => r.fecha === obtenerFechaLocal());
 
@@ -115,7 +143,6 @@ export default function MonitoreoPage() {
       nota: notaActual              
     };
 
-    // Control inteligente de duplicados: buscamos si ya existe un registro para esa fecha en el estado
     const registroExistenteEnFecha = registros.find(r => r.fecha === fechaSeleccionada);
     const idParaActualizar = registroEditando?.id || registroExistenteEnFecha?.id;
 
@@ -128,7 +155,6 @@ export default function MonitoreoPage() {
 
     setGuardando(false);
 
-    // 3. Verificamos si Supabase devolvió un error antes de celebrar
     if (resultado?.error) {
       alert("Hubo un problema al guardar tu registro en la base de datos. Intenta de nuevo.");
       return;
@@ -139,7 +165,6 @@ export default function MonitoreoPage() {
     alert(idParaActualizar ? "¡Emoción actualizada!" : "¡Emoción guardada con éxito!");
   };
 
-  // 2. Blindamos la función de eliminar, verificamos el ID y pedimos confirmación
   const eliminarRegistro = async (id?: string | number) => {
     if (!id) {
       alert("Error: No se puede identificar el registro para eliminar.");
@@ -149,7 +174,6 @@ export default function MonitoreoPage() {
     const confirmar = window.confirm("¿Estás seguro de que deseas eliminar este registro de emoción?");
     if (!confirmar) return;
 
-    // Convertimos explícitamente a string por si Supabase lo envía como numérico
     const exito = await eliminarRegistroEmocional(String(id));
     
     if (exito) {
@@ -210,6 +234,8 @@ export default function MonitoreoPage() {
           </div>
 
           <div className="p-6 space-y-6">
+
+            {/* Estado de hoy */}
             <div>
               <div className="flex justify-between items-end">
                 <p className="text-xs font-bold text-[#8C9BAE] tracking-wider uppercase">Tu estado de hoy</p>
@@ -233,6 +259,45 @@ export default function MonitoreoPage() {
               )}
             </div>
 
+            {/* ✅ BANNER DE ALERTA: se muestra si el promedio semanal es crítico (< 2.5)
+                No redirige automáticamente — el usuario decide si quiere ir a Modo Crisis */}
+            {promedioAnimo !== null && promedioAnimo < 2.5 && registros.length >= 3 && (
+              <div className="rounded-2xl overflow-hidden border border-rose-200 shadow-sm">
+                {/* Franja superior roja */}
+                <div className="bg-rose-500 px-4 py-3 flex items-center gap-2">
+                  <span className="text-lg">🚨</span>
+                  <p className="text-white text-xs font-extrabold uppercase tracking-wide">
+                    Alerta de bienestar
+                  </p>
+                </div>
+                {/* Cuerpo del banner */}
+                <div className="bg-rose-50 px-4 py-3 space-y-3">
+                  <p className="text-rose-900 text-xs font-medium leading-relaxed">
+                    Tu promedio de ánimo esta semana es de{" "}
+                    <strong>{promedioAnimo.toFixed(1)}/5.0</strong>. Hemos notado
+                    que has tenido días difíciles. No tienes que atravesar esto solo/a.
+                  </p>
+                  <p className="text-rose-700 text-[11px] leading-relaxed">
+                    Te recomendamos visitar el <strong>Modo Crisis</strong>, donde
+                    encontrarás recursos de apoyo psicológico, líneas de emergencia
+                    y técnicas de contención inmediata.
+                  </p>
+                  <button
+                    onClick={() => router.push(`/modoCrisis.2?auto=true&promedio=${promedioAnimo.toFixed(1)}`)}
+                    className="w-full bg-rose-500 hover:bg-rose-600 active:scale-[0.99] text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm shadow-rose-200"
+                  >
+                    Ver recursos de apoyo →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ✅ Tarjeta motivacional: solo si el promedio es saludable (>= 2.5) */}
+            {promedioAnimo !== null && promedioAnimo >= 2.5 && registros.length >= 3 && (
+              <AnimoFeedback promedioAnimo={promedioAnimo} />
+            )}
+
+            {/* Balance de los últimos 7 días */}
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm space-y-4">
               <h4 className="text-sm font-bold text-[#2A3B50]">Balance de los últimos 7 días</h4>
               <div className="h-48 w-full flex items-end justify-between gap-2 pt-4 border-b border-slate-100 pb-2 relative">
@@ -258,6 +323,7 @@ export default function MonitoreoPage() {
               </div>
             </div>
 
+            {/* Calendario de registros */}
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
               <h4 className="text-sm font-bold text-[#2A3B50] mb-3">Calendario de Registros</h4>
               <div className="max-h-56 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
@@ -296,6 +362,7 @@ export default function MonitoreoPage() {
               </div>
             </div>
 
+            {/* Tip anti-estrés */}
             <div className="bg-gradient-to-br from-[#F6EDFA] to-[#EDF3FC] border border-purple-100/50 p-5 rounded-3xl shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between mb-3 relative z-10">
                 <h4 className="text-xs font-bold text-purple-900 uppercase tracking-wider">Tip anti-estrés para hoy</h4>
@@ -315,6 +382,7 @@ export default function MonitoreoPage() {
           </div>
         </div>
 
+        {/* Modal */}
         {modalAbierto && (
           <div className="absolute inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
             <div className="bg-white w-full sm:max-w-sm rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-5 animate-slideUp">

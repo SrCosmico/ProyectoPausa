@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // ==========================================
 // INTERFACES Y DATOS DE RECURSOS DE APOYO
@@ -143,11 +143,8 @@ function AccordionItem({ punto }: AccordionItemProps) {
 
   return (
     <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${
-      punto.esEmergencia
-        ? "border-rose-200 bg-white"
-        : "border-slate-100 bg-white"
+      punto.esEmergencia ? "border-rose-200 bg-white" : "border-slate-100 bg-white"
     }`}>
-      {/* Cabecera del acordeón */}
       <button
         onClick={() => setAbierto(!abierto)}
         className="w-full flex items-center justify-between px-4 py-3.5 text-left focus:outline-none group"
@@ -177,13 +174,11 @@ function AccordionItem({ punto }: AccordionItemProps) {
         </svg>
       </button>
 
-      {/* Contenido expandido */}
       {abierto && (
         <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3 animate-fadeIn">
           <p className="text-[11px] font-medium text-slate-600 leading-relaxed">
             {punto.descripcion}
           </p>
-
           <div className="space-y-2">
             {punto.ubicacion && (
               <div className="flex items-start gap-2">
@@ -234,18 +229,14 @@ function AccordionItem({ punto }: AccordionItemProps) {
 // COMPONENTE PRINCIPAL: MODO CRISIS
 // ==========================================
 
-interface ModoCrisisProps {
-  /** Si viene de la detección automática de puntuación baja */
-  desencadenadoAutomaticamente?: boolean;
-  /** Promedio de bienestar de los últimos 7 días (para mensajes contextuales) */
-  promedioBienestar?: number;
-}
-
-export default function ModoCrisisPage({
-  desencadenadoAutomaticamente = false,
-  promedioBienestar,
-}: ModoCrisisProps) {
+export default function ModoCrisisPage() {
   const router = useRouter();
+
+  // ✅ NUEVO: Leemos los parámetros que envía monitoreo al redirigir
+  const searchParams = useSearchParams();
+  const desencadenadoAutomaticamente = searchParams.get('auto') === 'true';
+  const promedioBienestar = parseFloat(searchParams.get('promedio') ?? '0') || undefined;
+
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>("emergencia");
 
   const mensajePrincipal = desencadenadoAutomaticamente
@@ -256,7 +247,7 @@ export default function ModoCrisisPage({
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans">
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
 
-        {/* HEADER ROJO DE CRISIS */}
+        {/* HEADER */}
         <div className={`px-6 pt-6 pb-5 ${
           desencadenadoAutomaticamente
             ? "bg-gradient-to-b from-rose-50 to-white border-b border-rose-100"
@@ -286,14 +277,12 @@ export default function ModoCrisisPage({
             </div>
           </div>
 
-          {/* Banner de alerta automática */}
-          {desencadenadoAutomaticamente && (
+          {/* ✅ Banner contextual: diferente si fue automático o manual */}
+          {desencadenadoAutomaticamente ? (
             <div className="mt-4 p-3.5 bg-rose-500 text-white rounded-2xl flex items-start gap-3">
               <span className="text-lg flex-shrink-0 mt-0.5">💙</span>
               <div>
-                <p className="text-xs font-bold leading-snug">
-                  {mensajePrincipal}
-                </p>
+                <p className="text-xs font-bold leading-snug">{mensajePrincipal}</p>
                 {promedioBienestar !== undefined && (
                   <p className="text-[10px] font-medium mt-1 opacity-90">
                     Tu bienestar promedio esta semana: {promedioBienestar.toFixed(1)}/5.0
@@ -301,9 +290,7 @@ export default function ModoCrisisPage({
                 )}
               </div>
             </div>
-          )}
-
-          {!desencadenadoAutomaticamente && (
+          ) : (
             <div className="mt-4 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex items-start gap-3">
               <span className="text-lg flex-shrink-0 mt-0.5">💜</span>
               <p className="text-xs font-medium text-slate-600 leading-snug">
@@ -315,14 +302,10 @@ export default function ModoCrisisPage({
 
         {/* CONTENIDO SCROLLABLE */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-
-          {/* SECCIONES DE ACORDEÓN */}
           {SECCIONES_APOYO.map((seccion) => {
             const estaAbierta = seccionAbierta === seccion.id;
             return (
               <div key={seccion.id} className={`rounded-3xl border overflow-hidden ${seccion.colorBg}`}>
-
-                {/* Cabecera de la sección */}
                 <button
                   onClick={() => setSeccionAbierta(estaAbierta ? null : seccion.id)}
                   className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
@@ -348,7 +331,6 @@ export default function ModoCrisisPage({
                   </svg>
                 </button>
 
-                {/* Lista de puntos de apoyo */}
                 {estaAbierta && (
                   <div className="px-4 pb-4 space-y-2.5 animate-fadeIn">
                     {seccion.puntos.map((punto) => (
@@ -360,7 +342,7 @@ export default function ModoCrisisPage({
             );
           })}
 
-          {/* MENSAJE FINAL DE ESPERANZA */}
+          {/* Mensaje final */}
           <div className="p-4 bg-purple-50 border border-purple-100 rounded-3xl flex items-start gap-3 mb-4">
             <span className="text-xl flex-shrink-0">✨</span>
             <div>
@@ -373,7 +355,7 @@ export default function ModoCrisisPage({
           </div>
         </div>
 
-        {/* BOTÓN INFERIOR FIJO: VOLVER AL HOME */}
+        {/* BOTÓN INFERIOR */}
         <div className="bg-white border-t border-slate-100 p-4 sm:rounded-b-[40px] flex-shrink-0">
           <button
             onClick={() => router.push("/home.2")}
