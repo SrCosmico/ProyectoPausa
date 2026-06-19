@@ -10,6 +10,31 @@ import {
 import { NivelBienestar } from '@/models/monitoreo';
 import supabase from '@/lib/supabase';
 
+// ─── Componentes internos ───────────────────────────────────────────────────────
+
+function AnimoFeedback({ promedioAnimo }: { promedioAnimo: number }) {
+  const etiqueta = promedioAnimo >= 4.5
+    ? 'Excelente'
+    : promedioAnimo >= 3.5
+      ? 'Muy bien'
+      : 'Sigue adelante';
+
+  return (
+    <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Feedback del ánimo</p>
+          <h4 className="text-base font-bold text-slate-900 mt-1">{etiqueta}</h4>
+        </div>
+        <div className="text-3xl font-black text-indigo-600">{promedioAnimo.toFixed(1)}</div>
+      </div>
+      <p className="mt-3 text-sm text-slate-500 leading-relaxed">
+        Este valor es el promedio de tus registros recientes. Mantén el hábito de anotar tu estado para mejorar tu bienestar.
+      </p>
+    </div>
+  );
+}
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface RegistroHistorico {
@@ -260,29 +285,6 @@ function CalendarioRegistros({ dias, formatearFechaCorto, abrirModal, eliminarRe
         </div>
       )}
     </>
-  );
-}
-
-interface AnimoFeedbackProps {
-  promedioAnimo: number;
-}
-
-function AnimoFeedback({ promedioAnimo }: AnimoFeedbackProps) {
-  return (
-    <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
-      <h4 className="text-sm font-bold text-[#2A3B50]">¡Buen ánimo esta semana!</h4>
-      <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-        Tu promedio de ánimo es de <strong>{promedioAnimo.toFixed(1)}/5.0</strong>. Continúa reconociendo tus avances y cuidando tu bienestar día a día.
-      </p>
-      <div className="mt-4 grid gap-3">
-        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-700">
-          Aprovecha este impulso para mantener hábitos que te hagan sentir bien.
-        </div>
-        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-sm text-slate-700">
-          Si notas cambios, registra tu estado diario para seguir ajustando tu apoyo.
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -586,15 +588,6 @@ export default function MonitoreoPage() {
                         {c.badgeText}
                       </span>
                     </div>
-                    <button
-                      onClick={cambiarTip}
-                      className="p-1.5 bg-white/80 text-slate-500 hover:text-slate-700 rounded-full shadow-sm hover:shadow active:scale-95 transition-all"
-                      title="Ver otro tip"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                      </svg>
-                    </button>
                   </div>
 
                   {/* Contenido del tip */}
