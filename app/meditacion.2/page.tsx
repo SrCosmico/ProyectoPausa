@@ -21,6 +21,7 @@ export default function MeditacionRespiracionApp() {
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isTouching, setIsTouching] = useState<boolean>(false);
   
   // Real-Time Instructional Content
   const [currentInstruction, setCurrentInstruction] = useState<string>("");
@@ -361,7 +362,14 @@ export default function MeditacionRespiracionApp() {
               </div>
 
               <div className="my-6 flex flex-col items-center justify-center flex-1">
-                <div className="relative w-64 h-64 flex items-center justify-center">
+                <div
+                className="relative w-64 h-64 flex items-center justify-center"
+                onTouchStart={() => setIsTouching(true)}
+                onTouchEnd={() => setIsTouching(false)}
+                onMouseDown={() => setIsTouching(true)}
+                onMouseUp={() => setIsTouching(false)}
+               onMouseLeave={() => setIsTouching(false)}
+>
                   <div className={`absolute inset-0 rounded-full border-8 opacity-20 transition-all duration-1000 ${
                     sessionType === "meditacion" ? "border-purple-500 scale-105 animate-pulse" :
                     visualPhase === "inhala" ? "border-emerald-500 scale-110" :
@@ -369,7 +377,13 @@ export default function MeditacionRespiracionApp() {
                     visualPhase === "exhala" ? "border-blue-400 scale-100" : "border-slate-400 scale-95"
                   }`} />
 
-                  <div className="w-52 h-52 rounded-full bg-slate-50 shadow-inner flex flex-col items-center justify-center p-6 border border-slate-100 z-10 text-center">
+                  <div
+                 className={`w-52 h-52 rounded-full shadow-inner flex flex-col items-center justify-center p-6 border border-slate-100 z-10 text-center transition-all duration-500 ${
+                  isTouching
+                 ? "bg-emerald-100 scale-110"
+                 : "bg-slate-50 scale-100"
+                  }`}
+>
                     <span className="text-2xl font-black tracking-wider text-[#2A3B50] uppercase transition-all duration-500">
                       {sessionType === "respiracion" ? currentInstruction : "MEDITA"}
                     </span>
@@ -380,7 +394,9 @@ export default function MeditacionRespiracionApp() {
                 </div>
 
                 <div className="mt-6 flex items-center gap-2 text-slate-700 font-semibold bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
-                  <span>⏳</span>
+                  <p className="text-xs text-slate-500 mt-4 text-center">
+  Mantén presionado el círculo para mejorar tu concentración durante la respiración.
+                  </p>  <span>⏳</span>
                   <span className="text-sm tracking-tight font-bold">{formatTime(secondsLeft)} restantes</span>
                 </div>
 
