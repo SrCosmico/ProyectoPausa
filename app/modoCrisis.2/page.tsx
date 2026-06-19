@@ -355,15 +355,7 @@ export default function ModoCrisisPage() {
           </div>
         </div>
 
-        {/* BOTÓN INFERIOR */}
-        <div className="bg-white border-t border-slate-100 p-4 sm:rounded-b-[40px] flex-shrink-0">
-          <button
-            onClick={() => router.push("/home.2")}
-            className="w-full py-3.5 bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold text-sm rounded-2xl transition-all active:scale-[0.99] shadow-sm"
-          >
-            Volver al inicio
-          </button>
-        </div>
+
       </div>
 
       <style jsx global>{`
@@ -376,3 +368,4 @@ export default function ModoCrisisPage() {
     </div>
   );
 }
+
