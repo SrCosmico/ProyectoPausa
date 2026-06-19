@@ -9,6 +9,19 @@ import {
 } from '@/app/services/emocionesService';
 import { NivelBienestar } from '@/models/monitoreo';
 import supabase from '@/lib/supabase';
+// ✅ NUEVO: importamos el componente de feedback de ánimo
+// Si no existe el componente externo, definimos un fallback local simple
+const AnimoFeedback: React.FC<{ promedioAnimo: number; onClose?: () => void }> = ({ promedioAnimo }) => {
+  const mensajes = ['Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'];
+  const nivel = Math.max(1, Math.min(5, Math.round(promedioAnimo)));
+  const idx = nivel - 1;
+  return (
+    <div style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}>
+      <strong>Feedback de ánimo:</strong>
+      <div>{mensajes[idx] ?? 'N/A'}</div>
+    </div>
+  );
+};
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -59,14 +72,175 @@ const calcularPromedioSemanal = (registros: RegistroHistorico[]): number | null 
   return suma / ultimos7.length;
 };
 
-const AnimoFeedback = ({ promedioAnimo }: { promedioAnimo: number }) => (
-  <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
-    <h4 className="text-sm font-bold text-[#2A3B50]">Mensaje motivacional</h4>
-    <p className="text-slate-600 text-xs leading-relaxed mt-2">
-      Tu ánimo promedio esta semana es de <strong>{promedioAnimo.toFixed(1)}/5.0</strong>. Sigue cuidando de ti mismo/a y mantén tus hábitos positivos.
-    </p>
-  </div>
-);
+// ─── Componente CalendarioRegistros ──────────────────────────────────────────
+
+interface DiaCalendario {
+  fecha: string;
+  registro?: RegistroHistorico;
+}
+
+interface CalendarioRegistrosProps {
+  dias: DiaCalendario[];
+  formatearFechaCorto: (fecha: string) => string;
+  abrirModal: (fecha: string, registro?: RegistroHistorico) => void;
+  eliminarRegistro: (id?: string | number) => void;
+}
+
+function CalendarioRegistros({ dias, formatearFechaCorto, abrirModal, eliminarRegistro }: CalendarioRegistrosProps) {
+  const [registroDetalle, setRegistroDetalle] = useState<(RegistroHistorico & { fecha: string }) | null>(null);
+
+  const verDetalle = (fecha: string, registro: RegistroHistorico) => {
+    setRegistroDetalle({ ...registro, fecha });
+  };
+
+  const cerrarDetalle = () => setRegistroDetalle(null);
+
+  const handleEliminar = () => {
+    eliminarRegistro(registroDetalle?.id);
+    cerrarDetalle();
+  };
+
+  const handleEditar = () => {
+    if (!registroDetalle) return;
+    cerrarDetalle();
+    abrirModal(registroDetalle.fecha, registroDetalle);
+  };
+
+  // Nombre completo del día de la semana
+  const nombreDiaCompleto = (fechaStr: string) => {
+    const nombres = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const d = new Date(fechaStr + 'T12:00:00');
+    return `${nombres[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]}`;
+  };
+
+  return (
+    <>
+      <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
+        <h4 className="text-sm font-bold text-[#2A3B50] mb-3">Calendario de Registros</h4>
+        <div className="max-h-72 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+          {dias.map((dia) => {
+            const partesFecha = formatearFechaCorto(dia.fecha).split(' ');
+            return (
+              <div
+                key={dia.fecha}
+                className={`rounded-2xl border transition-all duration-150 ${
+                  dia.registro
+                    ? 'bg-slate-50 border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 cursor-pointer active:scale-[0.99]'
+                    : 'bg-white border-dashed border-slate-200'
+                }`}
+                onClick={() => dia.registro && verDetalle(dia.fecha, dia.registro)}
+              >
+                <div className="flex items-center justify-between px-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 text-center border-r border-slate-200 pr-2 flex-shrink-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">{partesFecha[0]}</p>
+                      <p className="text-sm font-black text-slate-700">{dia.fecha.split('-')[2]}</p>
+                    </div>
+                    {dia.registro ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{dia.registro.emoji}</span>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700">{dia.registro.estado}</p>
+                          {dia.registro.nota && (
+                            <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{dia.registro.nota}</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">Día vacío</p>
+                    )}
+                  </div>
+
+                  {dia.registro ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-slate-300 flex-shrink-0">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); abrirModal(dia.fecha); }}
+                      className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200 transition-colors"
+                    >
+                      Añadir
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Modal de detalle del registro */}
+      {registroDetalle && (
+        <div
+          className="absolute inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={cerrarDetalle}
+        >
+          <div
+            className="bg-white w-full sm:max-w-sm rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera */}
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                {nombreDiaCompleto(registroDetalle.fecha)}
+              </p>
+              <button onClick={cerrarDetalle} className="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">&times;</button>
+            </div>
+
+            {/* Estado emocional */}
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <span className="text-5xl">{registroDetalle.emoji}</span>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cómo te sentiste</p>
+                <p className="text-lg font-black text-[#2A3B50] mt-0.5">{registroDetalle.estado}</p>
+              </div>
+            </div>
+
+            {/* Nota */}
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Tu nota</p>
+              {registroDetalle.nota ? (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 max-h-32 overflow-y-auto">
+                  <p className="text-sm text-slate-600 font-medium leading-relaxed break-words whitespace-pre-wrap">
+                    "{registroDetalle.nota}"
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-4 text-center">
+                  <p className="text-xs text-slate-400 italic">No dejaste ninguna nota este día.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Acciones */}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleEditar}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                </svg>
+                Editar
+              </button>
+              <button
+                onClick={handleEliminar}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-2xl transition-colors border border-red-100"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
@@ -324,43 +498,12 @@ export default function MonitoreoPage() {
             </div>
 
             {/* Calendario de registros */}
-            <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
-              <h4 className="text-sm font-bold text-[#2A3B50] mb-3">Calendario de Registros</h4>
-              <div className="max-h-56 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                {generarDiasCalendario().map((dia, index) => (
-                  <div key={index} className={`flex items-center justify-between p-3 rounded-xl border ${dia.registro ? 'bg-slate-50 border-slate-100' : 'bg-white border-dashed border-slate-200'}`}>
-                    <div className="flex items-center gap-3 w-2/3">
-                      <div className="w-12 text-center border-r border-slate-200 pr-2">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">{formatearFechaCorto(dia.fecha).split(' ')[0]}</p>
-                        <p className="text-sm font-black text-slate-700">{dia.fecha.split('-')[2]}</p>
-                      </div>
-                      {dia.registro ? (
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <span className="text-xl">{dia.registro.emoji}</span>
-                          <div className="truncate">
-                            <p className="text-xs font-bold text-slate-700">{dia.registro.estado}</p>
-                            {dia.registro.nota && <p className="text-[10px] text-slate-400 truncate w-full">{dia.registro.nota}</p>}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-400 italic">Día vacío</p>
-                      )}
-                    </div>
-                    
-                    <div className="flex gap-1">
-                      {dia.registro ? (
-                        <>
-                          <button onClick={() => abrirModal(dia.fecha, dia.registro)} className="p-1.5 text-blue-500 bg-blue-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" /></svg></button>
-                          <button onClick={() => eliminarRegistro(dia.registro?.id)} className="p-1.5 text-red-500 bg-red-50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg></button>
-                        </>
-                      ) : (
-                        <button onClick={() => abrirModal(dia.fecha)} className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200">Añadir</button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CalendarioRegistros
+              dias={generarDiasCalendario()}
+              formatearFechaCorto={formatearFechaCorto}
+              abrirModal={abrirModal}
+              eliminarRegistro={eliminarRegistro}
+            />
 
             {/* Tip anti-estrés */}
             <div className="bg-gradient-to-br from-[#F6EDFA] to-[#EDF3FC] border border-purple-100/50 p-5 rounded-3xl shadow-sm relative overflow-hidden">
