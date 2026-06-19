@@ -6,7 +6,7 @@ import {
   obtenerNotasDiario, 
   actualizarNotaDiario, 
   borrarNotaDiario, 
-  NotaDiario 
+  NotaDiario
 } from '@/lib/supabase/services';
 
 export default function DiarioEmocionalView() {
