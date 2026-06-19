@@ -9,19 +9,6 @@ import {
 } from '@/app/services/emocionesService';
 import { NivelBienestar } from '@/models/monitoreo';
 import supabase from '@/lib/supabase';
-// ✅ NUEVO: importamos el componente de feedback de ánimo
-// Si no existe el componente externo, definimos un fallback local simple
-const AnimoFeedback: React.FC<{ promedioAnimo: number; onClose?: () => void }> = ({ promedioAnimo }) => {
-  const mensajes = ['Muy mal', 'Mal', 'Regular', 'Bien', 'Muy bien'];
-  const nivel = Math.max(1, Math.min(5, Math.round(promedioAnimo)));
-  const idx = nivel - 1;
-  return (
-    <div style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}>
-      <strong>Feedback de ánimo:</strong>
-      <div>{mensajes[idx] ?? 'N/A'}</div>
-    </div>
-  );
-};
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -50,7 +37,41 @@ const opcionesEmociones = [
   { n: 5, e: '🤩', s: 'Muy bien' }
 ];
 
-const bancoTips: TipAntiestres[] = [
+// Tips organizados por nivel de ánimo (1-5)
+const TIPS_POR_NIVEL: Record<number, TipAntiestres[]> = {
+  1: [ // Muy mal — contención inmediata
+    { id: 101, categoria: 'Respiración', contenido: 'Respira lento: inhala 4 segundos, sostén 4, exhala 4. Repite 3 veces. Tu sistema nervioso se calmará.' },
+    { id: 102, categoria: 'Grounding', contenido: 'Nombra 5 cosas que puedes ver, 4 que puedes tocar, 3 que puedes oír. Ancla tu mente al presente.' },
+    { id: 103, categoria: 'Pausa urgente', contenido: 'Detente. Pon agua fría en tus muñecas por 30 segundos. El frío activa tu sistema nervioso parasimpático.' },
+    { id: 104, categoria: 'Autocompasión', contenido: 'Está bien no estar bien. No tienes que resolver todo hoy. Un paso pequeño es suficiente.' },
+  ],
+  2: [ // Mal — calma y descanso
+    { id: 201, categoria: 'Descanso', contenido: 'Tómate 10 minutos lejos de pantallas. Cierra los ojos y escucha tu entorno sin juzgar nada.' },
+    { id: 202, categoria: 'Movimiento suave', contenido: 'Estira cuello y hombros despacio. El estrés se acumula ahí. Tres rotaciones lentas hacia cada lado.' },
+    { id: 203, categoria: 'Hidratación', contenido: 'Toma un vaso de agua fría ahora. La deshidratación leve amplifica el mal humor sin que lo notes.' },
+    { id: 204, categoria: 'Escritura', contenido: 'Escribe 3 líneas sobre cómo te sientes. No tiene que tener sentido. Solo sacarlo ayuda.' },
+  ],
+  3: [ // Regular — equilibrio
+    { id: 301, categoria: 'Hábitos', contenido: 'Haz una pausa activa cada 45 minutos de estudio. Tu concentración mejora significativamente.' },
+    { id: 302, categoria: 'Alimentación', contenido: 'Si llevas más de 3 horas sin comer, tu ánimo lo está pagando. Un snack ligero puede cambiar tu energía.' },
+    { id: 303, categoria: 'Conexión social', contenido: 'Escríbele a alguien que no hayas contactado esta semana. Las conexiones breves recargan el ánimo.' },
+    { id: 304, categoria: 'Logros pequeños', contenido: 'Anota una cosa que hayas hecho bien hoy, por pequeña que sea. El cerebro necesita reconocer avances.' },
+  ],
+  4: [ // Bien — mantener energía
+    { id: 401, categoria: 'Potencia tu día', contenido: 'Estás en buen momento. Aprovecha para abordar esa tarea que llevas posponiendo. Tienes la energía.' },
+    { id: 402, categoria: 'Gratitud', contenido: 'Escribe 3 cosas específicas por las que estás agradecido/a hoy. La gratitud concreta refuerza el bienestar.' },
+    { id: 403, categoria: 'Movimiento', contenido: 'Un buen ánimo es perfecto para una caminata de 15 minutos. El ejercicio consolida el estado positivo.' },
+    { id: 404, categoria: 'Comparte', contenido: 'Cuando estamos bien, podemos dar. Haz algo amable por alguien hoy, aunque sea pequeño.' },
+  ],
+  5: [ // Muy bien — potenciar el momento
+    { id: 501, categoria: '¡Excelente día!', contenido: 'Estás brillando hoy. Usa este impulso para aprender algo nuevo o avanzar en algo importante para ti.' },
+    { id: 502, categoria: 'Celebra', contenido: 'Reconoce que llegaste aquí. El bienestar no es casualidad, es el resultado de tus hábitos y esfuerzo.' },
+    { id: 503, categoria: 'Registra el momento', contenido: 'Escribe qué hiciste diferente hoy. Cuando vengan días difíciles, tendrás una guía de lo que te funciona.' },
+    { id: 504, categoria: 'Comparte energía', contenido: 'Tu energía positiva es contagiosa. Apoya a alguien de tu entorno que pueda necesitarlo hoy.' },
+  ],
+};
+
+const TIPS_GENERALES: TipAntiestres[] = [
   { id: 1, contenido: 'Recuerda hacer pausas activas cada 45 minutos de estudio. Estira tu cuello y hombros.', categoria: 'Relajación física' },
   { id: 2, contenido: 'Respira profundo: inhala en 4 segundos, sostén 4, exhala en 4. Repite 3 veces.', categoria: 'Respiración' },
   { id: 3, contenido: 'Aléjate de las pantallas por 10 minutos. Cierra los ojos y escucha tu entorno.', categoria: 'Desconexión digital' },
@@ -202,7 +223,7 @@ function CalendarioRegistros({ dias, formatearFechaCorto, abrirModal, eliminarRe
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Tu nota</p>
               {registroDetalle.nota ? (
-                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 max-h-32 overflow-y-auto">
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 max-h-36 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <p className="text-sm text-slate-600 font-medium leading-relaxed break-words whitespace-pre-wrap">
                     "{registroDetalle.nota}"
                   </p>
@@ -242,6 +263,29 @@ function CalendarioRegistros({ dias, formatearFechaCorto, abrirModal, eliminarRe
   );
 }
 
+interface AnimoFeedbackProps {
+  promedioAnimo: number;
+}
+
+function AnimoFeedback({ promedioAnimo }: AnimoFeedbackProps) {
+  return (
+    <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
+      <h4 className="text-sm font-bold text-[#2A3B50]">¡Buen ánimo esta semana!</h4>
+      <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+        Tu promedio de ánimo es de <strong>{promedioAnimo.toFixed(1)}/5.0</strong>. Continúa reconociendo tus avances y cuidando tu bienestar día a día.
+      </p>
+      <div className="mt-4 grid gap-3">
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-700">
+          Aprovecha este impulso para mantener hábitos que te hagan sentir bien.
+        </div>
+        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-sm text-slate-700">
+          Si notas cambios, registra tu estado diario para seguir ajustando tu apoyo.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function MonitoreoPage() {
@@ -254,7 +298,7 @@ export default function MonitoreoPage() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(obtenerFechaLocal());
   const [emocionSeleccionada, setEmocionSeleccionada] = useState(opcionesEmociones[3]);
   const [notaActual, setNotaActual] = useState("");
-  const [tipDelDia, setTipDelDia] = useState<TipAntiestres>(bancoTips[0]);
+  const [tipDelDia, setTipDelDia] = useState<TipAntiestres>(TIPS_GENERALES[0]);
   const [guardando, setGuardando] = useState(false);
 
   const refrescarDatos = useCallback(async () => {
@@ -375,9 +419,24 @@ export default function MonitoreoPage() {
     return `${dias[date.getDay()]} ${date.getDate()}`;
   };
 
+  // Selecciona tips según el nivel de ánimo de hoy
+  const obtenerTipsSegunAnimo = useCallback((): TipAntiestres[] => {
+    if (!estadoActual) return TIPS_GENERALES;
+    return TIPS_POR_NIVEL[estadoActual.nivel] ?? TIPS_GENERALES;
+  }, [estadoActual]);
+
+  // Inicializa el tip cuando cambia el estado de hoy
+  useEffect(() => {
+    const tips = obtenerTipsSegunAnimo();
+    const idx = Math.floor(Math.random() * tips.length);
+    setTipDelDia(tips[idx]);
+  }, [estadoActual?.nivel]);
+
   const cambiarTip = () => {
-    const tipsRestantes = bancoTips.filter(t => t.id !== tipDelDia.id);
-    const nuevoTip = tipsRestantes[Math.floor(Math.random() * tipsRestantes.length)];
+    const tips = obtenerTipsSegunAnimo();
+    const tipsRestantes = tips.filter(t => t.id !== tipDelDia.id);
+    const pool = tipsRestantes.length > 0 ? tipsRestantes : tips;
+    const nuevoTip = pool[Math.floor(Math.random() * pool.length)];
     setTipDelDia(nuevoTip);
   };
 
@@ -505,23 +564,61 @@ export default function MonitoreoPage() {
               eliminarRegistro={eliminarRegistro}
             />
 
-            {/* Tip anti-estrés */}
-            <div className="bg-gradient-to-br from-[#F6EDFA] to-[#EDF3FC] border border-purple-100/50 p-5 rounded-3xl shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between mb-3 relative z-10">
-                <h4 className="text-xs font-bold text-purple-900 uppercase tracking-wider">Tip anti-estrés para hoy</h4>
-                <button onClick={cambiarTip} className="p-1.5 bg-white text-purple-600 hover:text-purple-800 rounded-full shadow-sm hover:shadow active:scale-95 transition-all">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                </button>
-              </div>
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 flex items-start gap-4 relative z-10">
-                <span className="text-3xl p-2 bg-purple-50 rounded-xl shadow-sm">🧘‍♀️</span>
-                <div>
-                  <h5 className="text-xs font-bold text-[#2A3B50]">{tipDelDia.categoria}</h5>
-                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">{tipDelDia.contenido}</p>
+            {/* Tip inteligente según ánimo */}
+            {(() => {
+              const nivel = estadoActual?.nivel ?? null;
+              const config: Record<number, { grad: string; border: string; badge: string; badgeText: string; emoji: string; titulo: string }> = {
+                1: { grad: 'from-rose-50 to-pink-50',     border: 'border-rose-100',   badge: 'bg-rose-100 text-rose-700',    badgeText: 'Para este momento difícil', emoji: '🫂', titulo: 'Apoyo inmediato' },
+                2: { grad: 'from-orange-50 to-amber-50',  border: 'border-orange-100', badge: 'bg-orange-100 text-orange-700', badgeText: 'Para cuando estás bajo',     emoji: '🌿', titulo: 'Calma y descanso' },
+                3: { grad: 'from-yellow-50 to-lime-50',   border: 'border-yellow-100', badge: 'bg-yellow-100 text-yellow-700', badgeText: 'Para equilibrar tu día',     emoji: '⚖️', titulo: 'Equilibrio' },
+                4: { grad: 'from-emerald-50 to-teal-50',  border: 'border-emerald-100',badge: 'bg-emerald-100 text-emerald-700',badgeText: 'Para mantener tu energía',  emoji: '✨', titulo: 'Potencia tu día' },
+                5: { grad: 'from-indigo-50 to-purple-50', border: 'border-indigo-100', badge: 'bg-indigo-100 text-indigo-700', badgeText: '¡Estás en tu mejor momento!', emoji: '🌟', titulo: '¡Sigue brillando!' },
+              };
+              const c = nivel ? config[nivel] : { grad: 'from-[#F6EDFA] to-[#EDF3FC]', border: 'border-purple-100/50', badge: 'bg-purple-100 text-purple-700', badgeText: 'Registra tu ánimo para tips personalizados', emoji: '🧘‍♀️', titulo: 'Tip del día' };
+
+              return (
+                <div className={`bg-gradient-to-br ${c.grad} border ${c.border} p-5 rounded-3xl shadow-sm relative overflow-hidden`}>
+                  {/* Cabecera */}
+                  <div className="flex items-center justify-between mb-3 relative z-10">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{c.titulo}</h4>
+                      <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${c.badge}`}>
+                        {c.badgeText}
+                      </span>
+                    </div>
+                    <button
+                      onClick={cambiarTip}
+                      className="p-1.5 bg-white/80 text-slate-500 hover:text-slate-700 rounded-full shadow-sm hover:shadow active:scale-95 transition-all"
+                      title="Ver otro tip"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Contenido del tip */}
+                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 flex items-start gap-3 relative z-10">
+                    <span className="text-2xl flex-shrink-0 mt-0.5">{c.emoji}</span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">{tipDelDia.categoria}</p>
+                      <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">{tipDelDia.contenido}</p>
+                    </div>
+                  </div>
+
+                  {/* Indicador de personalización */}
+                  {!estadoActual && (
+                    <p className="text-[10px] text-slate-400 text-center mt-3 relative z-10">
+                      💡 Registra tu estado de hoy para recibir tips personalizados
+                    </p>
+                  )}
+
+                  <div className="absolute -bottom-6 -right-6 text-7xl opacity-5 select-none pointer-events-none">
+                    {c.emoji}
+                  </div>
                 </div>
-              </div>
-              <div className="absolute -bottom-6 -right-6 text-7xl opacity-5 select-none pointer-events-none">💡</div>
-            </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -556,8 +653,18 @@ export default function MonitoreoPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Notas (Opcional)</label>
-                <textarea value={notaActual} onChange={(e) => setNotaActual(e.target.value)} placeholder="¿Por qué te sientes así?" rows={2} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-500 resize-none"></textarea>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-500">Notas (Opcional)</label>
+                  <span className="text-[10px] text-slate-400">{notaActual.length}/300</span>
+                </div>
+                <textarea
+                  value={notaActual}
+                  onChange={(e) => setNotaActual(e.target.value.slice(0, 300))}
+                  placeholder="¿Por qué te sientes así? Cuéntame un poco más..."
+                  rows={4}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:bg-indigo-50/30 resize-none leading-relaxed transition-colors placeholder:text-slate-300 scrollbar-hide"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+                />
               </div>
 
               <button onClick={guardarRegistro} disabled={guardando} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 disabled:opacity-60 disabled:cursor-not-allowed">
@@ -574,3 +681,11 @@ export default function MonitoreoPage() {
     </div>
   );
 }
+
+// Ocultar scrollbar en Chrome/Safari para el contenedor de nota
+const style = typeof document !== 'undefined' ? (() => {
+  const s = document.createElement('style');
+  s.textContent = `.scrollbar-hide::-webkit-scrollbar { display: none; }`;
+  document.head.appendChild(s);
+  return s;
+})() : null;
