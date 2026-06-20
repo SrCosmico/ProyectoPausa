@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // ==========================================
@@ -131,6 +131,255 @@ const SECCIONES_APOYO: SeccionAcordeon[] = [
 ];
 
 // ==========================================
+// MAPA INTERACTIVO CON LEAFLET
+// ==========================================
+
+interface PuntoMapa {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  ubicacion: string;
+  horario: string;
+  telefono?: string;
+  email?: string;
+  lat: number;
+  lng: number;
+  color: string;
+  icono: string;
+  esEmergencia?: boolean;
+}
+
+const PUNTOS_MAPA: PuntoMapa[] = [
+  {
+    id: 'dbe',
+    nombre: 'División de Bienestar Estudiantil',
+    descripcion: 'Orientación y acompañamiento psicológico gratuito para estudiantes.',
+    ubicacion: 'Edificio de Rectorado, Piso 1',
+    horario: 'Lun–Vie, 8:00 a.m. – 5:00 p.m.',
+    telefono: '(0212) 605-4111',
+    email: 'bienestar@ucv.edu.ve',
+    lat: 10.4880,
+    lng: -66.8902,
+    color: '#4A72A6',
+    icono: '🏛️',
+  },
+  {
+    id: 'psico',
+    nombre: 'Clínica Psicológica — Psicología',
+    descripcion: 'Atención clínica supervisada. Solicita cita con antelación.',
+    ubicacion: 'Facultad de Humanidades, Escuela de Psicología',
+    horario: 'Lun–Vie, 8:00 a.m. – 12:00 p.m.',
+    telefono: '(0212) 605-2711',
+    lat: 10.4872,
+    lng: -66.8915,
+    color: '#7C3AED',
+    icono: '🧠',
+  },
+  {
+    id: 'medicina',
+    nombre: 'Depto. Psiquiatría — Medicina',
+    descripcion: 'Consulta médica especializada en salud mental.',
+    ubicacion: 'Facultad de Medicina, Piso 3',
+    horario: 'Lun–Vie, 9:00 a.m. – 1:00 p.m.',
+    telefono: '(0212) 605-3822',
+    lat: 10.4865,
+    lng: -66.8888,
+    color: '#059669',
+    icono: '🏥',
+  },
+  {
+    id: 'bomberos',
+    nombre: 'Bomberos Universitarios UCV',
+    descripcion: 'Primeros auxilios y emergencias médicas en el campus.',
+    ubicacion: 'Ciudad Universitaria, Portón principal',
+    horario: '24 horas, 7 días',
+    telefono: '(0212) 605-4444',
+    lat: 10.4893,
+    lng: -66.8875,
+    color: '#E11D48',
+    icono: '🚒',
+    esEmergencia: true,
+  },
+  {
+    id: 'inpsasel',
+    nombre: 'INPSASEL — Línea de Salud Mental',
+    descripcion: 'Atención psicológica de emergencia disponible las 24 horas.',
+    ubicacion: 'Av. José Félix Sosa, Caracas (sede central)',
+    horario: '24 horas, 7 días a la semana',
+    telefono: '0800-72583-00',
+    lat: 10.4915,
+    lng: -66.8860,
+    color: '#EA580C',
+    icono: '📞',
+    esEmergencia: true,
+  },
+];
+
+function MapaUCV() {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const [puntoSeleccionado, setPuntoSeleccionado] = useState<PuntoMapa | null>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    const linkCSS = document.createElement('link');
+    linkCSS.rel = 'stylesheet';
+    linkCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(linkCSS);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => {
+      const L = (window as any).L;
+
+      const map = L.map(mapRef.current, {
+        center: [10.4878, -66.8895],
+        zoom: 16,
+        zoomControl: true,
+        scrollWheelZoom: true,
+      });
+
+      mapInstanceRef.current = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(map);
+
+      PUNTOS_MAPA.forEach((punto) => {
+        const iconHtml = `
+          <div style="
+            background: ${punto.color};
+            width: 40px; height: 40px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+            display: flex; align-items: center; justify-content: center;
+          ">
+            <span style="transform: rotate(45deg); font-size: 18px; line-height: 1;">
+              ${punto.icono}
+            </span>
+          </div>
+        `;
+
+        const icon = L.divIcon({
+          html: iconHtml,
+          className: '',
+          iconSize: [40, 40],
+          iconAnchor: [20, 40],
+        });
+
+        const marker = L.marker([punto.lat, punto.lng], { icon }).addTo(map);
+        marker.on('click', () => {
+          map.panTo([punto.lat, punto.lng]);
+          setPuntoSeleccionado(punto);
+        });
+      });
+    };
+
+    document.head.appendChild(script);
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      {/* Mapa ocupa todo el contenedor padre */}
+      <div ref={mapRef} className="w-full h-full" />
+
+      {/* Bottom sheet del punto seleccionado */}
+      {puntoSeleccionado && (
+        <div className="absolute bottom-0 left-0 right-0 z-[1000] animate-slideUp">
+          <div className="bg-white rounded-t-[28px] shadow-2xl px-5 pt-4 pb-6">
+            {/* Handle */}
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
+
+            {/* Cabecera con color del punto */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+                  style={{ backgroundColor: puntoSeleccionado.color + '20' }}
+                >
+                  {puntoSeleccionado.icono}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[#2A3B50] leading-snug">{puntoSeleccionado.nombre}</p>
+                  <p className="text-[10px] font-medium mt-0.5" style={{ color: puntoSeleccionado.color }}>
+                    {puntoSeleccionado.esEmergencia ? '🔴 Emergencias 24/7' : '📍 ' + puntoSeleccionado.ubicacion}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPuntoSeleccionado(null)}
+                className="p-1.5 bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 flex-shrink-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Info */}
+            <div className="bg-slate-50 rounded-2xl px-4 py-3 space-y-1.5 mb-4">
+              <div className="flex items-start gap-2">
+                <span className="text-xs flex-shrink-0">📍</span>
+                <p className="text-[11px] text-slate-600 font-medium leading-snug">{puntoSeleccionado.ubicacion}</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs flex-shrink-0">🕒</span>
+                <p className="text-[11px] text-slate-600 font-medium">{puntoSeleccionado.horario}</p>
+              </div>
+              {puntoSeleccionado.email && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs flex-shrink-0">✉️</span>
+                  <p className="text-[11px] text-slate-600 font-medium">{puntoSeleccionado.email}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex gap-2">
+              {puntoSeleccionado.telefono && (
+                <a
+                  href={`tel:${puntoSeleccionado.telefono.replace(/\D/g, '')}`}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold text-white transition-colors"
+                  style={{ backgroundColor: puntoSeleccionado.color }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.338c0-1.36 1.22-2.337 2.57-2.096l1.77.32A2.25 2.25 0 0 1 8.33 6.44l.51 2.55a2.25 2.25 0 0 1-1.29 2.49l-.99.44a1.04 1.04 0 0 0-.57 1.17c.53 2.58 2.47 4.73 5.05 5.78l.45.18a1.04 1.04 0 0 0 1.23-.41l.44-.66a2.25 2.25 0 0 1 2.58-.92l2.53.84a2.25 2.25 0 0 1 1.55 2.25v1.44c0 1.36-1.22 2.34-2.57 2.09C7.62 22.78 1.5 15.5 1.5 6.75c0-.15.02-.3.05-.45l.69-.001.01.034Z" />
+                  </svg>
+                  Llamar ahora
+                </a>
+              )}
+              <a
+                href={`https://maps.google.com/?q=${puntoSeleccionado.lat},${puntoSeleccionado.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                </svg>
+                Ir a ubicación
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
 // COMPONENTE ACORDEÓN INDIVIDUAL
 // ==========================================
 
@@ -238,6 +487,7 @@ export default function ModoCrisisPage() {
   const promedioBienestar = parseFloat(searchParams.get('promedio') ?? '0') || undefined;
 
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>("emergencia");
+  const [mapaFullscreen, setMapaFullscreen] = useState(false);
 
   const mensajePrincipal = desencadenadoAutomaticamente
     ? "Hemos notado que tu bienestar ha sido bajo esta semana. No estás solo/a."
@@ -342,84 +592,22 @@ export default function ModoCrisisPage() {
             );
           })}
 
-          {/* Mapa de puntos de apoyo UCV */}
-          {(() => {
-            const mapaAbierto = seccionAbierta === 'mapa';
-            return (
-              <div className="rounded-3xl border overflow-hidden bg-teal-50 border-teal-100">
-                <button
-                  onClick={() => setSeccionAbierta(mapaAbierto ? null : 'mapa')}
-                  className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
-                  aria-expanded={mapaAbierto}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">🗺️</span>
-                    <span className="text-xs font-extrabold uppercase tracking-wide text-teal-700">
-                      Puntos de apoyo en el campus
-                    </span>
-                  </div>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2.5}
-                    stroke="currentColor"
-                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${mapaAbierto ? "rotate-180" : ""}`}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                  </svg>
-                </button>
-
-                {mapaAbierto && (
-                  <div className="px-4 pb-4 space-y-3 animate-fadeIn">
-
-                    {/* Leyenda de puntos */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { color: 'bg-[#4A72A6]', label: 'División de Bienestar Estudiantil' },
-                        { color: 'bg-violet-500',  label: 'Clínica Psicológica — Psicología' },
-                        { color: 'bg-emerald-500', label: 'Depto. Psiquiatría — Medicina' },
-                        { color: 'bg-rose-500',    label: 'Bomberos Universitarios UCV' },
-                      ].map((item) => (
-                        <div key={item.label} className="flex items-start gap-1.5 bg-white rounded-xl px-2.5 py-2 border border-teal-100">
-                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5 ${item.color}`} />
-                          <p className="text-[10px] text-slate-600 font-medium leading-tight">{item.label}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Iframe de Google Maps — Ciudad Universitaria UCV */}
-                    <div className="rounded-2xl overflow-hidden border border-teal-200 shadow-sm">
-                      <iframe
-                        title="Puntos de apoyo UCV"
-                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3923.6!2d-66.8897!3d10.4878!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8c2a589083d2f4c5%3A0x4d3c7b2c9e7e4a1!2sCiudad%20Universitaria%20de%20Caracas!5e0!3m2!1ses!2sve!4v1718900000000!5m2!1ses!2sve"
-                        width="100%"
-                        height="220"
-                        style={{ border: 0 }}
-                        allowFullScreen
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                    </div>
-
-                    {/* Botón abrir en Google Maps */}
-                    <a
-                      href="https://maps.google.com/?q=Ciudad+Universitaria+de+Caracas"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                      </svg>
-                      Abrir en Google Maps
-                    </a>
-                  </div>
-                )}
+          {/* Botón para abrir el mapa fullscreen */}
+          <button
+            onClick={() => setMapaFullscreen(true)}
+            className="w-full rounded-3xl border border-teal-100 bg-teal-50 px-5 py-4 flex items-center justify-between focus:outline-none hover:bg-teal-100 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🗺️</span>
+              <div className="text-left">
+                <p className="text-xs font-extrabold uppercase tracking-wide text-teal-700">Puntos de apoyo en el campus</p>
+                <p className="text-[10px] text-teal-500 font-medium mt-0.5">Ver mapa interactivo</p>
               </div>
-            );
-          })()}
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-teal-400 flex-shrink-0">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
 
           {/* Mensaje final */}
           <div className="p-4 bg-purple-50 border border-purple-100 rounded-3xl flex items-start gap-3 mb-4">
@@ -437,12 +625,43 @@ export default function ModoCrisisPage() {
 
       </div>
 
+      {/* MAPA FULLSCREEN — dentro del contenedor del celular */}
+      {mapaFullscreen && (
+        <div className="absolute inset-0 z-50 bg-white flex flex-col sm:rounded-[40px] overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 flex-shrink-0">
+            <button
+              onClick={() => setMapaFullscreen(false)}
+              className="p-2 -ml-1 text-slate-600 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+              </svg>
+            </button>
+            <div>
+              <p className="text-sm font-bold text-[#2A3B50]">Puntos de apoyo</p>
+              <p className="text-[10px] text-slate-400 font-medium">Ciudad Universitaria UCV — toca un pin para ver detalles</p>
+            </div>
+          </div>
+
+          {/* Mapa ocupa el resto del contenedor del celular */}
+          <div className="flex-1 relative min-h-0">
+            <MapaUCV />
+          </div>
+        </div>
+      )}
+
       <style jsx global>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-4px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+        .animate-fadeIn  { animation: fadeIn  0.2s ease-out forwards; }
+        .animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.32,0.72,0,1) forwards; }
       `}</style>
     </div>
   );
