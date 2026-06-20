@@ -20,7 +20,8 @@ type VistaDiario =
   | 'editarNota'
   | 'verNota'
   | 'estadisticas'
-  | 'cambiarPatron';
+  | 'cambiarPatron'
+  | 'verificarPatronActual';
 
 interface Nota {
   id: number;
@@ -215,6 +216,9 @@ export default function DiarioPage() {
   const [errorPatron, setErrorPatron] = useState<string | null>(null);
   const [intentosFallidos, setIntentosFallidos] = useState(0);
   const [esCambioPatron, setEsCambioPatron] = useState(false);
+  const [patronVerificando, setPatronVerificando] = useState<number[]>([]);
+  const [errorVerificacion, setErrorVerificacion] = useState<string | null>(null);
+  const [intentosVerificacion, setIntentosVerificacion] = useState(0);
 
   // Notas
   const [listaNotas, setListaNotas] = useState<Nota[]>([]);
@@ -228,6 +232,25 @@ export default function DiarioPage() {
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
 
   const MAX_CONTENIDO = 1000;
+
+  // IA
+  const [analizandoIA, setAnalizandoIA] = useState(false);
+  const [resultadoIA, setResultadoIA] = useState<{
+    estadoSugerido: { emoji: string; label: string } | null;
+    fraseCierre: string;
+  } | null>(null);
+  const [promptActivo, setPromptActivo] = useState(0);
+  const [horaActual] = useState(() => new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
+  const [fechaActual] = useState(() => new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' }));
+
+  const PROMPTS_ESCRITURA = [
+    '¿Qué fue lo mejor de hoy?',
+    '¿Qué te pesó o preocupó?',
+    '¿De qué estás agradecido hoy?',
+    '¿Qué aprendiste hoy?',
+    '¿Cómo te sentiste la mayor parte del día?',
+    '¿Qué harías diferente mañana?',
+  ];
 
   const opcionesEstado = [
     { emoji: '💜', label: 'Productivo' },
@@ -311,11 +334,34 @@ export default function DiarioPage() {
   };
 
   const iniciarCambioPatron = () => {
-    setEsCambioPatron(true);
-    setPatronCreando([]);
-    setPatronConfirmando([]);
-    setErrorPatron(null);
-    setVista('crearPatron');
+    setPatronVerificando([]);
+    setErrorVerificacion(null);
+    setIntentosVerificacion(0);
+    setVista('verificarPatronActual');
+  };
+
+  const handleVerificarPatronActual = () => {
+    const patronGuardado = obtenerPatron(userId!);
+    if (JSON.stringify(patronVerificando) === JSON.stringify(patronGuardado)) {
+      // Verificado correctamente → ahora crear nuevo patrón
+      setEsCambioPatron(true);
+      setPatronCreando([]);
+      setPatronConfirmando([]);
+      setErrorPatron(null);
+      setPatronVerificando([]);
+      setErrorVerificacion(null);
+      setIntentosVerificacion(0);
+      setVista('crearPatron');
+    } else {
+      const nuevos = intentosVerificacion + 1;
+      setIntentosVerificacion(nuevos);
+      setPatronVerificando([]);
+      setErrorVerificacion(
+        nuevos >= 3
+          ? 'Demasiados intentos. Usa "Restablecer patrón" si lo olvidaste.'
+          : `Patrón incorrecto. Te quedan ${3 - nuevos} intento${3 - nuevos === 1 ? '' : 's'}.`
+      );
+    }
   };
 
   const resetearPatron = () => {
@@ -333,19 +379,64 @@ export default function DiarioPage() {
 
   // ─── Handlers de notas ───────────────────────────────────────────────────
 
+  const analizarConIA = async () => {
+    if (!contenido.trim() || analizandoIA) return;
+    setAnalizandoIA(true);
+    setResultadoIA(null);
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: `Eres un asistente empático de bienestar emocional. Analiza esta entrada de diario y responde SOLO con un JSON válido, sin texto extra ni backticks.
+
+Entrada: "${contenido}"
+
+Responde con este formato exacto:
+{
+  "emoji": "uno de estos exactamente: 💜 💛 💙 💚",
+  "label": "uno de estos exactamente: Productivo Cansado Tranquilo Aprendizaje",
+  "frase": "Una frase de cierre cálida, breve (máx 12 palabras), en segunda persona, que valide emocionalmente lo que vivió la persona hoy. No uses comillas dobles dentro de la frase."
+}`
+          }]
+        })
+      });
+      const data = await response.json();
+      const texto = data.content?.map((b: { type: string; text?: string }) => b.type === 'text' ? b.text : '').join('') ?? '';
+      const parsed = JSON.parse(texto.trim());
+      const opcionesValidas = ['💜', '💛', '💙', '💚'];
+      const labelsValidos = ['Productivo', 'Cansado', 'Tranquilo', 'Aprendizaje'];
+      setResultadoIA({
+        estadoSugerido: opcionesValidas.includes(parsed.emoji) && labelsValidos.includes(parsed.label)
+          ? { emoji: parsed.emoji, label: parsed.label }
+          : null,
+        fraseCierre: parsed.frase ?? '',
+      });
+    } catch {
+      setResultadoIA({ estadoSugerido: null, fraseCierre: '' });
+    } finally {
+      setAnalizandoIA(false);
+    }
+  };
+
   const guardarNota = async () => {
     if (!userId) return;
+    const estadoFinal = estadoDia ?? resultadoIA?.estadoSugerido ?? undefined;
     const nueva: Nota = {
       id: Date.now(),
       titulo: titulo.trim() || 'Sin título',
       contenido,
       fecha: new Date().toLocaleDateString(),
-      emoji: estadoDia?.emoji,
-      label: estadoDia?.label,
+      emoji: estadoFinal?.emoji,
+      label: estadoFinal?.label,
     };
-    await insertarNotaDiario(userId, nueva.titulo, nueva.contenido, estadoDia?.emoji ?? null, estadoDia?.label ?? null);
+    await insertarNotaDiario(userId, nueva.titulo, nueva.contenido, estadoFinal?.emoji ?? null, estadoFinal?.label ?? null);
     setListaNotas([nueva, ...listaNotas]);
-    setTitulo(''); setContenido(''); setEstadoDia(null);
+    setTitulo(''); setContenido(''); setEstadoDia(null); setResultadoIA(null);
     setVista('listaNotas');
   };
 
@@ -361,7 +452,7 @@ export default function DiarioPage() {
     // TODO: llamar a updateNotaDiario en Supabase cuando esté disponible
     setListaNotas(listaNotas.map(n => n.id === notaActiva.id ? actualizada : n));
     setNotaActiva(actualizada);
-    setTitulo(''); setContenido(''); setEstadoDia(null);
+    setTitulo(''); setContenido(''); setEstadoDia(null); setResultadoIA(null);
     setVista('verNota');
   };
 
@@ -395,11 +486,12 @@ export default function DiarioPage() {
     else if (vista === 'confirmarPatron') { setPatronConfirmando([]); setVista('crearPatron'); }
     else if (vista === 'ingresarPatron') router.push('/home.2');
     else if (vista === 'listaNotas') setVista('ingresarPatron');
-    else if (vista === 'crearNota') { setTitulo(''); setContenido(''); setEstadoDia(null); setVista('listaNotas'); }
+    else if (vista === 'crearNota') { setTitulo(''); setContenido(''); setEstadoDia(null); setResultadoIA(null); setVista('listaNotas'); }
     else if (vista === 'editarNota') { setTitulo(''); setContenido(''); setEstadoDia(null); setVista('verNota'); }
     else if (vista === 'verNota') setVista('listaNotas');
     else if (vista === 'estadisticas') setVista('listaNotas');
     else if (vista === 'cambiarPatron') setVista('listaNotas');
+    else if (vista === 'verificarPatronActual') { setPatronVerificando([]); setErrorVerificacion(null); setVista('cambiarPatron'); }
   };
 
   const tituloCabecera: Record<VistaDiario, string> = {
@@ -413,6 +505,7 @@ export default function DiarioPage() {
     verNota: 'Mi nota',
     estadisticas: 'Mis emociones',
     cambiarPatron: 'Seguridad',
+    verificarPatronActual: 'Verificar identidad',
   };
 
   if (cargando) {
@@ -669,43 +762,139 @@ export default function DiarioPage() {
             </div>
           )}
 
-          {/* ── CREAR NOTA ── */}
+          {/* ── CREAR / EDITAR NOTA ── */}
           {(vista === 'crearNota' || vista === 'editarNota') && (
-            <div className="h-full flex flex-col pt-2 animate-fadeIn">
+            <div className="h-full flex flex-col animate-fadeIn">
+
+              {/* Fecha y hora — solo en nueva nota */}
+              {vista === 'crearNota' && (
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] text-slate-400 capitalize">{fechaActual}</span>
+                  <span className="text-[10px] text-slate-300">{horaActual}</span>
+                </div>
+              )}
+
+              {/* Título */}
               <input
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Título"
+                placeholder="Dale un título a este momento..."
                 maxLength={80}
-                className="w-full text-sm font-bold p-2 focus:outline-none text-[#2A3B50] placeholder:text-slate-300"
+                className="w-full text-base font-bold pb-2 focus:outline-none text-[#2A3B50] placeholder:text-slate-200 bg-transparent"
               />
-              <div className="w-full h-px bg-slate-100 my-2" />
+              <div className="w-full h-px bg-slate-100 mb-3" />
+
+              {/* Prompt de escritura — solo en nueva nota */}
+              {vista === 'crearNota' && contenido.length === 0 && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] text-[#6B66B2] font-medium italic flex-1">
+                    💭 {PROMPTS_ESCRITURA[promptActivo]}
+                  </span>
+                  <button
+                    onClick={() => setPromptActivo((promptActivo + 1) % PROMPTS_ESCRITURA.length)}
+                    className="text-[9px] text-slate-300 hover:text-[#6B66B2] transition-colors font-medium"
+                  >
+                    otro →
+                  </button>
+                </div>
+              )}
+
+              {/* Textarea principal */}
               <textarea
                 value={contenido}
-                onChange={(e) => setContenido(e.target.value.slice(0, MAX_CONTENIDO))}
-                placeholder="¿Qué tienes en mente hoy?"
-                className="w-full flex-1 p-2 text-xs text-slate-600 focus:outline-none resize-none leading-relaxed placeholder:text-slate-300"
-                style={{ scrollbarWidth: 'none' } as React.CSSProperties}
+                onChange={(e) => {
+                  setContenido(e.target.value.slice(0, MAX_CONTENIDO));
+                  if (resultadoIA) setResultadoIA(null);
+                }}
+                placeholder="Escribe aquí..."
+                className="w-full flex-1 text-sm text-slate-600 focus:outline-none resize-none leading-7 placeholder:text-slate-200 bg-transparent"
+                style={{ scrollbarWidth: 'none', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #f1f5f9 27px, #f1f5f9 28px)' } as React.CSSProperties}
               />
-              <div className="flex justify-end mb-1">
-                <span className={`text-[9px] ${contenido.length >= MAX_CONTENIDO ? 'text-rose-400 font-bold' : 'text-slate-300'}`}>
+
+              <div className="flex justify-end mb-2">
+                <span className={`text-[9px] ${contenido.length >= MAX_CONTENIDO ? 'text-rose-400 font-bold' : 'text-slate-200'}`}>
                   {contenido.length}/{MAX_CONTENIDO}
                 </span>
               </div>
 
-              <button
-                onClick={() => setPanelAbierto(true)}
-                className="mb-3 p-4 rounded-2xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full transition-all hover:bg-purple-100"
-              >
-                <span className="text-xs font-bold text-purple-700">
-                  {estadoDia ? `Día ${estadoDia.label}` : 'Definir mi día'}
-                </span>
-                <span className="text-xl">{estadoDia?.emoji || '💜'}</span>
-              </button>
+              {/* ── Resultado IA ── */}
+              {resultadoIA && !analizandoIA && (
+                <div className="mb-3 rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-4 space-y-3 animate-fadeIn">
+                  {/* Frase de cierre */}
+                  {resultadoIA.fraseCierre && (
+                    <p className="text-xs text-[#6B66B2] font-medium italic leading-relaxed">
+                      ✨ "{resultadoIA.fraseCierre}"
+                    </p>
+                  )}
+
+                  {/* Estado sugerido */}
+                  {resultadoIA.estadoSugerido && !estadoDia && (
+                    <div>
+                      <p className="text-[10px] text-slate-400 mb-2">La IA detectó este estado para tu día:</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEstadoDia(resultadoIA.estadoSugerido!)}
+                          className="flex items-center gap-2 px-3 py-2 bg-white border border-[#6B66B2] rounded-xl text-xs font-bold text-[#6B66B2] hover:bg-purple-50 transition-colors"
+                        >
+                          <span>{resultadoIA.estadoSugerido.emoji}</span>
+                          <span>{resultadoIA.estadoSugerido.label}</span>
+                          <span className="text-[10px] font-normal text-slate-400">· Aceptar</span>
+                        </button>
+                        <button
+                          onClick={() => setPanelAbierto(true)}
+                          className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] text-slate-500 hover:bg-slate-50 transition-colors"
+                        >
+                          Cambiar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {estadoDia && resultadoIA.estadoSugerido && (
+                    <p className="text-[10px] text-slate-400">
+                      Estado guardado: {estadoDia.emoji} {estadoDia.label}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* ── Botón analizar con IA (solo crearNota) ── */}
+              {vista === 'crearNota' && !resultadoIA && (
+                <button
+                  onClick={analizarConIA}
+                  disabled={contenido.trim().length < 20 || analizandoIA}
+                  className="mb-3 w-full py-3 rounded-2xl border border-purple-200 bg-purple-50 text-xs font-bold text-[#6B66B2] hover:bg-purple-100 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {analizandoIA ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-[#6B66B2] border-t-transparent rounded-full animate-spin" />
+                      Analizando tu entrada...
+                    </>
+                  ) : (
+                    <>✨ Analizar con IA</>
+                  )}
+                </button>
+              )}
+
+              {/* Estado manual */}
+              {!resultadoIA?.estadoSugerido || estadoDia ? (
+                <button
+                  onClick={() => setPanelAbierto(true)}
+                  className="mb-3 p-3.5 rounded-2xl bg-slate-50 flex items-center justify-between border border-slate-100 w-full transition-all hover:bg-slate-100"
+                >
+                  <span className="text-xs font-bold text-slate-500">
+                    {estadoDia ? `${estadoDia.emoji} Día ${estadoDia.label}` : 'Definir estado manualmente'}
+                  </span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 text-slate-400">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+              ) : null}
 
               <button
                 onClick={vista === 'crearNota' ? guardarNota : guardarEdicion}
-                className="w-full py-3 bg-[#6B66B2] text-white rounded-2xl font-bold text-xs shadow-md mb-4 hover:bg-[#5a5596] transition-colors"
+                disabled={contenido.trim().length === 0}
+                className="w-full py-3.5 bg-[#6B66B2] text-white rounded-2xl font-bold text-xs shadow-md mb-4 hover:bg-[#5a5596] transition-colors disabled:opacity-40"
               >
                 {vista === 'crearNota' ? 'Guardar nota' : 'Guardar cambios'}
               </button>
@@ -715,6 +904,69 @@ export default function DiarioPage() {
           {/* ── ESTADÍSTICAS ── */}
           {vista === 'estadisticas' && (
             <PanelEstadisticas notas={listaNotas} />
+          )}
+
+          {/* ── VERIFICAR PATRÓN ACTUAL (paso previo a cambiar patrón) ── */}
+          {vista === 'verificarPatronActual' && (
+            <div className="flex flex-col items-center pt-6 space-y-2 animate-fadeIn">
+              <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-2xl mb-2">🔑</div>
+              <h2 className="text-base font-bold text-[#2A3B50]">Confirma tu identidad</h2>
+              <p className="text-[11px] text-slate-400 text-center leading-relaxed px-4">
+                Ingresa tu patrón actual antes de crear uno nuevo.
+              </p>
+
+              <GrillaPatron
+                seleccionados={patronVerificando}
+                onToggle={(idx) => {
+                  if (intentosVerificacion >= 3) return;
+                  togglePunto(patronVerificando, setPatronVerificando, idx);
+                }}
+                disabled={intentosVerificacion >= 3}
+              />
+
+              {errorVerificacion && (
+                <div className={`w-full rounded-2xl px-4 py-3 text-xs font-medium text-center border ${
+                  intentosVerificacion >= 3
+                    ? 'bg-red-50 border-red-200 text-red-700'
+                    : 'bg-amber-50 border-amber-200 text-amber-700'
+                }`}>
+                  {intentosVerificacion >= 3 ? '🔒 ' : '⚠️ '}{errorVerificacion}
+                </div>
+              )}
+
+              {intentosVerificacion < 3 && (
+                <p className="text-[10px] text-slate-400">
+                  {patronVerificando.length} punto{patronVerificando.length !== 1 ? 's' : ''} seleccionado{patronVerificando.length !== 1 ? 's' : ''}
+                </p>
+              )}
+
+              {intentosVerificacion < 3 && (
+                <div className="flex gap-3 w-full pt-2">
+                  <button
+                    onClick={() => { setPatronVerificando([]); setErrorVerificacion(null); }}
+                    className="flex-1 py-3 border border-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-colors"
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    onClick={handleVerificarPatronActual}
+                    disabled={patronVerificando.length < 1}
+                    className="flex-1 py-3 bg-[#6B66B2] text-white rounded-2xl text-xs font-bold hover:bg-[#5a5596] transition-colors disabled:opacity-40"
+                  >
+                    Verificar
+                  </button>
+                </div>
+              )}
+
+              {intentosVerificacion >= 3 && (
+                <button
+                  onClick={() => { setVista('cambiarPatron'); setIntentosVerificacion(0); setErrorVerificacion(null); }}
+                  className="w-full py-3 border border-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-colors mt-2"
+                >
+                  Volver a seguridad
+                </button>
+              )}
+            </div>
           )}
 
           {/* ── CAMBIAR PATRÓN ── */}
