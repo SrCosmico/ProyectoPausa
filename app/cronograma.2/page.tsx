@@ -13,12 +13,16 @@ import { deleteCronogramaActivity } from '@/lib/supabase/cronograma';
 type VistaId = 'paso1' | 'paso2' | 'paso3' | 'paso4' | 'paso5' | 'vistaSemanal' | 'agregarActividad' | 'detallesActividad';
 type SubVistaCalendario = 'dia' | 'mes' | 'lista';
 
+type TipoActividad = 'Clase' | 'Estudio' | 'Tarea' | 'Examen';
+
 interface BloqueHorario {
   id: string;
-  hora: string;
+  dia: string;       // "25".."29" — coincide con el selector de fechas
+  tipo: TipoActividad;
+  horaInicio: string; // valor crudo tipo "07:00 a. m." (de opcionesHoras)
+  horaFin: string;
   titulo: string;
-  subtitulo: string;
-  color: string;
+  ubicacion: string;
 }
 
 const opcionesHoras = [
@@ -26,6 +30,43 @@ const opcionesHoras = [
   "12:00 p. m.", "01:00 p. m.", "02:00 p. m.", "03:00 p. m.", "04:00 p. m.", "05:00 p. m.", "06:00 p. m.",
   "07:00 p. m.", "08:00 p. m.", "09:00 p. m.", "10:00 p. m.", "11:00 p. m."
 ];
+
+const diasDemo = [
+  { d: "Lun", n: "25" },
+  { d: "Mar", n: "26" },
+  { d: "Mié", n: "27" },
+  { d: "Jue", n: "28" },
+  { d: "Vie", n: "29" }
+];
+
+const tiposActividad: TipoActividad[] = ["Clase", "Estudio", "Tarea", "Examen"];
+
+const coloresPorTipo: Record<TipoActividad, string> = {
+  Clase: "bg-purple-50 text-purple-700 border-purple-200",
+  Estudio: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  Tarea: "bg-blue-50 text-blue-700 border-blue-200",
+  Examen: "bg-orange-50 text-orange-700 border-orange-200"
+};
+
+// Convierte "07:00 a. m." / "01:00 p. m." a minutos desde medianoche, para ordenar y comparar horas.
+const minutosDesdeHora = (hora: string): number => {
+  const match = hora.match(/^(\d{2}):(\d{2}) (a|p)\. m\.$/);
+  if (!match) return 0;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const meridiano = match[3];
+  if (meridiano === 'p' && h !== 12) h += 12;
+  if (meridiano === 'a' && h === 12) h = 0;
+  return h * 60 + m;
+};
+
+// Convierte "07:00 a. m." a formato 24h corto "07:00" para mostrar en los bloques.
+const formatoHora24 = (hora: string): string => {
+  const total = minutosDesdeHora(hora);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
 
 // ─── Persistencia de onboarding del cronograma ───────────────────────────────
 // TODO: migrar a Supabase — guardar este flag en la tabla del usuario para que
@@ -40,6 +81,36 @@ const esPrimeraVezCronograma = (): boolean => {
 
 const marcarCronogramaConfigurado = () => {
   localStorage.setItem(CRONOGRAMA_CONFIGURADO_KEY, 'true');
+};
+
+// ─── Persistencia de actividades del cronograma ──────────────────────────────
+// TODO: migrar a Supabase (insertarActividad / eliminarActividad en
+// lib/supabase/cronograma) para que las actividades vivan en la base de datos
+// y no solo en este navegador.
+
+const ACTIVIDADES_KEY = 'cronograma_actividades';
+
+const actividadesDeEjemplo: BloqueHorario[] = [
+  { id: "1", dia: "27", tipo: "Clase", horaInicio: "07:00 a. m.", horaFin: "08:30 a. m.", titulo: "Cálculo diferencial", ubicacion: "Aula 201" },
+  { id: "2", dia: "27", tipo: "Clase", horaInicio: "08:40 a. m.", horaFin: "10:10 a. m.", titulo: "Física I", ubicacion: "Aula 102" },
+  { id: "3", dia: "27", tipo: "Estudio", horaInicio: "10:30 a. m.", horaFin: "11:30 a. m.", titulo: "Estudio personal", ubicacion: "Repaso de ejercicios" },
+  { id: "4", dia: "27", tipo: "Tarea", horaInicio: "12:00 p. m.", horaFin: "01:00 p. m.", titulo: "Almuerzo", ubicacion: "Descanso y comida" },
+  { id: "5", dia: "27", tipo: "Clase", horaInicio: "01:10 p. m.", horaFin: "02:40 p. m.", titulo: "Química general", ubicacion: "Laboratorio 3" }
+];
+
+const leerActividadesGuardadas = (): BloqueHorario[] => {
+  if (typeof window === 'undefined') return actividadesDeEjemplo;
+  const raw = localStorage.getItem(ACTIVIDADES_KEY);
+  if (!raw) return actividadesDeEjemplo;
+  try {
+    return JSON.parse(raw) as BloqueHorario[];
+  } catch {
+    return actividadesDeEjemplo;
+  }
+};
+
+const guardarActividadesEnStorage = (lista: BloqueHorario[]) => {
+  localStorage.setItem(ACTIVIDADES_KEY, JSON.stringify(lista));
 };
 
 export default function CronogramaPage() {
@@ -67,14 +138,17 @@ export default function CronogramaPage() {
   // Estados para añadir/ver detalles
   const [bloqueSeleccionado, setBloqueSeleccionado] = useState<BloqueHorario | null>(null);
 
-  // Bloques de ejemplo para simular la agenda
-  const bloquesSemana: BloqueHorario[] = [
-    { id: "1", hora: "07:00", titulo: "Cálculo diferencial", subtitulo: "Aula 201 (07:00 - 08:30)", color: "bg-purple-50 text-purple-700 border-purple-200" },
-    { id: "2", hora: "09:00", titulo: "Física I", subtitulo: "Aula 102 (08:40 - 10:10)", color: "bg-blue-50 text-blue-700 border-blue-200" },
-    { id: "3", hora: "10:30", titulo: "Estudio personal", subtitulo: "Repaso de ejercicios", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-    { id: "4", hora: "12:00", titulo: "Almuerzo", subtitulo: "Descanso y comida", color: "bg-orange-50 text-orange-700 border-orange-200" },
-    { id: "5", hora: "01:00", titulo: "Química general", subtitulo: "Laboratorio 3 (01:10 - 02:40)", color: "bg-purple-50 text-purple-700 border-purple-200" }
-  ];
+  // Actividades reales del cronograma (antes eran datos fijos de ejemplo)
+  const [actividadesGuardadas, setActividadesGuardadas] = useState<BloqueHorario[]>([]);
+
+  // Estados del formulario para agregar una nueva actividad
+  const [tipoNuevo, setTipoNuevo] = useState<TipoActividad>("Clase");
+  const [tituloNuevo, setTituloNuevo] = useState("");
+  const [ubicacionNuevo, setUbicacionNuevo] = useState("");
+  const [horaInicioNuevo, setHoraInicioNuevo] = useState("07:00 a. m.");
+  const [horaFinNuevo, setHoraFinNuevo] = useState("08:00 a. m.");
+  const [diaNuevo, setDiaNuevo] = useState("27");
+  const [errorNuevaActividad, setErrorNuevaActividad] = useState<string | null>(null);
 
   // Diccionario de estilos dinámicos basados en la selección de color
   const mapaEstilos = {
@@ -91,8 +165,58 @@ export default function CronogramaPage() {
 
   useEffect(() => {
     setVista(esPrimeraVezCronograma() ? 'paso1' : 'vistaSemanal');
+    setActividadesGuardadas(leerActividadesGuardadas());
     setCargando(false);
   }, []);
+
+  // Actividades del día seleccionado, ordenadas por hora de inicio
+  const actividadesDelDia = actividadesGuardadas
+    .filter(a => a.dia === diaActivoNumero)
+    .sort((a, b) => minutosDesdeHora(a.horaInicio) - minutosDesdeHora(b.horaInicio));
+
+  // Todas las actividades, ordenadas por día y luego por hora (para la vista de lista)
+  const actividadesOrdenadas = [...actividadesGuardadas].sort((a, b) => {
+    if (a.dia !== b.dia) return a.dia.localeCompare(b.dia);
+    return minutosDesdeHora(a.horaInicio) - minutosDesdeHora(b.horaInicio);
+  });
+
+  const agregarActividadNueva = () => {
+    if (!tituloNuevo.trim()) {
+      setErrorNuevaActividad('Ponle un título a la actividad.');
+      return;
+    }
+    if (minutosDesdeHora(horaFinNuevo) <= minutosDesdeHora(horaInicioNuevo)) {
+      setErrorNuevaActividad('La hora de fin debe ser después de la hora de inicio.');
+      return;
+    }
+    const nueva: BloqueHorario = {
+      id: Date.now().toString(),
+      dia: diaNuevo,
+      tipo: tipoNuevo,
+      horaInicio: horaInicioNuevo,
+      horaFin: horaFinNuevo,
+      titulo: tituloNuevo.trim(),
+      ubicacion: ubicacionNuevo.trim(),
+    };
+    const actualizadas = [...actividadesGuardadas, nueva];
+    setActividadesGuardadas(actualizadas);
+    guardarActividadesEnStorage(actualizadas);
+    setErrorNuevaActividad(null);
+    setTituloNuevo('');
+    setUbicacionNuevo('');
+    setTipoNuevo('Clase');
+    setDiaActivoNumero(diaNuevo);
+    setVista('vistaSemanal');
+  };
+
+  const eliminarActividadSeleccionada = () => {
+    if (!bloqueSeleccionado) return;
+    const actualizadas = actividadesGuardadas.filter(a => a.id !== bloqueSeleccionado.id);
+    setActividadesGuardadas(actualizadas);
+    guardarActividadesEnStorage(actualizadas);
+    setBloqueSeleccionado(null);
+    setVista('vistaSemanal');
+  };
 
   const manejarFlechaAtras = () => {
     switch (vista) {
@@ -102,7 +226,10 @@ export default function CronogramaPage() {
       case 'paso4': setVista('paso3'); break;
       case 'paso5': setVista('paso4'); break;
       case 'vistaSemanal': setVista('paso5'); break;
-      case 'agregarActividad': setVista('vistaSemanal'); break;
+      case 'agregarActividad':
+        setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase'); setErrorNuevaActividad(null);
+        setVista('vistaSemanal');
+        break;
       case 'detallesActividad': setVista('vistaSemanal'); break;
       default: router.push('/home.2');
     }
@@ -368,22 +495,20 @@ export default function CronogramaPage() {
                 <>
                   {/* SELECTOR DE FECHAS DE ABAJO INTERACTIVO */}
                   <div className="px-6 py-3 flex justify-between border-b border-slate-100 bg-white">
-                    {[
-                      { d: "Lun", n: "25" }, 
-                      { d: "Mar", n: "26" }, 
-                      { d: "Mié", n: "27" }, 
-                      { d: "Jue", n: "28" }, 
-                      { d: "Vie", n: "29" }
-                    ].map((day) => {
+                    {diasDemo.map((day) => {
                       const esDiaActivo = diaActivoNumero === day.n;
+                      const tieneActividades = actividadesGuardadas.some(a => a.dia === day.n);
                       return (
                         <button 
                           key={day.n} 
                           onClick={() => setDiaActivoNumero(day.n)}
-                          className={`flex flex-col items-center p-2 rounded-xl w-12 transition-all ${esDiaActivo ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50'}`}
+                          className={`relative flex flex-col items-center p-2 rounded-xl w-12 transition-all ${esDiaActivo ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                           <span className="text-[10px] font-bold">{day.d}</span>
                           <span className="text-xs font-black mt-0.5">{day.n}</span>
+                          {tieneActividades && !esDiaActivo && (
+                            <span className={`absolute bottom-1 w-1 h-1 rounded-full ${estilosActuales.bg}`} />
+                          )}
                         </button>
                       );
                     })}
@@ -392,12 +517,20 @@ export default function CronogramaPage() {
                   {/* Bloques Horarios Principales */}
                   <div className="p-6 space-y-4 relative">
                     <p className="text-[10px] font-bold text-slate-400 mb-1">Mostrando actividades del día {diaActivoNumero} de Mayo</p>
-                    {bloquesSemana.map((bloque) => (
+                    {actividadesDelDia.length === 0 && (
+                      <div className="text-center pt-10 space-y-2">
+                        <span className="text-3xl">🗓️</span>
+                        <p className="text-xs text-slate-400">No tienes actividades este día.</p>
+                      </div>
+                    )}
+                    {actividadesDelDia.map((bloque) => (
                       <div key={bloque.id} onClick={() => { setBloqueSeleccionado(bloque); setVista('detallesActividad'); }} className="flex gap-4 items-start cursor-pointer group">
-                        <span className="text-xs font-bold text-slate-400 pt-1 w-10">{bloque.hora}</span>
-                        <div className={`flex-1 p-3.5 border-l-4 rounded-xl border transition-all group-hover:shadow-md ${bloque.color}`}>
+                        <span className="text-xs font-bold text-slate-400 pt-1 w-10">{formatoHora24(bloque.horaInicio)}</span>
+                        <div className={`flex-1 p-3.5 border-l-4 rounded-xl border transition-all group-hover:shadow-md ${coloresPorTipo[bloque.tipo]}`}>
                           <h5 className="text-xs font-bold">{bloque.titulo}</h5>
-                          <p className="text-[10px] opacity-80 mt-0.5 font-medium">{bloque.subtitulo}</p>
+                          <p className="text-[10px] opacity-80 mt-0.5 font-medium">
+                            {bloque.ubicacion ? `${bloque.ubicacion} ` : ''}({formatoHora24(bloque.horaInicio)} - {formatoHora24(bloque.horaFin)})
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -418,20 +551,42 @@ export default function CronogramaPage() {
               {subVista === 'lista' && (
                 <div className="p-6 space-y-3 animate-fadeIn">
                   <p className="text-[10px] font-bold text-slate-400">Próximos eventos en formato lista</p>
-                  {bloquesSemana.map((bloque) => (
-                    <div key={bloque.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
+                  {actividadesOrdenadas.length === 0 && (
+                    <div className="text-center pt-10 space-y-2">
+                      <span className="text-3xl">🗓️</span>
+                      <p className="text-xs text-slate-400">Aún no has agregado actividades.</p>
+                    </div>
+                  )}
+                  {actividadesOrdenadas.map((bloque) => (
+                    <div
+                      key={bloque.id}
+                      onClick={() => { setBloqueSeleccionado(bloque); setDiaActivoNumero(bloque.dia); setVista('detallesActividad'); }}
+                      className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center cursor-pointer hover:border-slate-300 transition-colors"
+                    >
                       <div>
                         <h6 className="text-xs font-bold text-slate-800">{bloque.titulo}</h6>
-                        <p className="text-[10px] text-slate-400">{bloque.subtitulo}</p>
+                        <p className="text-[10px] text-slate-400">{bloque.ubicacion || bloque.tipo} · Día {bloque.dia} de Mayo</p>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md shadow-sm">{bloque.hora}</span>
+                      <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md shadow-sm">{formatoHora24(bloque.horaInicio)}</span>
                     </div>
                   ))}
                 </div>
               )}
 
               {/* BOTÓN FLOTANTE "+" ADAPTATIVO AL COLOR */}
-              <button onClick={() => setVista('agregarActividad')} className={`absolute bottom-4 right-6 w-12 h-12 ${estilosActuales.bg} text-white rounded-full shadow-xl flex items-center justify-center font-bold text-xl ${estilosActuales.hoverBg} transition-all transform active:scale-95 z-30`}>
+              <button
+                onClick={() => {
+                  setDiaNuevo(diaActivoNumero);
+                  setTipoNuevo('Clase');
+                  setTituloNuevo('');
+                  setUbicacionNuevo('');
+                  setHoraInicioNuevo('07:00 a. m.');
+                  setHoraFinNuevo('08:00 a. m.');
+                  setErrorNuevaActividad(null);
+                  setVista('agregarActividad');
+                }}
+                className={`absolute bottom-4 right-6 w-12 h-12 ${estilosActuales.bg} text-white rounded-full shadow-xl flex items-center justify-center font-bold text-xl ${estilosActuales.hoverBg} transition-all transform active:scale-95 z-30`}
+              >
                 +
               </button>
             </div>
@@ -440,20 +595,102 @@ export default function CronogramaPage() {
           {/* PANTALLA 9: AGREGAR ACTIVIDAD */}
           {vista === 'agregarActividad' && (
             <div className="p-6 space-y-4 animate-fadeIn">
+              {/* Tipo de actividad */}
               <div className="flex gap-2 justify-between">
-                {["Clase", "Estudio", "Tarea", "Examen"].map((t) => (
-                  <span key={t} className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 cursor-pointer hover:bg-slate-200">{t}</span>
-                ))}
+                {tiposActividad.map((t) => {
+                  const elegido = tipoNuevo === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTipoNuevo(t)}
+                      className={`flex-1 text-[11px] font-bold px-2 py-1.5 rounded-xl border transition-colors ${elegido ? coloresPorTipo[t] : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'}`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="space-y-3 pt-2">
+
+              {/* Día de la actividad */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Día</label>
+                <div className="flex justify-between">
+                  {diasDemo.map((day) => {
+                    const elegido = diaNuevo === day.n;
+                    return (
+                      <button
+                        key={day.n}
+                        type="button"
+                        onClick={() => setDiaNuevo(day.n)}
+                        className={`flex flex-col items-center p-2 rounded-xl w-12 transition-all ${elegido ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50 bg-slate-50'}`}
+                      >
+                        <span className="text-[10px] font-bold">{day.d}</span>
+                        <span className="text-xs font-black mt-0.5">{day.n}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-1">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">Título de la actividad</label>
-                  <input type="text" placeholder="Ej. Cálculo diferencial" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
+                  <input
+                    type="text"
+                    value={tituloNuevo}
+                    onChange={(e) => setTituloNuevo(e.target.value)}
+                    placeholder="Ej. Cálculo diferencial"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">Ubicación / Aula</label>
-                  <input type="text" placeholder="Ej. Aula 201" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
+                  <input
+                    type="text"
+                    value={ubicacionNuevo}
+                    onChange={(e) => setUbicacionNuevo(e.target.value)}
+                    placeholder="Ej. Aula 201"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
+                  />
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Hora de inicio</label>
+                    <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1">
+                      <select
+                        value={horaInicioNuevo}
+                        onChange={(e) => setHoraInicioNuevo(e.target.value)}
+                        className="w-full py-2.5 bg-transparent text-xs text-slate-700 font-bold focus:outline-none cursor-pointer appearance-none"
+                      >
+                        {opcionesHoras.map((hora) => (
+                          <option key={hora} value={hora}>{hora}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Hora de fin</label>
+                    <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1">
+                      <select
+                        value={horaFinNuevo}
+                        onChange={(e) => setHoraFinNuevo(e.target.value)}
+                        className="w-full py-2.5 bg-transparent text-xs text-slate-700 font-bold focus:outline-none cursor-pointer appearance-none"
+                      >
+                        {opcionesHoras.map((hora) => (
+                          <option key={hora} value={hora}>{hora}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {errorNuevaActividad && (
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-xs text-rose-700 font-medium text-center">
+                    {errorNuevaActividad}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -461,18 +698,24 @@ export default function CronogramaPage() {
           {/* PANTALLA 10: DETALLES DE ACTIVIDAD */}
           {vista === 'detallesActividad' && bloqueSeleccionado && (
             <div className="p-6 space-y-5 animate-fadeIn">
-              <div className="p-5 bg-purple-50/70 border border-purple-100 rounded-2xl text-purple-950 space-y-1">
+              <div className={`p-5 rounded-2xl space-y-1 border ${coloresPorTipo[bloqueSeleccionado.tipo]}`}>
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{bloqueSeleccionado.tipo}</span>
                 <h4 className="text-sm font-black">{bloqueSeleccionado.titulo}</h4>
-                <p className="text-xs font-bold text-purple-800">{bloqueSeleccionado.subtitulo}</p>
-                <p className="text-[10px] text-purple-600/90 font-medium pt-1">Día {diaActivoNumero} de Mayo</p>
-              </div>
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-slate-700">Descripción</p>
-                <p className="text-xs text-slate-500 leading-relaxed font-medium bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  Clase teórica estructurada conforme al cronograma guardado. Revisar temas de la semana.
+                {bloqueSeleccionado.ubicacion && (
+                  <p className="text-xs font-bold opacity-90">{bloqueSeleccionado.ubicacion}</p>
+                )}
+                <p className="text-[10px] opacity-80 font-medium pt-1">
+                  Día {bloqueSeleccionado.dia} de Mayo · {formatoHora24(bloqueSeleccionado.horaInicio)} - {formatoHora24(bloqueSeleccionado.horaFin)}
                 </p>
               </div>
-              <button onClick={() => setVista('vistaSemanal')} className="w-full py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors">
+              <button
+                onClick={() => {
+                  if (window.confirm('¿Seguro que quieres eliminar esta actividad?')) {
+                    eliminarActividadSeleccionada();
+                  }
+                }}
+                className="w-full py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors"
+              >
                 Eliminar actividad
               </button>
             </div>
@@ -490,7 +733,7 @@ export default function CronogramaPage() {
                 else if (vista === 'paso3') setVista('paso4');
                 else if (vista === 'paso4') setVista('paso5');
                 else if (vista === 'paso5') { marcarCronogramaConfigurado(); setVista('vistaSemanal'); }
-                else if (vista === 'agregarActividad') setVista('vistaSemanal');
+                else if (vista === 'agregarActividad') agregarActividadNueva();
               }}
               className={`w-full py-3.5 ${estilosActuales.bg} ${estilosActuales.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all`}
             >
