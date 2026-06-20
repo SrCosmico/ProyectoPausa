@@ -39,6 +39,17 @@ const diasDemo = [
   { d: "Vie", n: "29" }
 ];
 
+// Cuadrícula real de Mayo 2026 (semanas de lunes a domingo). `null` = día fuera del mes.
+const SEMANAS_MAYO_2026: (number | null)[][] = [
+  [null, null, null, null, 1, 2, 3],
+  [4, 5, 6, 7, 8, 9, 10],
+  [11, 12, 13, 14, 15, 16, 17],
+  [18, 19, 20, 21, 22, 23, 24],
+  [25, 26, 27, 28, 29, 30, 31],
+];
+
+const DIAS_SEMANA_CORTO = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
 const tiposActividad: TipoActividad[] = ["Clase", "Estudio", "Tarea", "Examen"];
 
 const coloresPorTipo: Record<TipoActividad, string> = {
@@ -593,12 +604,47 @@ export default function CronogramaPage() {
               )}
 
               {subVista === 'mes' && (
-                <div className="p-6 text-center space-y-3 animate-fadeIn">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    <span className="text-2xl">📅</span>
-                    <h5 className="text-xs font-bold text-slate-700 mt-2">Vista Mensual Activa</h5>
-                    <p className="text-[11px] text-slate-400 mt-1">Aquí se desplegará el calendario completo en cuadrícula de Mayo 2026.</p>
+                <div className="p-6 space-y-3 animate-fadeIn">
+                  <div className="grid grid-cols-7 gap-1 text-center">
+                    {DIAS_SEMANA_CORTO.map((d) => (
+                      <span key={d} className="text-[9px] font-bold text-slate-400">{d}</span>
+                    ))}
                   </div>
+                  <div className="space-y-1">
+                    {SEMANAS_MAYO_2026.map((semana, i) => (
+                      <div key={i} className="grid grid-cols-7 gap-1">
+                        {semana.map((dia, j) => {
+                          if (dia === null) return <div key={j} />;
+                          const diaStr = dia.toString();
+                          const esSeleccionable = diasDemo.some((d) => d.n === diaStr);
+                          const tieneActividades = actividadesGuardadas.some((a) => a.dia === diaStr);
+                          const esActivo = esSeleccionable && diaActivoNumero === diaStr;
+                          return (
+                            <button
+                              key={j}
+                              type="button"
+                              disabled={!esSeleccionable}
+                              onClick={() => { setDiaActivoNumero(diaStr); setSubVista('dia'); }}
+                              className={`relative aspect-square rounded-lg flex items-center justify-center text-[11px] font-bold transition-all
+                                ${esActivo
+                                  ? `${estilosActuales.bg} text-white shadow-md`
+                                  : esSeleccionable
+                                    ? 'text-slate-700 hover:bg-slate-100 cursor-pointer'
+                                    : 'text-slate-300 cursor-default'}`}
+                            >
+                              {dia}
+                              {tieneActividades && !esActivo && (
+                                <span className={`absolute bottom-1 w-1 h-1 rounded-full ${estilosActuales.bg}`} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 text-center pt-2">
+                    Por ahora el cronograma admite actividades de lunes 25 a viernes 29 de mayo. Toca un día con punto para ver sus actividades.
+                  </p>
                 </div>
               )}
 
