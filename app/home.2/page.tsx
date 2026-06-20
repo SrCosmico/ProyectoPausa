@@ -44,7 +44,6 @@ export const accesoRapidoData: AccesoRapido[] = [
   { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios", ruta: "/monitoreo.2"   },
   { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                ruta: "/cronograma.2"  },
   { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",               ruta: "/monitoreo.2"   },
-  // Modo crisis ahora tiene ruta real
   { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
   { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2"  },
   { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: ""               },
@@ -69,9 +68,10 @@ const mapeoIconosHerramientas: Record<string, string> = {
 
 export default function HomePage() {
   const router = useRouter();
-  const [usuarioNombre, setUsuarioNombre]   = useState('Usuario');
-  const [yaRegistroHoy, setYaRegistroHoy]   = useState(false);
-  const [loadingLogout, setLoadingLogout]   = useState(false);
+  const [usuarioNombre, setUsuarioNombre] = useState('Usuario');
+  const [usuarioAvatar, setUsuarioAvatar] = useState<string | null>(null); // ✅ NUEVO
+  const [yaRegistroHoy, setYaRegistroHoy] = useState(false);
+  const [loadingLogout, setLoadingLogout] = useState(false);
 
   const { preguntaActual, mostrarCheckin, guardarEmocionTemporal } = useQuizState();
 
@@ -86,6 +86,10 @@ export default function HomePage() {
       } else {
         setUsuarioNombre(obtenerNombreUsuarioLocal() || 'Estudiante');
       }
+
+      // ✅ NUEVO: leer avatar guardado desde perfil
+      const avatar = localStorage.getItem('userAvatar');
+      setUsuarioAvatar(avatar);
 
       const registroFecha = localStorage.getItem('fechaUltimoRegistro');
       const hoy = new Date().toLocaleDateString();
@@ -140,12 +144,20 @@ export default function HomePage() {
             <div className="flex items-center justify-between gap-4">
 
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-500 via-indigo-400 to-blue-400 p-0.5 shadow-md flex-shrink-0 flex items-center justify-center">
-                  <div className="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-indigo-400 translate-y-1">
-                      <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
-                    </svg>
-                  </div>
+                {/* ✅ Avatar igual al del perfil */}
+                <div
+                  className="w-12 h-12 rounded-full overflow-hidden border-4 border-slate-50 shadow-sm flex-shrink-0 flex items-center justify-center text-white text-lg font-bold"
+                  style={{ backgroundColor: '#A7C7D8' }}
+                >
+                  {usuarioAvatar ? (
+                    <img
+                      src={usuarioAvatar}
+                      alt="Foto de perfil"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{usuarioNombre.charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
 
                 <div>
