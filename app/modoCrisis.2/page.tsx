@@ -98,36 +98,6 @@ const SECCIONES_APOYO: SeccionAcordeon[] = [
       },
     ],
   },
-  {
-    id: "autoayuda",
-    titulo: "Técnicas de contención inmediata",
-    icono: "🧘",
-    color: "text-emerald-700",
-    colorBg: "bg-emerald-50 border-emerald-100",
-    puntos: [
-      {
-        id: "respiracion",
-        nombre: "Respiración 4-7-8",
-        descripcion: "Inhala contando 4 segundos, mantén 7 segundos, exhala lentamente en 8 segundos. Repite 3 veces. Activa el sistema nervioso parasimpático.",
-        ubicacion: "",
-        horario: "3–5 minutos",
-      },
-      {
-        id: "grounding",
-        nombre: "Técnica 5-4-3-2-1 (Grounding)",
-        descripcion: "Nombra 5 cosas que puedes VER, 4 que puedes TOCAR, 3 que puedes ESCUCHAR, 2 que puedes OLER, 1 que puedes SABOREAR. Ancla tu mente al presente.",
-        ubicacion: "",
-        horario: "2–3 minutos",
-      },
-      {
-        id: "frio",
-        nombre: "Técnica de frío",
-        descripcion: "Pon agua fría en tu muñeca o frente durante 30 segundos. El cambio de temperatura activa el reflejo de buceo y reduce la activación del sistema nervioso.",
-        ubicacion: "",
-        horario: "30 segundos – 1 minuto",
-      },
-    ],
-  },
 ];
 
 // ==========================================
