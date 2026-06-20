@@ -119,6 +119,7 @@ export default function CronogramaPage() {
   // Estado principal de navegación interna
   const [vista, setVista] = useState<VistaId>('paso1');
   const [cargando, setCargando] = useState(true);
+  const [primeraVezEnEstaSesion, setPrimeraVezEnEstaSesion] = useState(true);
   
   // ESTADOS DE INTERACTIVIDAD INTERNA DEL CRONOGRAMA
   const [subVista, setSubVista] = useState<SubVistaCalendario>('dia');
@@ -149,6 +150,7 @@ export default function CronogramaPage() {
   const [horaFinNuevo, setHoraFinNuevo] = useState("08:00 a. m.");
   const [diaNuevo, setDiaNuevo] = useState("27");
   const [errorNuevaActividad, setErrorNuevaActividad] = useState<string | null>(null);
+  const [actividadEditando, setActividadEditando] = useState<BloqueHorario | null>(null);
 
   // Diccionario de estilos dinámicos basados en la selección de color
   const mapaEstilos = {
@@ -164,7 +166,9 @@ export default function CronogramaPage() {
   // ─── Al montar: decide si mostrar el onboarding o ir directo al cronograma ──
 
   useEffect(() => {
-    setVista(esPrimeraVezCronograma() ? 'paso1' : 'vistaSemanal');
+    const esPrimeraVez = esPrimeraVezCronograma();
+    setPrimeraVezEnEstaSesion(esPrimeraVez);
+    setVista(esPrimeraVez ? 'paso1' : 'vistaSemanal');
     setActividadesGuardadas(leerActividadesGuardadas());
     setCargando(false);
   }, []);
@@ -180,7 +184,7 @@ export default function CronogramaPage() {
     return minutosDesdeHora(a.horaInicio) - minutosDesdeHora(b.horaInicio);
   });
 
-  const agregarActividadNueva = () => {
+  const guardarActividad = () => {
     if (!tituloNuevo.trim()) {
       setErrorNuevaActividad('Ponle un título a la actividad.');
       return;
@@ -189,24 +193,63 @@ export default function CronogramaPage() {
       setErrorNuevaActividad('La hora de fin debe ser después de la hora de inicio.');
       return;
     }
-    const nueva: BloqueHorario = {
-      id: Date.now().toString(),
-      dia: diaNuevo,
-      tipo: tipoNuevo,
-      horaInicio: horaInicioNuevo,
-      horaFin: horaFinNuevo,
-      titulo: tituloNuevo.trim(),
-      ubicacion: ubicacionNuevo.trim(),
-    };
-    const actualizadas = [...actividadesGuardadas, nueva];
-    setActividadesGuardadas(actualizadas);
-    guardarActividadesEnStorage(actualizadas);
+
+    if (actividadEditando) {
+      // Editando una actividad existente
+      const actualizadas = actividadesGuardadas.map((a) =>
+        a.id === actividadEditando.id
+          ? {
+              ...a,
+              dia: diaNuevo,
+              tipo: tipoNuevo,
+              horaInicio: horaInicioNuevo,
+              horaFin: horaFinNuevo,
+              titulo: tituloNuevo.trim(),
+              ubicacion: ubicacionNuevo.trim(),
+            }
+          : a
+      );
+      setActividadesGuardadas(actualizadas);
+      guardarActividadesEnStorage(actualizadas);
+      setBloqueSeleccionado(actualizadas.find((a) => a.id === actividadEditando.id) ?? null);
+      setErrorNuevaActividad(null);
+      setActividadEditando(null);
+      setDiaActivoNumero(diaNuevo);
+      setVista('detallesActividad');
+    } else {
+      // Creando una actividad nueva
+      const nueva: BloqueHorario = {
+        id: Date.now().toString(),
+        dia: diaNuevo,
+        tipo: tipoNuevo,
+        horaInicio: horaInicioNuevo,
+        horaFin: horaFinNuevo,
+        titulo: tituloNuevo.trim(),
+        ubicacion: ubicacionNuevo.trim(),
+      };
+      const actualizadas = [...actividadesGuardadas, nueva];
+      setActividadesGuardadas(actualizadas);
+      guardarActividadesEnStorage(actualizadas);
+      setErrorNuevaActividad(null);
+      setTituloNuevo('');
+      setUbicacionNuevo('');
+      setTipoNuevo('Clase');
+      setDiaActivoNumero(diaNuevo);
+      setVista('vistaSemanal');
+    }
+  };
+
+  const abrirEdicionActividad = () => {
+    if (!bloqueSeleccionado) return;
+    setActividadEditando(bloqueSeleccionado);
+    setTipoNuevo(bloqueSeleccionado.tipo);
+    setTituloNuevo(bloqueSeleccionado.titulo);
+    setUbicacionNuevo(bloqueSeleccionado.ubicacion);
+    setHoraInicioNuevo(bloqueSeleccionado.horaInicio);
+    setHoraFinNuevo(bloqueSeleccionado.horaFin);
+    setDiaNuevo(bloqueSeleccionado.dia);
     setErrorNuevaActividad(null);
-    setTituloNuevo('');
-    setUbicacionNuevo('');
-    setTipoNuevo('Clase');
-    setDiaActivoNumero(diaNuevo);
-    setVista('vistaSemanal');
+    setVista('agregarActividad');
   };
 
   const eliminarActividadSeleccionada = () => {
@@ -225,10 +268,21 @@ export default function CronogramaPage() {
       case 'paso3': setVista('paso2'); break;
       case 'paso4': setVista('paso3'); break;
       case 'paso5': setVista('paso4'); break;
-      case 'vistaSemanal': setVista('paso5'); break;
+      case 'vistaSemanal':
+        if (primeraVezEnEstaSesion) {
+          setVista('paso5');
+        } else {
+          router.push('/home.2');
+        }
+        break;
       case 'agregarActividad':
         setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase'); setErrorNuevaActividad(null);
-        setVista('vistaSemanal');
+        if (actividadEditando) {
+          setActividadEditando(null);
+          setVista('detallesActividad');
+        } else {
+          setVista('vistaSemanal');
+        }
         break;
       case 'detallesActividad': setVista('vistaSemanal'); break;
       default: router.push('/home.2');
@@ -269,7 +323,7 @@ export default function CronogramaPage() {
             {vista === 'paso1' && "Cronograma académico"}
             {(vista === 'paso2' || vista === 'paso3' || vista === 'paso4' || vista === 'paso5') && "Crear cronograma"}
             {vista === 'vistaSemanal' && "Mi cronograma"}
-            {vista === 'agregarActividad' && "Agregar actividad"}
+            {vista === 'agregarActividad' && (actividadEditando ? "Editar actividad" : "Agregar actividad")}
             {vista === 'detallesActividad' && "Detalles de actividad"}
           </h3>
           
@@ -576,6 +630,7 @@ export default function CronogramaPage() {
               {/* BOTÓN FLOTANTE "+" ADAPTATIVO AL COLOR */}
               <button
                 onClick={() => {
+                  setActividadEditando(null);
                   setDiaNuevo(diaActivoNumero);
                   setTipoNuevo('Clase');
                   setTituloNuevo('');
@@ -708,16 +763,27 @@ export default function CronogramaPage() {
                   Día {bloqueSeleccionado.dia} de Mayo · {formatoHora24(bloqueSeleccionado.horaInicio)} - {formatoHora24(bloqueSeleccionado.horaFin)}
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  if (window.confirm('¿Seguro que quieres eliminar esta actividad?')) {
-                    eliminarActividadSeleccionada();
-                  }
-                }}
-                className="w-full py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors"
-              >
-                Eliminar actividad
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={abrirEdicionActividad}
+                  className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                  </svg>
+                  Editar
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('¿Seguro que quieres eliminar esta actividad?')) {
+                      eliminarActividadSeleccionada();
+                    }
+                  }}
+                  className="flex-1 py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors"
+                >
+                  Eliminar actividad
+                </button>
+              </div>
             </div>
           )}
 
@@ -733,11 +799,11 @@ export default function CronogramaPage() {
                 else if (vista === 'paso3') setVista('paso4');
                 else if (vista === 'paso4') setVista('paso5');
                 else if (vista === 'paso5') { marcarCronogramaConfigurado(); setVista('vistaSemanal'); }
-                else if (vista === 'agregarActividad') agregarActividadNueva();
+                else if (vista === 'agregarActividad') guardarActividad();
               }}
               className={`w-full py-3.5 ${estilosActuales.bg} ${estilosActuales.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all`}
             >
-              {vista === 'paso1' ? "Crear mi cronograma" : vista === 'paso5' ? "Crear cronograma" : vista === 'agregarActividad' ? "Guardar actividad" : "Continuar"}
+              {vista === 'paso1' ? "Crear mi cronograma" : vista === 'paso5' ? "Crear cronograma" : vista === 'agregarActividad' ? (actividadEditando ? "Guardar cambios" : "Guardar actividad") : "Continuar"}
             </button>
           </div>
         )}
