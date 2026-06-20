@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 // DELATE
 import { deleteSelectedDay } from '@/lib/supabase/cronograma';
@@ -27,11 +27,27 @@ const opcionesHoras = [
   "07:00 p. m.", "08:00 p. m.", "09:00 p. m.", "10:00 p. m.", "11:00 p. m."
 ];
 
+// ─── Persistencia de onboarding del cronograma ───────────────────────────────
+// TODO: migrar a Supabase — guardar este flag en la tabla del usuario para que
+// funcione entre dispositivos en vez de quedar solo en este navegador.
+
+const CRONOGRAMA_CONFIGURADO_KEY = 'cronograma_configurado';
+
+const esPrimeraVezCronograma = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  return localStorage.getItem(CRONOGRAMA_CONFIGURADO_KEY) !== 'true';
+};
+
+const marcarCronogramaConfigurado = () => {
+  localStorage.setItem(CRONOGRAMA_CONFIGURADO_KEY, 'true');
+};
+
 export default function CronogramaPage() {
   const router = useRouter();
   
   // Estado principal de navegación interna
   const [vista, setVista] = useState<VistaId>('paso1');
+  const [cargando, setCargando] = useState(true);
   
   // ESTADOS DE INTERACTIVIDAD INTERNA DEL CRONOGRAMA
   const [subVista, setSubVista] = useState<SubVistaCalendario>('dia');
@@ -71,6 +87,13 @@ export default function CronogramaPage() {
 
   const estilosActuales = mapaEstilos[colorCronograma];
 
+  // ─── Al montar: decide si mostrar el onboarding o ir directo al cronograma ──
+
+  useEffect(() => {
+    setVista(esPrimeraVezCronograma() ? 'paso1' : 'vistaSemanal');
+    setCargando(false);
+  }, []);
+
   const manejarFlechaAtras = () => {
     switch (vista) {
       case 'paso1': router.push('/home.2'); break;
@@ -92,6 +115,14 @@ export default function CronogramaPage() {
       setList([...list, item]);
     }
   };
+
+  if (cargando) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-slate-200">
@@ -458,7 +489,7 @@ export default function CronogramaPage() {
                 else if (vista === 'paso2') setVista('paso3');
                 else if (vista === 'paso3') setVista('paso4');
                 else if (vista === 'paso4') setVista('paso5');
-                else if (vista === 'paso5') setVista('vistaSemanal');
+                else if (vista === 'paso5') { marcarCronogramaConfigurado(); setVista('vistaSemanal'); }
                 else if (vista === 'agregarActividad') setVista('vistaSemanal');
               }}
               className={`w-full py-3.5 ${estilosActuales.bg} ${estilosActuales.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all`}
