@@ -185,73 +185,160 @@ const PUNTOS_MAPA: PuntoMapa[] = [
   },
 ];
 
+// URLs de los recursos de Leaflet. Se reutilizan tal cual (sin npm) para no tocar
+// la arquitectura del proyecto, pero ahora se cargan de forma controlada.
+const LEAFLET_CSS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+
+// Carga el CSS de Leaflet una sola vez (evita inyectarlo de nuevo cada vez que se
+// abre el mapa) y espera a que esté realmente aplicado antes de continuar.
+function cargarLeafletCSS(): Promise<void> {
+  return new Promise((resolve) => {
+    const existente = document.querySelector('link[data-leaflet-css]') as HTMLLinkElement | null;
+    if (existente) {
+      // Si ya existe pero seguimos sin certeza de que terminó de cargar, igual seguimos:
+      // peor caso, el mapa se ve sin estilos un instante.
+      resolve();
+      return;
+    }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = LEAFLET_CSS_URL;
+    link.setAttribute('data-leaflet-css', 'true');
+    link.onload = () => resolve();
+    link.onerror = () => resolve(); // no bloquear el mapa si el CSS falla
+    document.head.appendChild(link);
+  });
+}
+
+// Carga el script de Leaflet una sola vez y reutiliza `window.L` si ya está disponible
+// (por ejemplo, si el usuario ya abrió el mapa antes en esta misma sesión).
+function cargarLeafletJS(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).L) {
+      resolve((window as any).L);
+      return;
+    }
+    const existente = document.querySelector('script[data-leaflet-js]') as HTMLScriptElement | null;
+    if (existente) {
+      existente.addEventListener('load', () => resolve((window as any).L));
+      existente.addEventListener('error', () => reject(new Error('No se pudo cargar Leaflet (JS)')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = LEAFLET_JS_URL;
+    script.setAttribute('data-leaflet-js', 'true');
+    script.onload = () => resolve((window as any).L);
+    script.onerror = () => reject(new Error('No se pudo cargar Leaflet (JS)'));
+    document.head.appendChild(script);
+  });
+}
+
 function MapaUCV() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [puntoSeleccionado, setPuntoSeleccionado] = useState<PuntoMapa | null>(null);
+  const [estadoMapa, setEstadoMapa] = useState<'cargando' | 'listo' | 'error'>('cargando');
 
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    let cancelado = false;
 
-    const linkCSS = document.createElement('link');
-    linkCSS.rel = 'stylesheet';
-    linkCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(linkCSS);
+    const iniciarMapa = async () => {
+      try {
+        // 1) Esperamos el CSS Y el JS antes de tocar Leaflet. Este es el punto que
+        //    fallaba: antes solo se esperaba el JS, así que en conexiones más lentas
+        //    o variables (común en datos móviles de Android) el mapa se inicializaba
+        //    sin el CSS aplicado todavía y los tiles quedaban invisibles para siempre,
+        //    aunque los marcadores (simples <div> con estilos inline) sí se vieran.
+        await cargarLeafletCSS();
+        const L = await cargarLeafletJS();
 
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = () => {
-      const L = (window as any).L;
+        if (cancelado || !mapRef.current || mapInstanceRef.current) return;
 
-      const map = L.map(mapRef.current, {
-        center: [10.4878, -66.8895],
-        zoom: 16,
-        zoomControl: true,
-        scrollWheelZoom: true,
-      });
-
-      mapInstanceRef.current = map;
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19,
-      }).addTo(map);
-
-      PUNTOS_MAPA.forEach((punto) => {
-        const iconHtml = `
-          <div style="
-            background: ${punto.color};
-            width: 40px; height: 40px;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            border: 3px solid white;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
-            display: flex; align-items: center; justify-content: center;
-          ">
-            <span style="transform: rotate(45deg); font-size: 18px; line-height: 1;">
-              ${punto.icono}
-            </span>
-          </div>
-        `;
-
-        const icon = L.divIcon({
-          html: iconHtml,
-          className: '',
-          iconSize: [40, 40],
-          iconAnchor: [20, 40],
+        const map = L.map(mapRef.current, {
+          center: [10.4878, -66.8895],
+          zoom: 16,
+          zoomControl: true,
+          scrollWheelZoom: true,
         });
 
-        const marker = L.marker([punto.lat, punto.lng], { icon }).addTo(map);
-        marker.on('click', () => {
-          map.panTo([punto.lat, punto.lng]);
-          setPuntoSeleccionado(punto);
+        mapInstanceRef.current = map;
+
+        // 2) Endpoint de tiles actualizado: el patrón con subdominios {s}.tile.openstreetmap.org
+        //    está deprecado por OSM; el dominio recomendado actual es uno solo.
+        const capaTiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap',
+          maxZoom: 19,
+        }).addTo(map);
+
+        capaTiles.on('load', () => {
+          if (!cancelado) setEstadoMapa('listo');
         });
-      });
+        capaTiles.on('tileerror', () => {
+          if (!cancelado) setEstadoMapa((prev) => (prev === 'listo' ? prev : 'error'));
+        });
+
+        PUNTOS_MAPA.forEach((punto) => {
+          const iconHtml = `
+            <div style="
+              background: ${punto.color};
+              width: 40px; height: 40px;
+              border-radius: 50% 50% 50% 0;
+              transform: rotate(-45deg);
+              border: 3px solid white;
+              box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+              display: flex; align-items: center; justify-content: center;
+            ">
+              <span style="transform: rotate(45deg); font-size: 18px; line-height: 1;">
+                ${punto.icono}
+              </span>
+            </div>
+          `;
+
+          const icon = L.divIcon({
+            html: iconHtml,
+            className: '',
+            iconSize: [40, 40],
+            iconAnchor: [20, 40],
+          });
+
+          const marker = L.marker([punto.lat, punto.lng], { icon }).addTo(map);
+          marker.on('click', () => {
+            map.panTo([punto.lat, punto.lng]);
+            setPuntoSeleccionado(punto);
+          });
+        });
+
+        // 3) El contenedor puede no tener su tamaño final todavía en el momento exacto
+        //    de iniciar el mapa (overlay fullscreen recién montado, barra de Android
+        //    cambiando de alto, etc.). Forzamos un recálculo justo después de montar...
+        requestAnimationFrame(() => map.invalidateSize());
+        setTimeout(() => map.invalidateSize(), 300);
+
+        // ...y seguimos recalculando si el tamaño del contenedor cambia más tarde
+        // (rotación de pantalla, aparición/desaparición de la barra de Android, etc.).
+        if (typeof ResizeObserver !== 'undefined' && mapRef.current) {
+          const observer = new ResizeObserver(() => {
+            map.invalidateSize();
+          });
+          observer.observe(mapRef.current);
+          resizeObserverRef.current = observer;
+        }
+      } catch (err) {
+        console.error('Error cargando el mapa de puntos de apoyo:', err);
+        if (!cancelado) setEstadoMapa('error');
+      }
     };
 
-    document.head.appendChild(script);
+    iniciarMapa();
 
     return () => {
+      cancelado = true;
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -263,6 +350,20 @@ function MapaUCV() {
     <div className="relative w-full h-full overflow-hidden">
       {/* Mapa ocupa todo el contenedor padre */}
       <div ref={mapRef} className="w-full h-full" />
+
+      {/* Spinner mientras cargan los tiles */}
+      {estadoMapa === 'cargando' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-50 pointer-events-none">
+          <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Aviso si los tiles no cargaron (sin conexión, tile server caído, etc.) */}
+      {estadoMapa === 'error' && (
+        <div className="absolute top-4 left-4 right-4 z-[999] bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-800 font-medium text-center shadow-sm">
+          No se pudo cargar el mapa. Revisa tu conexión — los puntos de apoyo siguen disponibles en la lista anterior.
+        </div>
+      )}
 
       {/* Bottom sheet del punto seleccionado */}
       {puntoSeleccionado && (
