@@ -276,11 +276,12 @@ function MapaUCV() {
 
         mapInstanceRef.current = map;
 
-        // CAMBIO 3b: crossOrigin:true previene errores CORS silenciosos en algunos WebViews de Android
-        const capaTiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap',
+        // CartoDB Positron: no bloquea localhost ni WebViews de Android,
+        // no requiere API key, y es más liviano que OSM para móviles.
+        const capaTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '© OpenStreetMap © CARTO',
+          subdomains:  'abcd',
           maxZoom:     19,
-          crossOrigin: true,
         });
 
         capaTiles.on('tileload', () => { if (!cancelado) setEstadoMapa('listo'); });
