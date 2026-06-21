@@ -185,99 +185,113 @@ const PUNTOS_MAPA: PuntoMapa[] = [
   },
 ];
 
-// URLs de los recursos de Leaflet. Se reutilizan tal cual (sin npm) para no tocar
-// la arquitectura del proyecto, pero ahora se cargan de forma controlada.
-const LEAFLET_CSS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-const LEAFLET_JS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+// CAMBIO 1: CDN cambiado de unpkg → jsDelivr (más confiable en móviles Android)
+const LEAFLET_CSS_URL = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS_URL  = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
 
-// Carga el CSS de Leaflet una sola vez (evita inyectarlo de nuevo cada vez que se
-// abre el mapa) y espera a que esté realmente aplicado antes de continuar.
 function cargarLeafletCSS(): Promise<void> {
   return new Promise((resolve) => {
     const existente = document.querySelector('link[data-leaflet-css]') as HTMLLinkElement | null;
-    if (existente) {
-      // Si ya existe pero seguimos sin certeza de que terminó de cargar, igual seguimos:
-      // peor caso, el mapa se ve sin estilos un instante.
-      resolve();
-      return;
-    }
+    if (existente) { resolve(); return; }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = LEAFLET_CSS_URL;
     link.setAttribute('data-leaflet-css', 'true');
-    link.onload = () => resolve();
-    link.onerror = () => resolve(); // no bloquear el mapa si el CSS falla
+    link.onload  = () => resolve();
+    link.onerror = () => resolve();
     document.head.appendChild(link);
   });
 }
 
-// Carga el script de Leaflet una sola vez y reutiliza `window.L` si ya está disponible
-// (por ejemplo, si el usuario ya abrió el mapa antes en esta misma sesión).
 function cargarLeafletJS(): Promise<any> {
   return new Promise((resolve, reject) => {
-    if ((window as any).L) {
-      resolve((window as any).L);
-      return;
-    }
+    if ((window as any).L) { resolve((window as any).L); return; }
     const existente = document.querySelector('script[data-leaflet-js]') as HTMLScriptElement | null;
     if (existente) {
-      existente.addEventListener('load', () => resolve((window as any).L));
+      existente.addEventListener('load',  () => resolve((window as any).L));
       existente.addEventListener('error', () => reject(new Error('No se pudo cargar Leaflet (JS)')));
       return;
     }
     const script = document.createElement('script');
     script.src = LEAFLET_JS_URL;
     script.setAttribute('data-leaflet-js', 'true');
-    script.onload = () => resolve((window as any).L);
+    script.onload  = () => resolve((window as any).L);
     script.onerror = () => reject(new Error('No se pudo cargar Leaflet (JS)'));
     document.head.appendChild(script);
   });
 }
 
 function MapaUCV() {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const mapRef            = useRef<HTMLDivElement>(null);
+  const mapInstanceRef    = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const intentosRef       = useRef(0);
   const [puntoSeleccionado, setPuntoSeleccionado] = useState<PuntoMapa | null>(null);
-  const [estadoMapa, setEstadoMapa] = useState<'cargando' | 'listo' | 'error'>('cargando');
+  const [estadoMapa, setEstadoMapa]               = useState<'cargando' | 'listo' | 'error'>('cargando');
 
   useEffect(() => {
     let cancelado = false;
 
+    const conTimeout = <T,>(promesa: Promise<T>, ms: number, mensaje: string): Promise<T> =>
+      Promise.race([
+        promesa,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(mensaje)), ms)),
+      ]);
+
+    // CAMBIO 2: esperar a que el contenedor tenga dimensiones reales antes de
+    // inicializar Leaflet. En Android el layout puede tardar varios frames en
+    // estabilizarse, y si Leaflet se monta con offsetWidth=0 el mapa nunca renderiza.
+    const esperarDimensiones = (el: HTMLDivElement, maxMs = 4000): Promise<void> =>
+      new Promise((resolve, reject) => {
+        if (el.offsetWidth > 0 && el.offsetHeight > 0) { resolve(); return; }
+        const inicio = Date.now();
+        const raf = () => {
+          if (cancelado)                                    { reject(new Error('cancelado')); return; }
+          if (el.offsetWidth > 0 && el.offsetHeight > 0)   { resolve(); return; }
+          if (Date.now() - inicio > maxMs)                  { reject(new Error('sin dimensiones')); return; }
+          requestAnimationFrame(raf);
+        };
+        requestAnimationFrame(raf);
+      });
+
     const iniciarMapa = async () => {
       try {
-        // 1) Esperamos el CSS Y el JS antes de tocar Leaflet. Este es el punto que
-        //    fallaba: antes solo se esperaba el JS, así que en conexiones más lentas
-        //    o variables (común en datos móviles de Android) el mapa se inicializaba
-        //    sin el CSS aplicado todavía y los tiles quedaban invisibles para siempre,
-        //    aunque los marcadores (simples <div> con estilos inline) sí se vieran.
-        await cargarLeafletCSS();
-        const L = await cargarLeafletJS();
+        await conTimeout(cargarLeafletCSS(), 8000, 'Tiempo de espera agotado cargando el CSS de Leaflet');
+        const L = await conTimeout(cargarLeafletJS(), 8000, 'Tiempo de espera agotado cargando Leaflet');
 
         if (cancelado || !mapRef.current || mapInstanceRef.current) return;
 
+        // Esperar dimensiones reales (crítico en Android)
+        await esperarDimensiones(mapRef.current);
+        if (cancelado || !mapRef.current || mapInstanceRef.current) return;
+
+        // CAMBIO 3a: tap:false evita que Leaflet duplique eventos táctiles en Android WebView
         const map = L.map(mapRef.current, {
-          center: [10.4878, -66.8895],
-          zoom: 16,
-          zoomControl: true,
+          center:          [10.4878, -66.8895],
+          zoom:            16,
+          zoomControl:     true,
           scrollWheelZoom: true,
+          tap:             false,
         });
 
         mapInstanceRef.current = map;
 
-        // 2) Endpoint de tiles actualizado: el patrón con subdominios {s}.tile.openstreetmap.org
-        //    está deprecado por OSM; el dominio recomendado actual es uno solo.
+        // CAMBIO 3b: crossOrigin:true previene errores CORS silenciosos en algunos WebViews de Android
         const capaTiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap',
-          maxZoom: 19,
-        }).addTo(map);
+          maxZoom:     19,
+          crossOrigin: true,
+        });
 
-        capaTiles.on('load', () => {
-          if (!cancelado) setEstadoMapa('listo');
-        });
-        capaTiles.on('tileerror', () => {
-          if (!cancelado) setEstadoMapa((prev) => (prev === 'listo' ? prev : 'error'));
-        });
+        capaTiles.on('tileload', () => { if (!cancelado) setEstadoMapa('listo'); });
+        capaTiles.on('load',     () => { if (!cancelado) setEstadoMapa('listo'); });
+        capaTiles.on('tileerror',() => { if (!cancelado) setEstadoMapa((prev) => (prev === 'listo' ? prev : 'error')); });
+
+        capaTiles.addTo(map);
+
+        setTimeout(() => {
+          if (!cancelado) setEstadoMapa((prev) => (prev === 'cargando' ? 'error' : prev));
+        }, 8000);
 
         PUNTOS_MAPA.forEach((punto) => {
           const iconHtml = `
@@ -295,39 +309,35 @@ function MapaUCV() {
               </span>
             </div>
           `;
-
-          const icon = L.divIcon({
-            html: iconHtml,
-            className: '',
-            iconSize: [40, 40],
-            iconAnchor: [20, 40],
-          });
-
+          const icon   = L.divIcon({ html: iconHtml, className: '', iconSize: [40, 40], iconAnchor: [20, 40] });
           const marker = L.marker([punto.lat, punto.lng], { icon }).addTo(map);
-          marker.on('click', () => {
-            map.panTo([punto.lat, punto.lng]);
-            setPuntoSeleccionado(punto);
+          marker.on('click', () => { map.panTo([punto.lat, punto.lng]); setPuntoSeleccionado(punto); });
+        });
+
+        // CAMBIO 3c: doble rAF encadenado en lugar de setTimeout para invalidateSize,
+        // garantiza que el DOM ya pintó el contenedor antes de que Leaflet lo mida.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (!cancelado && mapInstanceRef.current) {
+              map.invalidateSize({ animate: false });
+            }
           });
         });
 
-        // 3) El contenedor puede no tener su tamaño final todavía en el momento exacto
-        //    de iniciar el mapa (overlay fullscreen recién montado, barra de Android
-        //    cambiando de alto, etc.). Forzamos un recálculo justo después de montar...
-        requestAnimationFrame(() => map.invalidateSize());
-        setTimeout(() => map.invalidateSize(), 300);
-
-        // ...y seguimos recalculando si el tamaño del contenedor cambia más tarde
-        // (rotación de pantalla, aparición/desaparición de la barra de Android, etc.).
         if (typeof ResizeObserver !== 'undefined' && mapRef.current) {
-          const observer = new ResizeObserver(() => {
-            map.invalidateSize();
-          });
+          const observer = new ResizeObserver(() => { map.invalidateSize({ animate: false }); });
           observer.observe(mapRef.current);
           resizeObserverRef.current = observer;
         }
       } catch (err) {
         console.error('Error cargando el mapa de puntos de apoyo:', err);
-        if (!cancelado) setEstadoMapa('error');
+        // Reintentar una vez (cubre red intermitente en Android)
+        if (!cancelado && intentosRef.current < 1) {
+          intentosRef.current += 1;
+          setTimeout(iniciarMapa, 1500);
+        } else if (!cancelado) {
+          setEstadoMapa('error');
+        }
       }
     };
 
@@ -335,44 +345,32 @@ function MapaUCV() {
 
     return () => {
       cancelado = true;
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.disconnect();
-        resizeObserverRef.current = null;
-      }
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      if (resizeObserverRef.current) { resizeObserverRef.current.disconnect(); resizeObserverRef.current = null; }
+      if (mapInstanceRef.current)    { mapInstanceRef.current.remove();        mapInstanceRef.current    = null; }
     };
   }, []);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Mapa ocupa todo el contenedor padre */}
       <div ref={mapRef} className="w-full h-full" />
 
-      {/* Spinner mientras cargan los tiles */}
       {estadoMapa === 'cargando' && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-50 pointer-events-none">
           <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {/* Aviso si los tiles no cargaron (sin conexión, tile server caído, etc.) */}
       {estadoMapa === 'error' && (
         <div className="absolute top-4 left-4 right-4 z-[999] bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-800 font-medium text-center shadow-sm">
           No se pudo cargar el mapa. Revisa tu conexión — los puntos de apoyo siguen disponibles en la lista anterior.
         </div>
       )}
 
-      {/* Bottom sheet del punto seleccionado */}
       {puntoSeleccionado && (
         <div className="absolute bottom-0 left-0 right-0 z-[1000] animate-slideUp">
           <div className="bg-white rounded-t-[28px] shadow-2xl px-5 pt-4 pb-6">
-            {/* Handle */}
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
 
-            {/* Cabecera con color del punto */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div
@@ -398,7 +396,6 @@ function MapaUCV() {
               </button>
             </div>
 
-            {/* Info */}
             <div className="bg-slate-50 rounded-2xl px-4 py-3 space-y-1.5 mb-4">
               <div className="flex items-start gap-2">
                 <span className="text-xs flex-shrink-0">📍</span>
@@ -416,7 +413,6 @@ function MapaUCV() {
               )}
             </div>
 
-            {/* Botones de acción */}
             <div className="flex gap-2">
               {puntoSeleccionado.telefono && (
                 <a
@@ -552,7 +548,6 @@ function AccordionItem({ punto }: AccordionItemProps) {
 export default function ModoCrisisPage() {
   const router = useRouter();
 
-  // ✅ NUEVO: Leemos los parámetros que envía monitoreo al redirigir
   const searchParams = useSearchParams();
   const desencadenadoAutomaticamente = searchParams.get('auto') === 'true';
   const promedioBienestar = parseFloat(searchParams.get('promedio') ?? '0') || undefined;
@@ -598,7 +593,6 @@ export default function ModoCrisisPage() {
             </div>
           </div>
 
-          {/* ✅ Banner contextual: diferente si fue automático o manual */}
           {desencadenadoAutomaticamente ? (
             <div className="mt-4 p-3.5 bg-rose-500 text-white rounded-2xl flex items-start gap-3">
               <span className="text-lg flex-shrink-0 mt-0.5">💙</span>
@@ -663,7 +657,6 @@ export default function ModoCrisisPage() {
             );
           })}
 
-          {/* Botón para abrir el mapa fullscreen */}
           <button
             onClick={() => setMapaFullscreen(true)}
             className="w-full rounded-3xl border border-teal-100 bg-teal-50 px-5 py-4 flex items-center justify-between focus:outline-none hover:bg-teal-100 transition-colors"
@@ -680,7 +673,6 @@ export default function ModoCrisisPage() {
             </svg>
           </button>
 
-          {/* Mensaje final */}
           <div className="p-4 bg-purple-50 border border-purple-100 rounded-3xl flex items-start gap-3 mb-4">
             <span className="text-xl flex-shrink-0">✨</span>
             <div>
@@ -693,13 +685,11 @@ export default function ModoCrisisPage() {
           </div>
         </div>
 
-
       </div>
 
-      {/* MAPA FULLSCREEN — dentro del contenedor del celular */}
+      {/* MAPA FULLSCREEN */}
       {mapaFullscreen && (
         <div className="absolute inset-0 z-50 bg-white flex flex-col sm:rounded-[40px] overflow-hidden">
-          {/* Header */}
           <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 flex-shrink-0">
             <button
               onClick={() => setMapaFullscreen(false)}
@@ -714,8 +704,6 @@ export default function ModoCrisisPage() {
               <p className="text-[10px] text-slate-400 font-medium">Ciudad Universitaria UCV — toca un pin para ver detalles</p>
             </div>
           </div>
-
-          {/* Mapa ocupa el resto del contenedor del celular */}
           <div className="flex-1 relative min-h-0">
             <MapaUCV />
           </div>
