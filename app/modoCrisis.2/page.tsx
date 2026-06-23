@@ -550,7 +550,7 @@ export default function ModoCrisisPage() {
   const router = useRouter();
 
   const desencadenadoAutomaticamente = false;
-  const promedioBienestar: number | undefined = undefined;
+  const promedioBienestar: number = 0;
 
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>("emergencia");
   const [mapaFullscreen, setMapaFullscreen] = useState(false);
@@ -598,9 +598,9 @@ export default function ModoCrisisPage() {
               <span className="text-lg flex-shrink-0 mt-0.5">💙</span>
               <div>
                 <p className="text-xs font-bold leading-snug">{mensajePrincipal}</p>
-                {typeof promedioBienestar === 'number' && (
+                {promedioBienestar !== undefined && (
                   <p className="text-[10px] font-medium mt-1 opacity-90">
-                    Tu bienestar promedio esta semana: {promedioBienestar?.toFixed(1)}
+                    Tu bienestar promedio esta semana: {promedioBienestar.toFixed(1)}
                   </p>
                 )}
               </div>
