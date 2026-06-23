@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // ==========================================
 // INTERFACES Y DATOS DE RECURSOS DE APOYO
@@ -546,7 +546,7 @@ function AccordionItem({ punto }: AccordionItemProps) {
 // COMPONENTE PRINCIPAL: MODO CRISIS
 // ==========================================
 
-export default function ModoCrisisPage() {
+function ModoCrisisContent() {
   const router = useRouter();
 
   const desencadenadoAutomaticamente = false;
@@ -723,5 +723,14 @@ export default function ModoCrisisPage() {
         .animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.32,0.72,0,1) forwards; }
       `}</style>
     </div>
+  );
+}
+import { Suspense } from "react";
+
+export default function ModoCrisisPage() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <ModoCrisisContent />
+    </Suspense>
   );
 }
