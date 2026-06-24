@@ -2,7 +2,12 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { insertarMotivosOnboarding } from '@/lib/supabase/motivos';
+//DELATE
+import { deleteItem } from '@/lib/supabase/motivos';
+
+// ==========================================
+// INTERFACES Y MODELOS DE DATOS DE LA APP
+// ==========================================
 
 export type MotivoId =
   | "estres"
@@ -22,50 +27,50 @@ export interface OpcionMotivo {
 export interface PantallaMotivos {
   paso: number;
   totalPasos: number;
-  pregunta: string;
-  instruccion: string;
+  pregunta: string;         // "¿Cuál es tu principal motivo para usar Pausa?"
+  instruccion: string;      // "Puedes elegir más de una opción"
   opciones: OpcionMotivo[];
-  otroTexto: string;
+  otroTexto: string;        // valor del campo libre "Otro"
   botonContinuar: string;
 }
 
+// Data base obligatoria provista por el usuario
 export const opcionesMotivosData: Omit<OpcionMotivo, "seleccionado">[] = [
-  { id: "estres",     label: "Manejar el estrés" },
-  { id: "bienestar",  label: "Mejorar mi bienestar emocional" },
-  { id: "dormir",     label: "Dormir mejor" },
-  { id: "academico",  label: "Organizarme mejor académicamente" },
-  { id: "motivacion", label: "Sentirme más motivado/a" },
-  { id: "otro",       label: "Otro (especificar)" },
+  { id: "estres",      label: "Manejar el estrés" },
+  { id: "bienestar",   label: "Mejorar mi bienestar emocional" },
+  { id: "dormir",      label: "Dormir mejor" },
+  { id: "academico",   label: "Organizarme mejor académicamente" },
+  { id: "motivacion",  label: "Sentirme más motivado/a" },
+  { id: "otro",        label: "Otro (especificar)" },
 ];
 
+// Mapeo visual de emojis correspondientes al diseño de la interfaz
 const mapeoIconos: Record<MotivoId, string> = {
   estres: "🧘",
   bienestar: "🌸",
   dormir: "🌙",
   academico: "📚",
   motivacion: "✨",
-  otro: "✏️",
+  otro: "✏️"
 };
 
 export default function MotivosPage() {
   const router = useRouter();
 
-  // ↓ CAMBIO: todo empieza en false para forzar una elección
+  // --- CONFIGURACIÓN DE ESTADOS EXCLUSIVOS DE ESTA PANTALLA ---
   const [seleccionados, setSeleccionados] = useState<Record<MotivoId, boolean>>({
-    estres:     false,
-    bienestar:  false,
-    dormir:     false,
-    academico:  false,
+    estres: true, // Opción activa inicial por defecto
+    bienestar: false,
+    dormir: false,
+    academico: false,
     motivacion: false,
-    otro:       false,
+    otro: false
   });
 
   const [otroTexto, setOtroTexto] = useState<string>('');
-  const [intentoContinuar, setIntentoContinuar] = useState(false);
+  const [simulacionEnvioOtro, setSimulacionEnvioOtro] = useState<boolean>(false);
 
-  // ↓ CAMBIO: computed que indica si algo está elegido
-  const algunoSeleccionado = Object.values(seleccionados).some(Boolean);
-
+  // Construcción del objeto reactivo implementando la interfaz PantallaMotivos
   const datosMotivos: PantallaMotivos = {
     paso: 1,
     totalPasos: 6,
@@ -75,47 +80,66 @@ export default function MotivosPage() {
       id: item.id,
       label: item.label,
       icono: mapeoIconos[item.id],
-      seleccionado: seleccionados[item.id],
+      seleccionado: seleccionados[item.id]
     })),
-    otroTexto,
-    botonContinuar: "Continuar",
+    otroTexto: otroTexto,
+    botonContinuar: "Continuar"
   };
 
   const toggleOpcionId = (id: MotivoId) => {
-    setSeleccionados(prev => ({ ...prev, [id]: !prev[id] }));
-    setIntentoContinuar(false);
+    setSeleccionados(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
   };
 
-  // ↓ CAMBIO: handler que valida, guarda y navega
-  const handleContinuar = async () => {
-    if (!algunoSeleccionado) {
-      setIntentoContinuar(true);
-      return;
+  const handleOtroSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (otroTexto.trim() !== '') {
+        setSimulacionEnvioOtro(true);
+        setTimeout(() => {
+          setSimulacionEnvioOtro(false);
+        }, 3000);
+      }
     }
+  };
 
-    const userId = localStorage.getItem('alumnoEmail') || 'guest';
-    const seleccionadosIds = (Object.entries(seleccionados) as [MotivoId, boolean][])
-      .filter(([, v]) => v)
-      .map(([k]) => k);
-    await insertarMotivosOnboarding(userId, seleccionadosIds, otroTexto);
+  // Guardar motivos seleccionados en localStorage para el onboarding
+  const handleContinuar = () => {
+    const motivosSeleccionados = Object.entries(seleccionados)
+      .filter(([, valor]) => valor)
+      .map(([id]) => id);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('motivos_onboarding', JSON.stringify(motivosSeleccionados));
+      if (otroTexto.trim()) {
+        localStorage.setItem('motivos_otro_texto', otroTexto.trim());
+      }
+    }
 
     router.push('estadoActual.2');
   };
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
+      {/* Contenedor Esqueleto Mobile-First */}
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
-
+        
         <div className="pt-4">
-          <button
-            onClick={() => router.push('bienvenida.2')}
+          
+          {/* Botón Flecha de Regreso */}
+          <button 
+            onClick={() => router.push('bienvenida.2')} 
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none"
+            aria-label="Volver a la pantalla de bienvenida"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
           </button>
 
+          {/* Barra de progreso visual (Paso 1) */}
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
             <div className="bg-[#4A72A6] h-full w-1/6 rounded-full transition-all duration-300" />
           </div>
@@ -123,30 +147,26 @@ export default function MotivosPage() {
             Paso {datosMotivos.paso} de {datosMotivos.totalPasos}
           </p>
 
+          {/* Título de sección */}
           <h3 className="text-xl font-bold text-[#2A3B50] mt-4 leading-snug">
             {datosMotivos.pregunta}
           </h3>
           <p className="text-xs text-[#8C9BAE] mt-1">
             {datosMotivos.instruccion}
           </p>
-
-          {/* ↓ CAMBIO: hint de validación */}
-          {intentoContinuar && !algunoSeleccionado && (
-            <p className="mt-3 text-xs font-semibold text-rose-500 flex items-center gap-1.5">
-              <span>⚠️</span> Selecciona al menos una opción para continuar
-            </p>
-          )}
-
-          <div className="space-y-3 mt-5">
+          
+          {/* Caja de Opciones */}
+          <div className="space-y-3 mt-6">
             {datosMotivos.opciones.map((opcion) => {
               if (opcion.id === "otro") return null;
+              
               return (
                 <button
                   key={opcion.id}
                   onClick={() => toggleOpcionId(opcion.id)}
                   className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-150 active:scale-[0.99] ${
-                    opcion.seleccionado
-                      ? 'border-[#4A72A6] bg-[#4A72A6]/5 shadow-sm'
+                    opcion.seleccionado 
+                      ? 'border-[#4A72A6] bg-[#4A72A6]/5 shadow-sm' 
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
@@ -167,16 +187,17 @@ export default function MotivosPage() {
               );
             })}
 
-            {/* Opción "Otro" expandible */}
+            {/* Bloque de la opción expansible: "Otro (especificar)" */}
             {(() => {
               const opcionOtro = datosMotivos.opciones.find(o => o.id === "otro");
               if (!opcionOtro) return null;
+
               return (
                 <div className={`w-full rounded-2xl border p-4 transition-all duration-150 ${
                   opcionOtro.seleccionado ? 'border-[#4A72A6] bg-[#4A72A6]/5' : 'border-slate-200 bg-white'
                 }`}>
-                  <button
-                    onClick={() => toggleOpcionId("otro")}
+                  <button 
+                    onClick={() => toggleOpcionId("otro")} 
                     className="w-full flex items-center justify-between text-left focus:outline-none"
                   >
                     <div className="flex items-center gap-3">
@@ -193,14 +214,24 @@ export default function MotivosPage() {
                       )}
                     </div>
                   </button>
+
+                  {/* Campo input libre */}
                   {opcionOtro.seleccionado && (
-                    <input
-                      type="text"
-                      value={otroTexto}
-                      onChange={(e) => setOtroTexto(e.target.value)}
-                      placeholder="Escribe tu motivo..."
-                      className="mt-3 w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A72A6] text-slate-700 transition-colors"
-                    />
+                    <div className="mt-3 relative">
+                      <input
+                        type="text"
+                        value={otroTexto}
+                        onChange={(e) => setOtroTexto(e.target.value)}
+                        onKeyDown={handleOtroSubmit}
+                        placeholder="Escribe tu motivo y presiona Enter..."
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A72A6] text-slate-700 transition-colors"
+                      />
+                      {simulacionEnvioOtro && (
+                        <p className="text-[11px] text-emerald-600 font-semibold mt-2 flex items-center gap-1 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                          ✨ ¡Mensaje enviado con éxito! (Simulación)
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               );
@@ -208,19 +239,16 @@ export default function MotivosPage() {
           </div>
         </div>
 
-        {/* ↓ CAMBIO: botón con validación visual */}
+        {/* Botón de Acción Continuar */}
         <div className="mt-8 pb-4">
-          <button
+          <button 
             onClick={handleContinuar}
-            className={`w-full font-semibold py-4 px-6 rounded-2xl shadow-lg transition-all active:scale-[0.99] text-base text-center ${
-              algunoSeleccionado
-                ? 'bg-[#4A72A6] hover:bg-[#3B5E8C] text-white shadow-blue-900/10 cursor-pointer'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-            }`}
+            className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
           >
             {datosMotivos.botonContinuar}
           </button>
         </div>
+
       </div>
     </div>
   );
