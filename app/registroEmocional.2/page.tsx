@@ -2,36 +2,31 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  crearRegistroEmocional,
-  limpiarEmocionTemporal,
-  obtenerEmocionTemporal,
-  obtenerTituloRegistro,
-} from '@/lib/supabase/registroemocional';
+import supabase from '@/lib/supabase';
+import { insertarRegistros } from '@/app/services/emocionesService';
+import { ESTADO_A_NIVEL, obtenerFechaLocalHoy } from '@/models/monitoreo';
+import { obtenerTituloRegistro } from '@/lib/supabase/registroemocional';
+import { obtenerEmocionTemporal, limpiarEmocionTemporal } from '@/lib/supabase/quizState';
 import { obtenerUsuarioIdLocal } from '@/lib/supabase/home';
 import { emojiEstadosData } from '@/models/home';
 
 export default function RegistroEmocionalPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState('');
   const [emocionSeleccionada, setEmocionSeleccionada] = useState<string | null>(null);
   const [notaOpcional, setNotaOpcional] = useState<string>("");
   const [tituloCabecera, setTituloCabecera] = useState<string>("¿Cómo te sientes hoy?");
   const [estaGuardando, setEstaGuardando] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const cargarEstado = async () => {
       const id = obtenerUsuarioIdLocal();
-      setUserId(id);
 
       const titulo = await obtenerTituloRegistro(id);
       setTituloCabecera(titulo);
 
       const { estado } = obtenerEmocionTemporal(id);
-
-      if (estado) {
-        setEmocionSeleccionada(estado);
-      }
+      if (estado) setEmocionSeleccionada(estado);
 
       limpiarEmocionTemporal(id);
     };
@@ -43,19 +38,42 @@ export default function RegistroEmocionalPage() {
     if (!emocionSeleccionada) return;
 
     setEstaGuardando(true);
+    setError(null);
 
-    const { error } = await crearRegistroEmocional({
-      usuario_id: userId || obtenerUsuarioIdLocal(),
+    // 1. Verificamos que haya una sesión real de Supabase
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      setError('Debes iniciar sesión para registrar tu emoción.');
+      setEstaGuardando(false);
+      return;
+    }
+
+    // 2. Convertimos el estado textual a nivel numérico (1-5)
+    const nivel = ESTADO_A_NIVEL[emocionSeleccionada];
+
+    // 3. Insertamos el registro real en la tabla 'historial_emociones'
+    const { error: errorSupabase } = await insertarRegistros({
+      user_id: user.id,
+      fecha: obtenerFechaLocalHoy(),
+      nivel,
       estado: emocionSeleccionada,
-      descripcion: notaOpcional,
-      fecha: new Date().toISOString(),
+      nota: notaOpcional.trim() || null,
     });
 
-    if (!error) {
-      router.push('/home.2');
-    } else {
-      setEstaGuardando(false);
+    setEstaGuardando(false);
+
+    if (errorSupabase) {
+      setError('No se pudo guardar tu registro. Intenta de nuevo.');
+      return;
     }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fechaUltimoRegistro', new Date().toLocaleDateString());
+    }
+
+    // 4. Redirigimos directo a monitoreo para que vea su registro reflejado
+    router.push('/monitoreo.2');
   };
 
   return (
@@ -68,6 +86,12 @@ export default function RegistroEmocionalPage() {
         </div>
 
         <div className="flex-1 px-6">
+          {error && (
+            <div className="mb-4 p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-xl">
+              ⚠️ {error}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             {emojiEstadosData.map((emocion) => (
               <button

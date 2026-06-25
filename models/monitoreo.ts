@@ -10,7 +10,7 @@ export interface RegistroHistorico {
   user_id?: string;
   dia?: string;            // Fecha en formato "YYYY-MM-DD"
   fecha?: string;          // Para renderizado visual (alias de dia)
-  nivel: NivelBienestar;  // 1–5 (antes era number, ahora tipado estrictamente)
+  nivel: NivelBienestar;
   estado: string;          // "Muy mal" | "Mal" | "Regular" | "Bien" | "Muy bien"
   nota?: string | null;
 }
@@ -22,7 +22,6 @@ export interface TipAntiEstres {
   icono: string;
 }
 
-// Mapa de nivel numérico → estado textual
 export const NIVEL_A_ESTADO: Record<NivelBienestar, string> = {
   1: "Muy mal",
   2: "Mal",
@@ -31,7 +30,6 @@ export const NIVEL_A_ESTADO: Record<NivelBienestar, string> = {
   5: "Muy bien",
 };
 
-// Mapa de estado textual → nivel numérico
 export const ESTADO_A_NIVEL: Record<string, NivelBienestar> = {
   "Muy mal":  1,
   "Mal":      2,
@@ -40,7 +38,6 @@ export const ESTADO_A_NIVEL: Record<string, NivelBienestar> = {
   "Muy bien": 5,
 };
 
-// Mapa de nivel numérico → emoji visual
 export const NIVEL_A_EMOJI: Record<NivelBienestar, string> = {
   1: "😩",
   2: "😔",
@@ -49,22 +46,45 @@ export const NIVEL_A_EMOJI: Record<NivelBienestar, string> = {
   5: "🤩",
 };
 
-// Umbral por debajo del cual el sistema sugiere modo crisis
+// Umbral por defecto, puede ser sobrescrito por la personalización del onboarding
 export const UMBRAL_CRISIS = 1.8;
 
-// Calcula el promedio de los últimos 7 días
 export function calcularPromedioBienestar(registros: RegistroHistorico[]): number {
   if (registros.length === 0) return 3;
   const suma = registros.reduce((acc, r) => acc + (r.nivel ?? 3), 0);
   return suma / registros.length;
 }
 
-// Determina si el promedio cae en zona de alerta o crisis
-export function clasificarEstadoBienestar(promedio: number): "crisis" | "alerta" | "moderado" | "bien" {
-  if (promedio <= UMBRAL_CRISIS)   return "crisis";
-  if (promedio <= 2.5)              return "alerta";
-  if (promedio <= 3.5)              return "moderado";
+/**
+ * Determina si el promedio cae en zona de alerta o crisis.
+ * Acepta un umbral personalizado (ver leerUmbralCrisisPersonalizado).
+ */
+export function clasificarEstadoBienestar(
+  promedio: number,
+  umbralCrisis: number = UMBRAL_CRISIS
+): "crisis" | "alerta" | "moderado" | "bien" {
+  if (promedio <= umbralCrisis) return "crisis";
+  if (promedio <= 2.5)          return "alerta";
+  if (promedio <= 3.5)          return "moderado";
   return "bien";
+}
+
+/**
+ * Lee el umbral de crisis personalizado guardado por home.2 según la
+ * frecuencia de estrés reportada en el onboarding. Si no existe, usa el default.
+ */
+export function leerUmbralCrisisPersonalizado(): number {
+  if (typeof window === 'undefined') return UMBRAL_CRISIS;
+  const guardado = localStorage.getItem('umbral_crisis_personalizado');
+  const valor = guardado ? parseFloat(guardado) : NaN;
+  return Number.isFinite(valor) ? valor : UMBRAL_CRISIS;
+}
+
+/** Devuelve la fecha de hoy en zona horaria local, formato YYYY-MM-DD. */
+export function obtenerFechaLocalHoy(): string {
+  const ahora = new Date();
+  const offset = ahora.getTimezoneOffset() * 60000;
+  return new Date(ahora.getTime() - offset).toISOString().split('T')[0];
 }
 
 // Datos de simulación para la interfaz

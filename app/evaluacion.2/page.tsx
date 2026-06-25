@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import supabase from '@/lib/supabase';
 
 // ==========================================
 // CONFIGURACIÓN Y TIPOS DE LA ESCALA VALIDADA PSS-4
@@ -68,6 +69,16 @@ export default function EvaluacionFlujoPage() {
   const [pasoActual, setPasoActual] = useState<number>(0); 
   const [respuestas, setRespuestas] = useState<Record<string, number>>({});
   const [animarCambio, setAnimarCambio] = useState<boolean>(false);
+  const [factorPrincipal, setFactorPrincipal] = useState<string>('');
+
+  useEffect(() => {
+    const cargarFactorPrincipal = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const factor = session?.user?.user_metadata?.factores_impacto?.[0];
+      if (factor) setFactorPrincipal(factor);
+    };
+    cargarFactorPrincipal();
+  }, []);
 
   const preguntaActual = preguntasPSS4Data[pasoActual - 1];
 
@@ -97,6 +108,21 @@ export default function EvaluacionFlujoPage() {
     }
   };
 
+const TIPS_POR_FACTOR: Record<string, RecomendacionDinamica> = {
+  estres_academico: { icono: "📚", texto: "Organiza tus tareas pendientes en tu cronograma académico" },
+  sobrecarga_tareas: { icono: "🗂️", texto: "Divide tus tareas grandes en pasos pequeños y alcanzables" },
+  falta_tiempo: { icono: "⏰", texto: "Bloquea 15 minutos hoy solo para ti en tu cronograma" },
+  problemas_personales: { icono: "🤝", texto: "Considera hablar con alguien de confianza sobre cómo te sientes" },
+  ansiedad: { icono: "🧘", texto: "Practica el ejercicio 4-7-8 para calmar tu ansiedad" },
+  motivacion_baja: { icono: "✨", texto: "Define una meta pequeña hoy y celebra al cumplirla" },
+};
+
+const conTipContextual = (base: RecomendacionDinamica[]): RecomendacionDinamica[] => {
+  const tip = TIPS_POR_FACTOR[factorPrincipal];
+  if (!tip || base.some((r) => r.texto === tip.texto)) return base;
+  return [...base, tip];
+};
+
   // --- CÁLCULO DE RESULTADOS CON RECOMENDACIONES CONDICIONALES ---
   const calcularResultadoEstres = () => {
     let puntajeTotal = 0;
@@ -114,10 +140,10 @@ export default function EvaluacionFlujoPage() {
         porcentajeBarra: "15%",
         mensaje: "Estás experimentando un nivel bajo de estrés percibido. Te sientes con control de tus actividades diarias.",
         emoji: "😊",
-        recomendaciones: [
-          { icono: "🌱", texto: "Registra tu gratitud de hoy en tu diario personal" },
-          { icono: "🚀", texto: "¡Gran balance! Sigue manteniendo tus hábitos actuales" }
-        ] as RecomendacionDinamica[]
+        recomendaciones: conTipContextual([
+          { icono: "🧘", texto: "Prueba una meditación de 5 minutos" },
+          { icono: "🍃", texto: "Revisa tus técnicas anti-estrés" }
+        ])
       };
     } else if (puntajeTotal <= 12) {
       return { 
@@ -129,10 +155,10 @@ export default function EvaluacionFlujoPage() {
         mensaje: "Estás experimentando un nivel moderado de estrés. Es normal sentirse así ocasionalmente, pero es importante prestar atención a tu bienestar.",
         emoji: "😐",
         // Vinculado exactamente a tu mockup original
-        recomendaciones: [
+        recomendaciones: conTipContextual([
           { icono: "🧘", texto: "Prueba una meditación de 5 minutos" },
           { icono: "🍃", texto: "Revisa tus técnicas anti-estrés" }
-        ] as RecomendacionDinamica[]
+        ])
       };
     } else {
       return { 
@@ -143,10 +169,10 @@ export default function EvaluacionFlujoPage() {
         porcentajeBarra: "88%",
         mensaje: "Tus niveles de estrés percibido son elevados. Te recomendamos tomar pausas regulares y apoyarte en nuestras herramientas de contención.",
         emoji: "😩",
-        recomendaciones: [
-          { icono: "😮‍💨", texto: "Realiza una respiración consciente profunda ahora" },
-          { icono: "🚨", texto: "Prueba el modo crisis para asistencia inmediata" }
-        ] as RecomendacionDinamica[]
+        recomendaciones: conTipContextual([
+          { icono: "🧘", texto: "Prueba una meditación de 5 minutos" },
+          { icono: "🍃", texto: "Revisa tus técnicas anti-estrés" }
+        ])
       };
     }
   };

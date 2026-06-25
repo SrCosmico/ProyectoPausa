@@ -1,4 +1,5 @@
 "use client";
+import { calcularPromedioBienestar, clasificarEstadoBienestar, leerUmbralCrisisPersonalizado } from '@/models/monitoreo';
 import React, { useState, useEffect, useCallback } from 'react'; 
 import { useRouter } from 'next/navigation';
 import { 
@@ -327,6 +328,10 @@ export default function MonitoreoPage() {
 
   // ✅ NUEVO: Derivamos el promedio del estado actual para pasarlo a AnimoFeedback
   const promedioAnimo = calcularPromedioSemanal(registros);
+  const promedioSemana = calcularPromedioBienestar(
+  registros.slice(0, 7).map((r) => ({ nivel: r.nivel as NivelBienestar, estado: r.estado }))
+);
+const estadoBienestarSemana = clasificarEstadoBienestar(promedioSemana, leerUmbralCrisisPersonalizado());
 
   const estadoActual = registros.find(r => r.fecha === obtenerFechaLocal());
 
@@ -469,6 +474,19 @@ export default function MonitoreoPage() {
           </div>
 
           <div className="p-6 space-y-6">
+            {estadoBienestarSemana === 'crisis' && (
+  <button
+    onClick={() => router.push(`/modoCrisis.2?auto=1&promedio=${promedioSemana.toFixed(1)}`)}
+    className="w-full p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-left hover:bg-rose-100 transition-colors"
+  >
+    <span className="text-2xl">💙</span>
+    <div className="flex-1">
+      <p className="text-xs font-bold text-rose-800">Hemos notado que tu bienestar ha sido bajo</p>
+      <p className="text-[11px] text-rose-600 font-medium mt-0.5">Toca aquí para ver ayuda inmediata</p>
+    </div>
+    <span className="text-rose-400">›</span>
+  </button>
+)}
 
             {/* Estado de hoy */}
             <div>

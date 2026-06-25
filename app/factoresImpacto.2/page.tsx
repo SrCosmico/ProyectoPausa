@@ -4,10 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 // DELATE
 import { deleteItem } from '@/lib/supabase/factoresImpacto';
-
-// ==========================================
-// INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO
-// ==========================================
+import { guardarFactoresOnboarding } from '@/lib/supabase/onboarding';
 
 export type FactorId =
   | "estres_academico"
@@ -100,28 +97,18 @@ export default function FactoresImpactoPage() {
     }
   };
 
-  // Guardar factores seleccionados en localStorage para el onboarding
-  const handleContinuar = () => {
-    const factoresSeleccionados = Object.entries(seleccionados)
-      .filter(([, valor]) => valor)
-      .map(([id]) => id);
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('factores_impacto_onboarding', JSON.stringify(factoresSeleccionados));
-      if (otroTexto.trim()) {
-        localStorage.setItem('factores_impacto_otro', otroTexto.trim());
-      }
-    }
-
+  const manejarContinuar = () => {
+    const factoresSeleccionados = (Object.keys(seleccionados) as FactorId[]).filter(
+      (id) => seleccionados[id]
+    );
+    guardarFactoresOnboarding(factoresSeleccionados, otroTexto);
     router.push('/preferenciasApoyo.2');
   };
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
-      {/* Contenedor Mobile-First */}
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
         
-        {/* BLOQUE SUPERIOR */}
         <div className="pt-4">
           
           <button 
@@ -175,7 +162,6 @@ export default function FactoresImpactoPage() {
                   </div>
                 </button>
 
-                {/* Sub-pantalla de entrada "Otro" */}
                 {opcion.id === 'otro' && opcion.seleccionado && (
                   <div className="mt-2 px-1 space-y-2 dynamic-input-animation">
                     <div className="relative flex items-center">
@@ -216,10 +202,9 @@ export default function FactoresImpactoPage() {
           </div>
         </div>
 
-        {/* BLOQUE INFERIOR */}
         <div className="mt-8 pb-4 w-full">
           <button 
-            onClick={handleContinuar}
+            onClick={manejarContinuar}
             className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
           >
             {datosFactores.botonContinuar}

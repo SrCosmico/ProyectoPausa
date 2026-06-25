@@ -4,10 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 //DELATE
 import { deleteItem } from '@/lib/supabase/motivos';
-
-// ==========================================
-// INTERFACES Y MODELOS DE DATOS DE LA APP
-// ==========================================
+import { guardarMotivosOnboarding } from '@/lib/supabase/onboarding';
 
 export type MotivoId =
   | "estres"
@@ -27,14 +24,13 @@ export interface OpcionMotivo {
 export interface PantallaMotivos {
   paso: number;
   totalPasos: number;
-  pregunta: string;         // "¿Cuál es tu principal motivo para usar Pausa?"
-  instruccion: string;      // "Puedes elegir más de una opción"
+  pregunta: string;
+  instruccion: string;
   opciones: OpcionMotivo[];
-  otroTexto: string;        // valor del campo libre "Otro"
+  otroTexto: string;
   botonContinuar: string;
 }
 
-// Data base obligatoria provista por el usuario
 export const opcionesMotivosData: Omit<OpcionMotivo, "seleccionado">[] = [
   { id: "estres",      label: "Manejar el estrés" },
   { id: "bienestar",   label: "Mejorar mi bienestar emocional" },
@@ -44,7 +40,6 @@ export const opcionesMotivosData: Omit<OpcionMotivo, "seleccionado">[] = [
   { id: "otro",        label: "Otro (especificar)" },
 ];
 
-// Mapeo visual de emojis correspondientes al diseño de la interfaz
 const mapeoIconos: Record<MotivoId, string> = {
   estres: "🧘",
   bienestar: "🌸",
@@ -57,9 +52,8 @@ const mapeoIconos: Record<MotivoId, string> = {
 export default function MotivosPage() {
   const router = useRouter();
 
-  // --- CONFIGURACIÓN DE ESTADOS EXCLUSIVOS DE ESTA PANTALLA ---
   const [seleccionados, setSeleccionados] = useState<Record<MotivoId, boolean>>({
-    estres: true, // Opción activa inicial por defecto
+    estres: true,
     bienestar: false,
     dormir: false,
     academico: false,
@@ -70,7 +64,6 @@ export default function MotivosPage() {
   const [otroTexto, setOtroTexto] = useState<string>('');
   const [simulacionEnvioOtro, setSimulacionEnvioOtro] = useState<boolean>(false);
 
-  // Construcción del objeto reactivo implementando la interfaz PantallaMotivos
   const datosMotivos: PantallaMotivos = {
     paso: 1,
     totalPasos: 6,
@@ -105,30 +98,21 @@ export default function MotivosPage() {
     }
   };
 
-  // Guardar motivos seleccionados en localStorage para el onboarding
-  const handleContinuar = () => {
-    const motivosSeleccionados = Object.entries(seleccionados)
-      .filter(([, valor]) => valor)
-      .map(([id]) => id);
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('motivos_onboarding', JSON.stringify(motivosSeleccionados));
-      if (otroTexto.trim()) {
-        localStorage.setItem('motivos_otro_texto', otroTexto.trim());
-      }
-    }
-
+  // Persiste las opciones elegidas y avanza al siguiente paso del cuestionario
+  const manejarContinuar = () => {
+    const motivosSeleccionados = (Object.keys(seleccionados) as MotivoId[]).filter(
+      (id) => seleccionados[id]
+    );
+    guardarMotivosOnboarding(motivosSeleccionados, otroTexto);
     router.push('estadoActual.2');
   };
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
-      {/* Contenedor Esqueleto Mobile-First */}
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
         
         <div className="pt-4">
           
-          {/* Botón Flecha de Regreso */}
           <button 
             onClick={() => router.push('bienvenida.2')} 
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none"
@@ -139,7 +123,6 @@ export default function MotivosPage() {
             </svg>
           </button>
 
-          {/* Barra de progreso visual (Paso 1) */}
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
             <div className="bg-[#4A72A6] h-full w-1/6 rounded-full transition-all duration-300" />
           </div>
@@ -147,7 +130,6 @@ export default function MotivosPage() {
             Paso {datosMotivos.paso} de {datosMotivos.totalPasos}
           </p>
 
-          {/* Título de sección */}
           <h3 className="text-xl font-bold text-[#2A3B50] mt-4 leading-snug">
             {datosMotivos.pregunta}
           </h3>
@@ -155,7 +137,6 @@ export default function MotivosPage() {
             {datosMotivos.instruccion}
           </p>
           
-          {/* Caja de Opciones */}
           <div className="space-y-3 mt-6">
             {datosMotivos.opciones.map((opcion) => {
               if (opcion.id === "otro") return null;
@@ -187,7 +168,6 @@ export default function MotivosPage() {
               );
             })}
 
-            {/* Bloque de la opción expansible: "Otro (especificar)" */}
             {(() => {
               const opcionOtro = datosMotivos.opciones.find(o => o.id === "otro");
               if (!opcionOtro) return null;
@@ -215,7 +195,6 @@ export default function MotivosPage() {
                     </div>
                   </button>
 
-                  {/* Campo input libre */}
                   {opcionOtro.seleccionado && (
                     <div className="mt-3 relative">
                       <input
@@ -239,10 +218,9 @@ export default function MotivosPage() {
           </div>
         </div>
 
-        {/* Botón de Acción Continuar */}
         <div className="mt-8 pb-4">
           <button 
-            onClick={handleContinuar}
+            onClick={manejarContinuar}
             className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
           >
             {datosMotivos.botonContinuar}

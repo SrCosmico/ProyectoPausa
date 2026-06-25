@@ -38,14 +38,14 @@ export const emojiEstadosData: EmojiEstado[] = [
   { estado: "Muy bien", emoji: "🤩" },
 ];
 
+// "antistres" ahora es el acceso directo a Monitoreo (antes "Tips anti-estrés")
 export const accesoRapidoData: AccesoRapido[] = [
-  { id: "evaluacion",  titulo: "Evaluación rápida",         descripcion: "Conoce tu bienestar",                ruta: "/evaluacion.2"  },
+  { id: "evaluacion",  titulo: "Evaluación rápida",        descripcion: "Conoce tu bienestar",                ruta: "/evaluacion.2"  },
   { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                ruta: "/meditacion.2"  },
-  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios", ruta: "/monitoreo.2"   },
+  { id: "antistres",   titulo: "Monitoreo emocional",       descripcion: "Revisa tu progreso y tus registros", ruta: "/monitoreo.2"   },
   { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                ruta: "/cronograma.2"  },
-  { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",               ruta: "/monitoreo.2"   },
-  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
   { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2"  },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
   { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: ""               },
 ];
 
@@ -58,20 +58,74 @@ export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
 const mapeoIconosHerramientas: Record<string, string> = {
   evaluacion: "📊",
   meditacion: "🧘",
-  antistres:  "🍃",
+  antistres:  "📈",
   cronograma: "📅",
-  registro:   "❤️",
-  crisis:     "🚨",
   diario:     "🔐",
+  crisis:     "🚨",
   ia:         "💬",
 };
 
+// ==========================================
+// PERSONALIZACIÓN SEGÚN METADATA DEL ONBOARDING
+// ==========================================
+
+/** Mueve al frente las herramientas relacionadas con los motivos elegidos por el usuario. */
+function personalizarOrdenHerramientas(
+  base: AccesoRapido[],
+  motivos: string[]
+): AccesoRapido[] {
+  const prioridadPorMotivo: Record<string, string> = {
+    dormir: 'meditacion',
+    academico: 'cronograma',
+    estres: 'evaluacion',
+    bienestar: 'antistres',
+    motivacion: 'antistres',
+  };
+
+  const idsPrioritarios = motivos
+    .map((m) => prioridadPorMotivo[m])
+    .filter((id): id is string => Boolean(id));
+
+  if (idsPrioritarios.length === 0) return base;
+
+  const ordenados = [...base];
+  [...idsPrioritarios].reverse().forEach((id) => {
+    const idx = ordenados.findIndex((item) => item.id === id);
+    if (idx > 0) {
+      const [item] = ordenados.splice(idx, 1);
+      ordenados.unshift(item);
+    }
+  });
+
+  return ordenados;
+}
+
+const SALUDO_POR_FACTOR: Record<string, string> = {
+  estres_academico: 'Estamos aquí para ayudarte con el estrés académico 📚',
+  sobrecarga_tareas: 'Vamos a organizar tu carga de tareas juntos 📝',
+  falta_tiempo: 'Te ayudamos a encontrar tiempo para ti 🕒',
+  problemas_personales: 'Estamos aquí para acompañarte 💜',
+  ansiedad: 'Tu calma es nuestra prioridad 🧘',
+  motivacion_baja: 'Vamos a recuperar tu motivación juntos ✨',
+};
+
+/** Baja el umbral de crisis si el usuario reportó estrés muy frecuente en el onboarding. */
+function personalizarUmbralCrisis(frecuenciaEstres: string) {
+  if (typeof window === 'undefined') return;
+  if (frecuenciaEstres === 'todos_los_dias') {
+    localStorage.setItem('umbral_crisis_personalizado', '2.2');
+  } else if (frecuenciaEstres === 'varias_semana') {
+    localStorage.setItem('umbral_crisis_personalizado', '2.0');
+  }
+}
+
 export default function HomePage() {
   const router = useRouter();
-  const [usuarioNombre, setUsuarioNombre] = useState('Usuario');
-  const [usuarioAvatar, setUsuarioAvatar] = useState<string | null>(null); // ✅ NUEVO
-  const [yaRegistroHoy, setYaRegistroHoy] = useState(false);
-  const [loadingLogout, setLoadingLogout] = useState(false);
+  const [usuarioNombre, setUsuarioNombre]   = useState('Usuario');
+  const [yaRegistroHoy, setYaRegistroHoy]   = useState(false);
+  const [loadingLogout, setLoadingLogout]   = useState(false);
+  const [herramientas, setHerramientas]     = useState<AccesoRapido[]>(accesoRapidoData);
+  const [saludo, setSaludo]                 = useState('Nos alegra que estés aquí');
 
   const { preguntaActual, mostrarCheckin, guardarEmocionTemporal } = useQuizState();
 
@@ -87,13 +141,24 @@ export default function HomePage() {
         setUsuarioNombre(obtenerNombreUsuarioLocal() || 'Estudiante');
       }
 
-      // ✅ NUEVO: leer avatar guardado desde perfil
-      const avatar = localStorage.getItem('userAvatar');
-      setUsuarioAvatar(avatar);
-
       const registroFecha = localStorage.getItem('fechaUltimoRegistro');
       const hoy = new Date().toLocaleDateString();
       if (registroFecha === hoy) setYaRegistroHoy(true);
+
+      // --- Personalización a partir de los datos del cuestionario de onboarding ---
+      const metadata = session.user?.user_metadata;
+      if (metadata?.onboarding_completado) {
+        const motivos: string[] = metadata.motivos_principales ?? [];
+        setHerramientas(personalizarOrdenHerramientas(accesoRapidoData, motivos));
+
+        const frecuencia: string = metadata.frecuencia_estres ?? '';
+        personalizarUmbralCrisis(frecuencia);
+
+        const factorPrincipal: string = metadata.factores_impacto?.[0] ?? '';
+        if (factorPrincipal && SALUDO_POR_FACTOR[factorPrincipal]) {
+          setSaludo(SALUDO_POR_FACTOR[factorPrincipal]);
+        }
+      }
     };
     verificarSesionReal();
   }, [router]);
@@ -123,13 +188,13 @@ export default function HomePage() {
 
   const datosHome = {
     usuario:    { nombre: usuarioNombre },
-    saludo:     "Nos alegra que estés aquí",
+    saludo,
     registroEmocional: {
       pregunta:     preguntaCheckin,
       descripcion:  "Registra tu estado emocional",
       opcionesEmoji: emojiEstadosData,
     },
-    accesoRapido: accesoRapidoData,
+    accesoRapido: herramientas,
     navegacion: navegacionData.map((item) => ({ ...item, activo: item.id === "inicio" })),
   };
 
@@ -144,20 +209,12 @@ export default function HomePage() {
             <div className="flex items-center justify-between gap-4">
 
               <div className="flex items-center gap-4">
-                {/* ✅ Avatar igual al del perfil */}
-                <div
-                  className="w-12 h-12 rounded-full overflow-hidden border-4 border-slate-50 shadow-sm flex-shrink-0 flex items-center justify-center text-white text-lg font-bold"
-                  style={{ backgroundColor: '#A7C7D8' }}
-                >
-                  {usuarioAvatar ? (
-                    <img
-                      src={usuarioAvatar}
-                      alt="Foto de perfil"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span>{usuarioNombre.charAt(0).toUpperCase()}</span>
-                  )}
+                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-500 via-indigo-400 to-blue-400 p-0.5 shadow-md flex-shrink-0 flex items-center justify-center">
+                  <div className="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-indigo-400 translate-y-1">
+                      <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
+                    </svg>
+                  </div>
                 </div>
 
                 <div>
@@ -168,7 +225,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* BOTÓN LOGOUT */}
               <button
                 onClick={handleLogout}
                 disabled={loadingLogout}
@@ -185,7 +241,6 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* CHECK-IN EMOCIONAL */}
             {mostrarCheckin && (
               <div className="mt-6 bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 text-center">
                 <h3 className="text-sm font-bold text-[#334155]">
@@ -266,7 +321,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* NAVEGACIÓN INFERIOR */}
         <div className="bg-white border-t border-slate-100 px-6 py-3.5 flex justify-around items-center sm:rounded-b-[40px] z-30 shadow-[0_-6px_20px_rgba(0,0,0,0.03)] flex-shrink-0">
           {datosHome.navegacion.map((tab) => {
             const rutasMenu = {
