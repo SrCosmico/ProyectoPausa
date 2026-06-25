@@ -1,11 +1,11 @@
+// app/perfil/page.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase';
-import { cerrarSesion } from '@/app/services/authService';
+import { createClient } from '@/lib/supabase/client';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+const supabase = createClient();
 
 interface OpcionMenu {
   id: string;
@@ -14,10 +14,7 @@ interface OpcionMenu {
   descripcion: string;
   ruta?: string;
   accion?: () => void;
-  peligro?: boolean;
 }
-
-// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -26,44 +23,65 @@ export default function PerfilPage() {
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
   const [foto, setFoto] = useState<string | null>(null);
+  const [userId, setUserId] = useState('');
   const [cargando, setCargando] = useState(true);
   const [loadingLogout, setLoadingLogout] = useState(false);
+  const [loadingAvatar, setLoadingAvatar] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [guardandoNombre, setGuardandoNombre] = useState(false);
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
-
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/login'); return; }
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) { router.push('/login'); return; }
 
-      const user = session.user;
-      const nombreMeta = user.user_metadata?.nombre_usuario || user.user_metadata?.full_name || '';
-      setNombre(nombreMeta || user.email?.split('@')[0] || 'Estudiante');
+      setUserId(user.id);
       setCorreo(user.email || '');
-      setFoto(localStorage.getItem('userAvatar'));
+
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('nombre, avatar_url')
+        .eq('id', user.id)
+        .single();
+
+      const nombreFallback =
+        user.user_metadata?.nombre_usuario ||
+        user.user_metadata?.full_name ||
+        user.email?.split('@')[0] ||
+        'Estudiante';
+
+      setNombre(perfil?.nombre || nombreFallback);
+      setFoto(perfil?.avatar_url || null);
       setCargando(false);
     };
     init();
   }, [router]);
 
-  // ─── Cambiar foto ──────────────────────────────────────────────────────────
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setFoto(result);
-        localStorage.setItem('userAvatar', result);
-      };
-      reader.readAsDataURL(e.target.files[0]);
+    setLoadingAvatar(true);
+    const ext = file.name.split('.').pop();
+    const filePath = `${userId}/avatar.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setFoto(publicUrl);
+      await supabase
+        .from('perfiles')
+        .upsert({ id: userId, avatar_url: publicUrl, updated_at: new Date().toISOString() }, { onConflict: 'id' });
     }
+    setLoadingAvatar(false);
   };
-
-  // ─── Editar nombre ─────────────────────────────────────────────────────────
 
   const abrirEditar = () => {
     setNuevoNombre(nombre);
@@ -73,10 +91,16 @@ export default function PerfilPage() {
   const guardarNombre = async () => {
     if (!nuevoNombre.trim()) return;
     setGuardandoNombre(true);
-    const { error } = await supabase.auth.updateUser({
-      data: { nombre_usuario: nuevoNombre.trim() }
-    });
-    if (!error) {
+
+    const [{ error: authError }, { error: dbError }] = await Promise.all([
+      supabase.auth.updateUser({ data: { nombre_usuario: nuevoNombre.trim() } }),
+      supabase.from('perfiles').upsert(
+        { id: userId, nombre: nuevoNombre.trim(), updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      ),
+    ]);
+
+    if (!authError && !dbError) {
       setNombre(nuevoNombre.trim());
       setModalEditar(false);
     } else {
@@ -85,12 +109,10 @@ export default function PerfilPage() {
     setGuardandoNombre(false);
   };
 
-  // ─── Cerrar sesión ─────────────────────────────────────────────────────────
-
   const handleLogout = async () => {
     if (loadingLogout) return;
     setLoadingLogout(true);
-    const { error } = await cerrarSesion();
+    const { error } = await supabase.auth.signOut();
     if (error) {
       alert(`No se pudo cerrar sesión: ${error.message}`);
       setLoadingLogout(false);
@@ -98,8 +120,6 @@ export default function PerfilPage() {
       router.push('/login');
     }
   };
-
-  // ─── Opciones del menú ────────────────────────────────────────────────────
 
   const opcionesMenu: OpcionMenu[] = [
     {
@@ -130,8 +150,6 @@ export default function PerfilPage() {
     },
   ];
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
   if (cargando) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">
@@ -161,7 +179,7 @@ export default function PerfilPage() {
         {/* CONTENIDO */}
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
 
-          {/* Sección de avatar */}
+          {/* Avatar */}
           <div className="bg-white px-6 pt-8 pb-6 flex flex-col items-center border-b border-slate-100">
             <div className="relative mb-4">
               <div
@@ -169,13 +187,14 @@ export default function PerfilPage() {
                 className="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-50 shadow-md cursor-pointer flex items-center justify-center text-white text-3xl font-bold"
                 style={{ backgroundColor: '#A7C7D8' }}
               >
-                {foto ? (
+                {loadingAvatar ? (
+                  <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                ) : foto ? (
                   <img src={foto} alt="Perfil" className="w-full h-full object-cover" />
                 ) : (
                   <span>{nombre.charAt(0).toUpperCase()}</span>
                 )}
               </div>
-              {/* Botón de cámara */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute bottom-0 right-0 w-8 h-8 bg-[#4A72A6] rounded-full flex items-center justify-center shadow-md border-2 border-white"
@@ -193,21 +212,17 @@ export default function PerfilPage() {
               className="hidden"
               accept="image/*"
             />
-
             <h2 className="text-lg font-bold text-[#2A3B50]">{nombre}</h2>
             <p className="text-xs text-slate-400 mt-0.5">{correo}</p>
-
-            {/* Badge de estudiante UCV */}
             <div className="mt-3 flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-full px-3 py-1">
               <span className="text-xs">🎓</span>
               <span className="text-[11px] font-bold text-[#4A72A6]">Estudiante UCV</span>
             </div>
           </div>
 
-          {/* Menú de opciones */}
+          {/* Menú */}
           <div className="px-6 py-5 space-y-3">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Configuración</p>
-
             {opcionesMenu.map((item) => (
               <button
                 key={item.id}
@@ -230,7 +245,6 @@ export default function PerfilPage() {
               </button>
             ))}
 
-            {/* Cerrar sesión */}
             <div className="pt-2">
               <button
                 onClick={handleLogout}
@@ -265,7 +279,6 @@ export default function PerfilPage() {
               <h3 className="font-bold text-[#2A3B50]">Editar nombre</h3>
               <button onClick={() => setModalEditar(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
-
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1.5">Nombre de usuario</label>
               <input
@@ -275,7 +288,6 @@ export default function PerfilPage() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
               />
             </div>
-
             <div className="flex gap-3">
               <button
                 onClick={() => setModalEditar(false)}

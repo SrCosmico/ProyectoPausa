@@ -1,53 +1,43 @@
-// ============================================================
-// CRUD: Letra "R" pantalla de perfil
-// ============================================================
-
+// lib/supabase/perfil.ts
+import { createClient } from '@/lib/supabase/client';
 import {
   opcionesMenuPerfil,
   usuarioDefecto,
   type UsuarioPerfil,
   type OpcionMenu,
-} from "@/models/perfil";
+} from '@/models/perfil';
 
-/** Lee el perfil del usuario activo desde localStorage. */
-export function leerPerfilUsuario(): UsuarioPerfil {
-  if (typeof window === "undefined") return usuarioDefecto;
+const supabase = createClient();
+
+export async function leerPerfilUsuario(userId: string): Promise<UsuarioPerfil> {
+  const { data, error } = await supabase
+    .from('perfiles')
+    .select('nombre, avatar_url')
+    .eq('id', userId)
+    .single();
+
+  if (error || !data) return { ...usuarioDefecto };
+
   return {
-    nombre: localStorage.getItem("alumnoNombre") ?? usuarioDefecto.nombre,
-    correo: localStorage.getItem("alumnoEmail") ?? usuarioDefecto.correo,
-    avatar: localStorage.getItem("userAvatar") ?? null,
+    nombre: data.nombre || usuarioDefecto.nombre,
+    correo: usuarioDefecto.correo,
+    avatar: data.avatar_url || null,
   };
 }
 
-/** Devuelve las opciones del menú de configuración del perfil. */
 export function leerOpcionesMenuPerfil(): OpcionMenu[] {
   return opcionesMenuPerfil;
 }
 
-/** Verifica si existe una sesión activa válida en localStorage. */
-export function leerSesionActiva(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem("sesionActiva") === "true";
-}
-
-
-async function actualizarPerfil(
+export async function actualizarPerfil(
   userId: string,
   nuevosDatos: { nombre?: string; biografia?: string; avatar_url?: string }
 ) {
-  if (typeof window !== 'undefined') {
-    if (nuevosDatos.nombre) {
-      localStorage.setItem('alumnoNombre', nuevosDatos.nombre);
-    }
-    if (nuevosDatos.avatar_url) {
-      localStorage.setItem('userAvatar', nuevosDatos.avatar_url);
-    }
-    if (nuevosDatos.biografia) {
-      localStorage.setItem(`biografia_${userId}`, nuevosDatos.biografia);
-    }
-    return { data: nuevosDatos, error: null };
-  }
-  return { data: null, error: null };
-}
+  const { data, error } = await supabase
+    .from('perfiles')
+    .upsert({ id: userId, ...nuevosDatos, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+    .select()
+    .single();
 
-export { actualizarPerfil };
+  return { data, error };
+}
