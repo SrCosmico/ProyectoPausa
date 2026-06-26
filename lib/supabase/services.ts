@@ -1,89 +1,76 @@
-// Interface estricta para definir qué es una Nota en TypeScript
+import { createClient } from '@/lib/supabase/client';
+
 export interface NotaDiario {
-  id: string;
+  id: string;          // UUID de Supabase
   user_id: string;
   titulo: string;
   contenido: string;
   fecha: string;
+  emoji_dia?: string | null;
+  label_dia?: string | null;
 }
 
-const STORAGE_KEY = 'diario_notas_local';
+const getSupabase = () => createClient();
 
-function leerNotasStorage(): NotaDiario[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as NotaDiario[];
-  } catch {
-    return [];
-  }
-}
-
-function guardarNotasStorage(notas: NotaDiario[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notas));
-}
-
-// ========================================================
-// CAPA DE SERVICIOS: DIARIO EMOCIONAL (CRUD COMPLETO)
-// ========================================================
-
-/**
- * LETRA C (Create): Inserta una nueva nota escrita por el alumno
- */
+/** C — Crear nota en notas_diario */
 export const crearNotaDiario = async (
   userId: string,
   titulo: string,
-  contenido: string
+  contenido: string,
+  emojiDia?: string | null,
+  labelDia?: string | null
 ): Promise<NotaDiario[]> => {
-  const notas = leerNotasStorage();
-  const nuevaNota: NotaDiario = {
-    id: Date.now().toString(),
-    user_id: userId,
-    titulo: titulo.trim() || 'Sin título',
-    contenido: contenido.trim(),
-    fecha: new Date().toISOString(),
-  };
-  notas.unshift(nuevaNota);
-  guardarNotasStorage(notas);
-  return [nuevaNota];
+  const { data, error } = await getSupabase()
+    .from('notas_diario')
+    .insert([{
+      user_id:   userId,
+      titulo:    titulo.trim() || 'Sin título',
+      contenido: contenido.trim(),
+      fecha:     new Date().toISOString(),
+      emoji_dia: emojiDia  ?? null,
+      label_dia: labelDia  ?? null,
+    }])
+    .select();
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as NotaDiario[];
 };
 
-/**
- * LETRA R (Read): Lee todas las notas guardadas de un alumno específico
- */
-export const obtenerNotasDiario = async (
-  userId: string
-): Promise<NotaDiario[]> => {
-  return leerNotasStorage().filter((n) => n.user_id === userId);
+/** R — Obtener todas las notas de un usuario */
+export const obtenerNotasDiario = async (userId: string): Promise<NotaDiario[]> => {
+  const { data, error } = await getSupabase()
+    .from('notas_diario')
+    .select('*')
+    .eq('user_id', userId)
+    .order('fecha', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as NotaDiario[];
 };
 
-/**
- * LETRA U (Update): Actualiza el título o contenido de una nota existente
- */
+/** U — Actualizar título y contenido de una nota */
 export const actualizarNotaDiario = async (
   notaId: string,
   nuevoTitulo: string,
   nuevoContenido: string
 ): Promise<NotaDiario[]> => {
-  const notas = leerNotasStorage();
-  const actualizadas = notas.map((n) =>
-    n.id === notaId
-      ? {
-          ...n,
-          titulo: nuevoTitulo.trim(),
-          contenido: nuevoContenido.trim(),
-        }
-      : n
-  );
-  guardarNotasStorage(actualizadas);
-  return actualizadas.filter((n) => n.id === notaId);
+  const { data, error } = await getSupabase()
+    .from('notas_diario')
+    .update({ titulo: nuevoTitulo.trim(), contenido: nuevoContenido.trim() })
+    .eq('id', notaId)
+    .select();
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as NotaDiario[];
 };
 
-/**
- * LETRA D (Delete): Elimina una nota permanentemente mediante su ID
- */
+/** D — Eliminar nota */
 export const borrarNotaDiario = async (notaId: string): Promise<boolean> => {
-  const notas = leerNotasStorage();
-  guardarNotasStorage(notas.filter((n) => n.id !== notaId));
+  const { error } = await getSupabase()
+    .from('notas_diario')
+    .delete()
+    .eq('id', notaId);
+
+  if (error) throw new Error(error.message);
   return true;
 };
