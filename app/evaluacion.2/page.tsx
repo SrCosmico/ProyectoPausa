@@ -205,9 +205,8 @@ export default function EvaluacionFlujoPage() {
         respuestas
       );
 
-      // La función devuelve { data, error } — comprobar ambos casos
-      const { data: dataGuardada, error: errorGuardada } = resultadoGuardado;
-      if (errorGuardada || !dataGuardada || (Array.isArray(dataGuardada) && dataGuardada.length === 0)) {
+      // La función devuelve un array con el registro insertado
+      if (!resultadoGuardado || resultadoGuardado.length === 0) {
         throw new Error('No se pudo confirmar el guardado del resultado.');
       }
 
