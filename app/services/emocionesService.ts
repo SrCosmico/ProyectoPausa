@@ -1,7 +1,7 @@
-// app/services/emocionesService.ts
+// app/services/emocionesService.ts — Sistema de puntuación numérica de bienestar
 import supabase from '@/lib/supabase';
 import { RegistroEmocion, Recomendacion } from '@/app/types';
-import { NIVEL_A_EMOJI, NivelBienestar } from '@/models/monitoreo';
+import { ESTADO_A_NIVEL, NIVEL_A_EMOJI, NivelBienestar, obtenerFechaLocalHoy } from '@/models/monitoreo';
 
 const RECOMENDACIONES_DUMMY: Recomendacion[] = [
   { estado_animo: 'bien',    consejo: '¡Vas por buen camino! Sigue con tus hábitos de bienestar.' },
@@ -10,6 +10,15 @@ const RECOMENDACIONES_DUMMY: Recomendacion[] = [
   { estado_animo: 'triste',  consejo: 'Escribe en tu diario lo que sientes. Liberar emociones ayuda.' },
   { estado_animo: 'ansioso', consejo: 'Realiza el ejercicio 4-7-8 para calmar tu sistema nervioso.' },
 ];
+
+/** Igual que obtenerFechaLocalHoy() de models/monitoreo.ts pero para N días atrás,
+ *  corrigiendo el offset de zona horaria local antes de convertir a "YYYY-MM-DD". */
+function obtenerFechaLocalHaceNDias(n: number): string {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() - n);
+  const offset = fecha.getTimezoneOffset() * 60000;
+  return new Date(fecha.getTime() - offset).toISOString().split('T')[0];
+}
 
 export const guardarEmocion = async (emocion: RegistroEmocion) => {
   const { data, error } = await supabase
@@ -21,7 +30,8 @@ export const guardarEmocion = async (emocion: RegistroEmocion) => {
       valor_numerico: emocion.valor_numerico,
     }])
     .select();
-  if (error) console.error('Error de Supabase:', error);
+
+  if (error) console.error("Error de Supabase:", error);
   return { success: !error, data, error };
 };
 
@@ -31,42 +41,50 @@ export const obtenerHistorialUsuario = async (userId: string) => {
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: true });
+
   if (error) {
-    console.error('Error al obtener historial:', error);
+    console.error("Error al obtener historial:", error);
     return [];
   }
   return data ?? [];
 };
 
 export const obtenerRecomendacionPorAnimo = async (estadoAnimo: string) => {
-  return (
-    RECOMENDACIONES_DUMMY.find((r) => r.estado_animo === estadoAnimo.toLowerCase())
-    ?? RECOMENDACIONES_DUMMY[0]
+  const recomendacion = RECOMENDACIONES_DUMMY.find(
+    (r) => r.estado_animo === estadoAnimo.toLowerCase()
   );
+  return recomendacion ?? RECOMENDACIONES_DUMMY[0];
 };
 
-// ── TAREA 2: filtro 7 días + orden descendente ──────────────────────────────
+/**
+ * LETRA R: HISTORIAL SEMANAL (ÚNICA FUENTE DE VERDAD)
+ * Devuelve solo los registros de los últimos 7 días (incluyendo hoy),
+ * ordenados del más reciente al más antiguo. Reemplaza por completo a
+ * la versión simulada que existía en lib/supabase/monitoreo.ts.
+ */
 export const leerHistorialEmocionalSemanal = async (userId: string) => {
-  const hace7dias = new Date();
-  hace7dias.setDate(hace7dias.getDate() - 7);
-  const fechaInicio = hace7dias.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  const fechaDesde = obtenerFechaLocalHaceNDias(6); // hoy + 6 atrás = ventana de 7 días
+  const fechaHasta = obtenerFechaLocalHoy();
 
   const { data, error } = await supabase
     .from('historial_emociones')
     .select('*')
     .eq('user_id', userId)
-    .gte('dia', fechaInicio)                               // solo últimos 7 días
-    .order('created_at', { ascending: false });            // más reciente primero
+    .gte('dia', fechaDesde)
+    .lte('dia', fechaHasta)
+    .order('dia', { ascending: false });
 
   if (error) {
-    console.error('Error al leer historial semanal:', error);
+    console.error("Error al leer historial semanal:", error);
     return [];
   }
   return data ?? [];
 };
 
-// ── TAREA 1: UPSERT para evitar duplicados por (user_id, dia) ───────────────
-// Requiere en BD: UNIQUE(user_id, dia)  →  ver comentario de migración en repo.
+/**
+ * Inserta un registro con nivel numérico (1-5) en lugar de emoji.
+ * El emoji se deriva del nivel para mantener compatibilidad visual.
+ */
 export const insertarRegistros = async (registro: {
   user_id: string;
   fecha: string;
@@ -78,21 +96,18 @@ export const insertarRegistros = async (registro: {
 
   const { data, error } = await supabase
     .from('historial_emociones')
-    .upsert(
-      [{
-        user_id: registro.user_id,
-        dia:     registro.fecha,
-        nivel:   registro.nivel,
-        estado:  registro.estado,
-        emoji:   emojiDinamico,
-        nota:    registro.nota ?? null,
-      }],
-      { onConflict: 'user_id,dia' }   // actualiza si ya existe el par
-    )
+    .insert([{
+      user_id:  registro.user_id,
+      dia:      registro.fecha,
+      nivel:    registro.nivel,
+      estado:   registro.estado,
+      emoji:    emojiDinamico,
+      nota:     registro.nota ?? null,
+    }])
     .select();
 
   if (error) {
-    console.error('Error en upsert historial_emociones:', JSON.stringify(error, null, 2));
+    console.error("Error en Supabase al insertar:", JSON.stringify(error, null, 2));
   }
   return { data, error };
 };
@@ -102,38 +117,36 @@ export const eliminarRegistroEmocional = async (id: string) => {
     .from('historial_emociones')
     .delete()
     .eq('id', id);
+
   if (error) {
-    console.error('Error al eliminar registro:', JSON.stringify(error, null, 2));
+    console.error("Error al eliminar registro:", JSON.stringify(error, null, 2));
     return false;
   }
   return true;
 };
 
-export const actualizarRegistroEmocional = async (
-  id: string,
-  cambios: {
-    fecha?: string;
-    nivel?: NivelBienestar;
-    estado?: string;
-    nota?: string | null;
-  }
-) => {
+export const actualizarRegistroEmocional = async (id: string, cambios: {
+  fecha?: string;
+  nivel?: NivelBienestar;
+  estado?: string;
+  nota?: string | null;
+}) => {
   const emojiDinamico = cambios.nivel ? NIVEL_A_EMOJI[cambios.nivel] : undefined;
 
   const { data, error } = await supabase
     .from('historial_emociones')
     .update({
-      dia:    cambios.fecha,
-      nivel:  cambios.nivel,
+      dia:   cambios.fecha,
+      nivel: cambios.nivel,
       estado: cambios.estado,
       ...(emojiDinamico ? { emoji: emojiDinamico } : {}),
-      nota:   cambios.nota,
+      nota:  cambios.nota,
     })
     .eq('id', id)
     .select();
 
   if (error) {
-    console.error('Error al actualizar:', JSON.stringify(error, null, 2));
+    console.error("Error al actualizar:", JSON.stringify(error, null, 2));
   }
   return { data, error };
 };
