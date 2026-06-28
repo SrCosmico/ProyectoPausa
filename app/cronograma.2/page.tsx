@@ -238,40 +238,75 @@ export default function CronogramaPage() {
     }
   };
 
-  const guardarActividadDB = async () => {
-    if (!cronogramaId) { setErrorNuevaActividad('Ocurrió un error. El cronograma no está inicializado.'); return; }
-    if (!tituloNuevo.trim()) { setErrorNuevaActividad('Ponle un título a la actividad.'); return; }
-    if (minutosDesdeHora(horaFinNuevo) <= minutosDesdeHora(horaInicioNuevo)) { setErrorNuevaActividad('La hora de fin debe ser después de la hora de inicio.'); return; }
+const guardarActividadDB = async () => {
+    // 1. Validaciones básicas antes de tocar la base de datos
+    if (!cronogramaId) { 
+      setErrorNuevaActividad('Ocurrió un error. El cronograma no está inicializado.'); 
+      return; 
+    }
+    if (!tituloNuevo.trim()) { 
+      setErrorNuevaActividad('Ponle un título a la actividad.'); 
+      return; 
+    }
+    if (minutosDesdeHora(horaFinNuevo) <= minutosDesdeHora(horaInicioNuevo)) { 
+      setErrorNuevaActividad('La hora de fin debe ser después de la hora de inicio.'); 
+      return; 
+    }
 
     setIsSaving(true);
+    setErrorNuevaActividad(null); // Limpiar errores previos
+
     try {
       if (actividadEditando) {
+        // Lógica para actualizar
         const respuesta = await actualizarActividad(actividadEditando.id, {
-          titulo: tituloNuevo, ubicacion: ubicacionNuevo, tipo: tipoNuevo, fecha: fechaNueva, horaInicio: horaInicioNuevo, horaFin: horaFinNuevo
+          titulo: tituloNuevo, 
+          ubicacion: ubicacionNuevo, 
+          tipo: tipoNuevo, 
+          fecha: fechaNueva, 
+          horaInicio: horaInicioNuevo, 
+          horaFin: horaFinNuevo
         });
+        
         if (respuesta) {
           setActividadesGuardadas(prev => prev.map(a => a.id === respuesta.id ? respuesta : a));
           setBloqueSeleccionado(respuesta);
           setFechaActiva(fechaNueva);
           setVista('detallesActividad');
+        } else {
+          throw new Error("No se pudo actualizar en la base de datos.");
         }
       } else {
+        // Lógica para insertar nueva
         const respuesta = await insertarActividad(cronogramaId, {
-          fecha: fechaNueva, tipo: tipoNuevo, horaInicio: horaInicioNuevo, horaFin: horaFinNuevo, titulo: tituloNuevo, ubicacion: ubicacionNuevo
+          fecha: fechaNueva, 
+          tipo: tipoNuevo, 
+          horaInicio: horaInicioNuevo, 
+          horaFin: horaFinNuevo, 
+          titulo: tituloNuevo, 
+          ubicacion: ubicacionNuevo
         });
+        
         if (respuesta) {
           setActividadesGuardadas(prev => [...prev, respuesta]);
           setFechaActiva(fechaNueva);
           setVista('vistaSemanal');
+        } else {
+          throw new Error("No se pudo insertar en la base de datos.");
         }
       }
-      setErrorNuevaActividad(null);
-      setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase');
-    } catch (error) {
-      setErrorNuevaActividad('Hubo un error al guardar la actividad en la base de datos.');
+      
+      // Limpieza tras éxito
+      setTituloNuevo(''); 
+      setUbicacionNuevo(''); 
+      setTipoNuevo('Clase');
+      setActividadEditando(null);
+
+    } catch (error: any) {
+      console.error("Error al guardar actividad:", error);
+      setErrorNuevaActividad('Hubo un error al guardar la actividad. Por favor, intenta de nuevo.');
     } finally {
       setIsSaving(false);
-      setActividadEditando(null);
     }
   };
 

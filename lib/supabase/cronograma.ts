@@ -55,7 +55,6 @@ export const obtenerActividadesCronograma = async (): Promise<BloqueHorario[]> =
     return [];
   }
 
-  // Mapeamos de base de datos (snake_case) al formato del frontend (camelCase)
   return data.map((act: any) => ({
     id: act.id,
     fecha: act.fecha,
@@ -76,13 +75,17 @@ export const insertarActividad = async (
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  // Validación segura para evitar crasheos con .trim()
+  const tituloSeguro = (actividad.titulo || '').trim() || 'Sin título';
+  const ubicacionSegura = (actividad.ubicacion || '').trim() || null;
+
   const { data, error } = await supabase
     .from('actividades_cronograma')
     .insert([{
       cronograma_id: cronogramaId,
       user_id: user.id,
-      titulo: actividad.titulo.trim() || 'Sin título',
-      ubicacion: actividad.ubicacion.trim() || null,
+      titulo: tituloSeguro,
+      ubicacion: ubicacionSegura,
       tipo_actividad: actividad.tipo,
       fecha: actividad.fecha,
       hora_inicio: actividad.horaInicio,
@@ -92,7 +95,7 @@ export const insertarActividad = async (
     .single();
 
   if (error) {
-    console.error('Error insertando actividad:', error.message);
+    console.error('Error insertando actividad en Supabase:', error.message, error.details);
     return null;
   }
 
