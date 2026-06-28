@@ -8,6 +8,8 @@ import {
   actualizarActividadCronograma,
   leerActividadesCronogramaUsuario,
   eliminarActividadCronograma,
+  guardarConfiguracionCronograma,
+  obtenerConfiguracionCronograma,
   type ActividadCronogramaGuardada,
 } from '@/lib/supabase/cronograma';
 
@@ -102,7 +104,6 @@ export default function CronogramaPage() {
   const [actividadesPreferidas, setActividadesPreferidas] = useState<string[]>(["Clases", "Estudio personal", "Tareas"]);
   const [nombreCronograma, setNombreCronograma] = useState("Semestre Mayo - Julio 2026");
 
-  // Paleta de colores globales mutada a variables estilizadas puramente pasteles confortables
   const [colorCronograma, setColorCronograma] = useState<"blue" | "purple" | "emerald" | "orange" | "rose">("blue");
   const [recordatorios, setRecordatorios] = useState(true);
 
@@ -110,12 +111,12 @@ export default function CronogramaPage() {
   const [cargandoSesion, setCargandoSesion] = useState(true);
   const [actividadesGuardadas, setActividadesGuardadas] = useState<ActividadCronogramaGuardada[]>([]);
   const [cargandoActividades, setCargandoActividades] = useState(false);
+  const [guardandoAjustes, setGuardandoAjustes] = useState(false);
 
   const [fechaSeleccionadaVista, setFechaSeleccionadaVista] = useState<string>(obtenerFechaISO(new Date()));
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
   const [bloqueSeleccionado, setBloqueSeleccionado] = useState<ActividadCronogramaGuardada | null>(null);
 
-  // States para creación y control de edición
   const [idActividadEditando, setIdActividadEditando] = useState<string | null>(null);
   const [tituloNuevaActividad, setTituloNuevaActividad] = useState("");
   const [ubicacionNuevaActividad, setUbicacionNuevaActividad] = useState("");
@@ -134,7 +135,7 @@ export default function CronogramaPage() {
     rose: { bg: "bg-rose-400", hoverBg: "hover:bg-rose-500", text: "text-rose-500", bgLight: "bg-rose-50/70", border: "border-rose-200" }
   };
 
-  const estilosActuales = mapaEstilos[colorCronograma];
+  const estilosActuales = mapaEstilos[colorCronograma] || mapaEstilos.blue;
   const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
   const refrescarActividades = useCallback(async (idUsuario: string) => {
@@ -152,8 +153,22 @@ export default function CronogramaPage() {
         return;
       }
       setUserId(session.user.id);
-      setCargandoSesion(false);
+
+      // Cargar la configuración general desde Supabase
+      const { data: config } = await obtenerConfiguracionCronograma(session.user.id);
+      if (config) {
+        if (config.nombre) setNombreCronograma(config.nombre);
+        if (config.color) setColorCronograma(config.color as any);
+        if (config.dias_activos) setDiasSeleccionados(config.dias_activos);
+        if (config.hora_inicio) setHoraInicio(config.hora_inicio);
+        if (config.hora_fin) setHoraFin(config.hora_fin);
+        if (config.actividades_preferidas) setActividadesPreferidas(config.actividades_preferidas);
+        if (config.recordatorios !== null) setRecordatorios(config.recordatorios);
+      }
+
       await refrescarActividades(session.user.id);
+      setCargandoSesion(false);
+      
       if (vista === 'paso1') setVista('vistaSemanal');
     };
     inicializar();
@@ -196,7 +211,7 @@ export default function CronogramaPage() {
   };
 
   const iniciarEdicionActividad = (actividad: ActividadCronogramaGuardada, e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita abrir la vista estática de detalles
+    e.stopPropagation(); 
     setIdActividadEditando(actividad.id);
     setTituloNuevaActividad(actividad.titulo);
     setUbicacionNuevaActividad(actividad.ubicacion || "");
@@ -266,6 +281,22 @@ export default function CronogramaPage() {
       setBloqueSeleccionado(null);
       setVista('vistaSemanal');
     }
+  };
+
+  const procesarGuardadoConfiguracion = async () => {
+    if (!userId) return;
+    setGuardandoAjustes(true);
+    await guardarConfiguracionCronograma(userId, {
+      nombre: nombreCronograma,
+      color: colorCronograma,
+      dias: diasSeleccionados,
+      horaInicio: horaInicio,
+      horaFin: horaFin,
+      actividades: actividadesPreferidas,
+      recordatorios: recordatorios
+    });
+    setGuardandoAjustes(false);
+    setVista('vistaSemanal');
   };
 
   const actividadesDelDia = actividadesGuardadas.filter(a => a.fecha === fechaSeleccionadaVista);
@@ -460,7 +491,6 @@ export default function CronogramaPage() {
                         <button key={day.iso} onClick={() => setFechaSeleccionadaVista(day.iso)} className={`relative flex flex-col items-center p-2 rounded-xl w-12 transition-all pb-3.5 ${esDiaActivo ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50'}`}>
                           <span className="text-[10px] font-bold">{day.abbr}</span>
                           <span className="text-xs font-black mt-0.5">{day.num}</span>
-                          {/* Punto indicador debajo de cada día del cinturón horizontal con actividades */}
                           {tieneActividad && (
                             <span className={`w-1 h-1 rounded-full absolute bottom-1 ${esDiaActivo ? 'bg-white' : estilosActuales.bg}`} />
                           )}
@@ -489,7 +519,6 @@ export default function CronogramaPage() {
                                 {actividad.ubicacion ? `${actividad.ubicacion} · ` : ''}{actividad.hora_inicio.slice(0, 5)} - {actividad.hora_fin.slice(0, 5)}
                               </p>
                             </div>
-                            {/* Flecha de Edición */}
                             <button 
                               onClick={(e) => iniciarEdicionActividad(actividad, e)}
                               className="p-1.5 rounded-lg hover:bg-white/60 transition-colors text-slate-400 hover:text-slate-700"
@@ -597,7 +626,6 @@ export default function CronogramaPage() {
                           </span>
                           <span className="text-[10px] font-bold bg-white/70 px-2 py-0.5 rounded-md opacity-90">{actividad.hora_inicio.slice(0, 5)}</span>
                           
-                          {/* Flechita para editar la actividad en fila */}
                           <button 
                             onClick={(e) => iniciarEdicionActividad(actividad, e)}
                             className="p-1 rounded-md hover:bg-white/70 text-slate-400 hover:text-slate-800 transition-colors ml-1"
@@ -773,14 +801,18 @@ export default function CronogramaPage() {
         {['paso2', 'paso3', 'paso4', 'paso5', 'agregarActividad', 'configuracionRapida'].includes(vista) && (
           <div className="p-6 bg-white border-t border-slate-100 sm:rounded-b-[40px] z-20">
             <button
-              disabled={vista === 'agregarActividad' && guardandoActividad}
-              onClick={() => {
+              disabled={(vista === 'agregarActividad' && guardandoActividad) || (vista === 'configuracionRapida' && guardandoAjustes)}
+              onClick={async () => {
                 if (vista === 'paso2') setVista('paso3');
                 else if (vista === 'paso3') setVista('paso4');
                 else if (vista === 'paso4') setVista('paso5');
-                else if (vista === 'paso5') setVista('vistaSemanal');
+                else if (vista === 'paso5') {
+                  await procesarGuardadoConfiguracion();
+                }
                 else if (vista === 'agregarActividad') handleGuardarActividad();
-                else if (vista === 'configuracionRapida') setVista('vistaSemanal');
+                else if (vista === 'configuracionRapida') {
+                  await procesarGuardadoConfiguracion();
+                }
               }}
               className={`w-full py-3.5 ${estilosActuales.bg} ${estilosActuales.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
             >
@@ -789,7 +821,7 @@ export default function CronogramaPage() {
                 : vista === 'agregarActividad'
                 ? (guardandoActividad ? "Guardando..." : (idActividadEditando ? "Guardar cambios" : "Guardar actividad"))
                 : vista === 'configuracionRapida'
-                ? "Confirmar cambios"
+                ? (guardandoAjustes ? "Guardando..." : "Confirmar cambios")
                 : "Continuar"}
             </button>
           </div>

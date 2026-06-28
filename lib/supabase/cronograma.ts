@@ -48,6 +48,53 @@ import { createClient } from './client'
 
 const supabase = createClient()
 
+// ============================================================
+// CONFIGURACIÓN GLOBAL DEL CRONOGRAMA (NUEVO)
+// ============================================================
+
+export async function guardarConfiguracionCronograma(userId: string, data: any) {
+  // Verificamos si ya existe un cronograma para este usuario
+  const { data: existente } = await supabase
+    .from('cronogramas')
+    .select('id')
+    .eq('user_id', userId)
+    .single()
+
+  const payload = {
+    user_id: userId,
+    nombre: data.nombre,
+    color: data.color,
+    dias_activos: data.dias,
+    hora_inicio: data.horaInicio,
+    hora_fin: data.horaFin,
+    actividades_preferidas: data.actividades,
+    recordatorios: data.recordatorios
+  }
+
+  if (existente) {
+    // Si existe, actualizamos
+    return await supabase
+      .from('cronogramas')
+      .update(payload)
+      .eq('id', existente.id)
+  } else {
+    // Si no existe, creamos uno nuevo
+    return await supabase
+      .from('cronogramas')
+      .insert([payload])
+  }
+}
+
+export async function obtenerConfiguracionCronograma(userId: string) {
+  const { data, error } = await supabase
+    .from('cronogramas')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle() // maybeSingle evita errores si el usuario es nuevo y no tiene config
+
+  return { data, error }
+}
+
 /**
  * LETRA C: PANTALLA CRONOGRAMA ACADÉMICO - AGREGAR ACTIVIDAD
  * Inserta un bloque horario o evento específico asignado a un cronograma (versión local/legacy).
