@@ -95,6 +95,7 @@ export default function CronogramaPage() {
   const [vista, setVista] = useState<VistaId>('paso1');
   const [cargando, setCargando] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [errorConfig, setErrorConfig] = useState<string | null>(null); // Estado para mostrar errores
   
   // Data base states
   const [cronogramaId, setCronogramaId] = useState<string | null>(null);
@@ -144,25 +145,29 @@ export default function CronogramaPage() {
   useEffect(() => {
     const cargarDatos = async () => {
       setCargando(true);
-      const cronogramaUser = await obtenerCronogramaUsuario();
-      
-      if (cronogramaUser) {
-        setCronogramaId(cronogramaUser.id);
-        setColorCronograma(cronogramaUser.color);
-        setNombreCronograma(cronogramaUser.nombre);
-        setRecordatorios(cronogramaUser.recordatorios);
+      try {
+        const cronogramaUser = await obtenerCronogramaUsuario();
         
-        const actividadesBD = await obtenerActividadesCronograma();
-        setActividadesGuardadas(actividadesBD);
-        setVista('vistaSemanal');
-      } else {
-        setVista('paso1');
+        if (cronogramaUser) {
+          setCronogramaId(cronogramaUser.id);
+          setColorCronograma(cronogramaUser.color);
+          setNombreCronograma(cronogramaUser.nombre);
+          setRecordatorios(cronogramaUser.recordatorios);
+          
+          const actividadesBD = await obtenerActividadesCronograma();
+          setActividadesGuardadas(actividadesBD);
+          setVista('vistaSemanal');
+        } else {
+          setVista('paso1');
+        }
+      } catch (error) {
+        console.error("Error cargando el cronograma", error);
+      } finally {
+        setMesActual({ year: hoy.getFullYear(), month: hoy.getMonth() });
+        setFechaActiva(HOY_ISO);
+        setFechaNueva(HOY_ISO);
+        setCargando(false);
       }
-      
-      setMesActual({ year: hoy.getFullYear(), month: hoy.getMonth() });
-      setFechaActiva(HOY_ISO);
-      setFechaNueva(HOY_ISO);
-      setCargando(false);
     };
 
     cargarDatos();
@@ -219,12 +224,15 @@ export default function CronogramaPage() {
 
   const guardarCronogramaConfig = async () => {
     setIsSaving(true);
+    setErrorConfig(null);
     try {
       const nuevoConfig = await crearCronograma(nombreCronograma, colorCronograma, recordatorios);
       setCronogramaId(nuevoConfig.id);
       setVista('vistaSemanal');
-    } catch (error) {
-      console.error("Error al crear la configuración", error);
+    } catch (error: any) {
+      console.error("Error al crear la configuración:", error);
+      // Extraemos el mensaje de error para mostrarlo en la UI
+      setErrorConfig(error.message || "No se pudo conectar a la base de datos. Asegúrate de ejecutar el código SQL en Supabase.");
     } finally {
       setIsSaving(false);
     }
@@ -260,7 +268,7 @@ export default function CronogramaPage() {
       setErrorNuevaActividad(null);
       setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase');
     } catch (error) {
-      setErrorNuevaActividad('Hubo un error al guardar la actividad.');
+      setErrorNuevaActividad('Hubo un error al guardar la actividad en la base de datos.');
     } finally {
       setIsSaving(false);
       setActividadEditando(null);
@@ -317,9 +325,7 @@ export default function CronogramaPage() {
       case 'paso3': setVista('paso2'); break;
       case 'paso4': setVista('paso3'); break;
       case 'paso5': setVista('paso4'); break;
-      case 'vistaSemanal':
-        // FIX PRINCIPAL: Al presionar atrás desde la vista semanal, te devuelve al inicio.
-        router.push('/home.2'); break;
+      case 'vistaSemanal': router.push('/home.2'); break;
       case 'agregarActividad':
         setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase'); setErrorNuevaActividad(null);
         actividadEditando ? (setActividadEditando(null), setVista('detallesActividad')) : setVista('vistaSemanal');
@@ -492,6 +498,14 @@ export default function CronogramaPage() {
                 <h4 className="text-base font-bold text-[#2A3B50]">¡Último paso!</h4>
                 <p className="text-xs text-slate-400 mt-0.5">Ponle un nombre a tu cronograma.</p>
               </div>
+
+              {/* Mensaje de error para notificar fallos de Supabase */}
+              {errorConfig && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-xs text-rose-700 font-medium">
+                  <strong>Error:</strong> {errorConfig}
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">Nombre de tu cronograma</label>
@@ -888,8 +902,8 @@ export default function CronogramaPage() {
                 else if (vista === 'paso2') setVista('paso3');
                 else if (vista === 'paso3') setVista('paso4');
                 else if (vista === 'paso4') setVista('paso5');
-                else if (vista === 'paso5') guardarCronogramaConfig(); // Enviar a BD en el último paso
-                else if (vista === 'agregarActividad') guardarActividadDB(); // Guardar/editar tarea
+                else if (vista === 'paso5') guardarCronogramaConfig(); 
+                else if (vista === 'agregarActividad') guardarActividadDB(); 
               }}
               className={`w-full py-3.5 ${estilos.bg} ${estilos.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all flex justify-center disabled:opacity-75`}
             >
