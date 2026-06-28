@@ -2,27 +2,21 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { deleteSelectedDay } from '@/lib/supabase/cronograma';
-import { deleteSelectedActivity } from '@/lib/supabase/cronograma';
-import { deleteCronogramaActivity } from '@/lib/supabase/cronograma';
+import { 
+  obtenerCronogramaUsuario, 
+  crearCronograma, 
+  obtenerActividadesCronograma, 
+  insertarActividad, 
+  actualizarActividad, 
+  eliminarActividad 
+} from '@/lib/supabase/cronograma';
+import { type BloqueHorario, type TipoActividad } from '@/models/cronograma';
 
 // ==========================================
-// INTERFACES Y CONFIGURACIÓN
+// CONFIGURACIÓN
 // ==========================================
 type VistaId = 'paso1' | 'paso2' | 'paso3' | 'paso4' | 'paso5' | 'vistaSemanal' | 'agregarActividad' | 'detallesActividad';
 type SubVistaCalendario = 'dia' | 'mes' | 'lista';
-type TipoActividad = 'Clase' | 'Estudio' | 'Tarea' | 'Examen';
-
-interface BloqueHorario {
-  id: string;
-  // Ahora el día es una fecha completa ISO "YYYY-MM-DD" para soportar múltiples meses
-  fecha: string;
-  tipo: TipoActividad;
-  horaInicio: string;
-  horaFin: string;
-  titulo: string;
-  ubicacion: string;
-}
 
 const opcionesHoras = [
   "05:00 a. m.", "06:00 a. m.", "07:00 a. m.", "08:00 a. m.", "09:00 a. m.", "10:00 a. m.", "11:00 a. m.",
@@ -49,7 +43,7 @@ const dotColorPorTipo: Record<TipoActividad, string> = {
   Examen:  "bg-orange-400",
 };
 
-// ─── Utilidades de hora ──────────────────────────────────────────────────────
+// ─── Utilidades de hora y calendario ──────────────────────────────────────────
 
 const minutosDesdeHora = (hora: string): number => {
   const match = hora.match(/^(\d{2}):(\d{2}) (a|p)\. m\.$/);
@@ -69,12 +63,8 @@ const formatoHora24 = (hora: string): string => {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
 
-// ─── Utilidades de calendario ────────────────────────────────────────────────
-
-/** Devuelve la cuadrícula del mes (lunes→domingo). Cada semana es array de 7: Date | null */
 const calcularSemanasMes = (year: number, month: number): (Date | null)[][] => {
   const primerDia = new Date(year, month, 1);
-  // getDay(): 0=Dom … 6=Sáb → convertir a lunes=0
   const offsetLunes = (primerDia.getDay() + 6) % 7;
   const diasEnMes = new Date(year, month + 1, 0).getDate();
 
@@ -82,7 +72,6 @@ const calcularSemanasMes = (year: number, month: number): (Date | null)[][] => {
     ...Array(offsetLunes).fill(null),
     ...Array.from({ length: diasEnMes }, (_, i) => new Date(year, month, i + 1)),
   ];
-  // Rellenar hasta múltiplo de 7
   while (celdas.length % 7 !== 0) celdas.push(null);
 
   const semanas: (Date | null)[][] = [];
@@ -96,37 +85,6 @@ const fechaISO = (d: Date): string =>
 const hoy = new Date();
 const HOY_ISO = fechaISO(hoy);
 
-// ─── Actividades de ejemplo (con fecha ISO) ──────────────────────────────────
-
-const actividadesDeEjemplo: BloqueHorario[] = [
-  { id: "1", fecha: "2026-05-27", tipo: "Clase",   horaInicio: "07:00 a. m.", horaFin: "08:30 a. m.", titulo: "Cálculo diferencial", ubicacion: "Aula 201" },
-  { id: "2", fecha: "2026-05-27", tipo: "Clase",   horaInicio: "08:40 a. m.", horaFin: "10:10 a. m.", titulo: "Física I",             ubicacion: "Aula 102" },
-  { id: "3", fecha: "2026-05-27", tipo: "Estudio", horaInicio: "10:30 a. m.", horaFin: "11:30 a. m.", titulo: "Estudio personal",    ubicacion: "Repaso de ejercicios" },
-  { id: "4", fecha: "2026-05-27", tipo: "Tarea",   horaInicio: "12:00 p. m.", horaFin: "01:00 p. m.", titulo: "Almuerzo",            ubicacion: "Descanso y comida" },
-  { id: "5", fecha: "2026-05-27", tipo: "Clase",   horaInicio: "01:10 p. m.", horaFin: "02:40 p. m.", titulo: "Química general",    ubicacion: "Laboratorio 3" },
-  { id: "6", fecha: "2026-05-29", tipo: "Examen",  horaInicio: "09:00 a. m.", horaFin: "11:00 a. m.", titulo: "Examen parcial Física", ubicacion: "Aula Magna" },
-];
-
-// ─── Persistencia localStorage ───────────────────────────────────────────────
-
-const CRONOGRAMA_CONFIGURADO_KEY = 'cronograma_configurado';
-const ACTIVIDADES_KEY = 'cronograma_actividades_v2'; // v2 para no mezclar con datos viejos
-
-const esPrimeraVezCronograma = (): boolean => {
-  if (typeof window === 'undefined') return true;
-  return localStorage.getItem(CRONOGRAMA_CONFIGURADO_KEY) !== 'true';
-};
-const marcarCronogramaConfigurado = () => localStorage.setItem(CRONOGRAMA_CONFIGURADO_KEY, 'true');
-
-const leerActividadesGuardadas = (): BloqueHorario[] => {
-  if (typeof window === 'undefined') return actividadesDeEjemplo;
-  const raw = localStorage.getItem(ACTIVIDADES_KEY);
-  if (!raw) return actividadesDeEjemplo;
-  try { return JSON.parse(raw) as BloqueHorario[]; } catch { return actividadesDeEjemplo; }
-};
-const guardarActividadesEnStorage = (lista: BloqueHorario[]) =>
-  localStorage.setItem(ACTIVIDADES_KEY, JSON.stringify(lista));
-
 // ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
@@ -136,7 +94,10 @@ export default function CronogramaPage() {
 
   const [vista, setVista] = useState<VistaId>('paso1');
   const [cargando, setCargando] = useState(true);
-  const [primeraVezEnEstaSesion, setPrimeraVezEnEstaSesion] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Data base states
+  const [cronogramaId, setCronogramaId] = useState<string | null>(null);
 
   // Calendario
   const [subVista, setSubVista] = useState<SubVistaCalendario>('dia');
@@ -178,31 +139,41 @@ export default function CronogramaPage() {
   };
   const estilos = mapaEstilos[colorCronograma];
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
+  // ─── Init (Carga desde Supabase) ──────────────────────────────────────────
 
   useEffect(() => {
-    const esPrimera = esPrimeraVezCronograma();
-    setPrimeraVezEnEstaSesion(esPrimera);
-    setVista(esPrimera ? 'paso1' : 'vistaSemanal');
-    setActividadesGuardadas(leerActividadesGuardadas());
-    // Sincronizar mes actual con hoy
-    setMesActual({ year: hoy.getFullYear(), month: hoy.getMonth() });
-    setFechaActiva(HOY_ISO);
-    setFechaNueva(HOY_ISO);
-    setCargando(false);
+    const cargarDatos = async () => {
+      setCargando(true);
+      const cronogramaUser = await obtenerCronogramaUsuario();
+      
+      if (cronogramaUser) {
+        setCronogramaId(cronogramaUser.id);
+        setColorCronograma(cronogramaUser.color);
+        setNombreCronograma(cronogramaUser.nombre);
+        setRecordatorios(cronogramaUser.recordatorios);
+        
+        const actividadesBD = await obtenerActividadesCronograma();
+        setActividadesGuardadas(actividadesBD);
+        setVista('vistaSemanal');
+      } else {
+        setVista('paso1');
+      }
+      
+      setMesActual({ year: hoy.getFullYear(), month: hoy.getMonth() });
+      setFechaActiva(HOY_ISO);
+      setFechaNueva(HOY_ISO);
+      setCargando(false);
+    };
+
+    cargarDatos();
   }, []);
 
-  // ─── Semanas del mes actual ───────────────────────────────────────────────
+  // ─── Lógica Derivada ──────────────────────────────────────────────────────
 
-  const semanasMes = useMemo(
-    () => calcularSemanasMes(mesActual.year, mesActual.month),
-    [mesActual]
-  );
-
-  // Días de la semana que contiene la fecha activa (para la barra de día)
+  const semanasMes = useMemo(() => calcularSemanasMes(mesActual.year, mesActual.month), [mesActual]);
   const diasBarraDia = useMemo(() => {
     const d = new Date(fechaActiva + 'T00:00:00');
-    const dow = (d.getDay() + 6) % 7; // lunes=0
+    const dow = (d.getDay() + 6) % 7;
     const lunes = new Date(d);
     lunes.setDate(d.getDate() - dow);
     return Array.from({ length: 7 }, (_, i) => {
@@ -211,8 +182,6 @@ export default function CronogramaPage() {
       return dd;
     });
   }, [fechaActiva]);
-
-  // ─── Actividades filtradas ────────────────────────────────────────────────
 
   const actividadesDelDia = useMemo(() =>
     actividadesGuardadas
@@ -229,13 +198,8 @@ export default function CronogramaPage() {
     [actividadesGuardadas]
   );
 
-  // Set de fechas con actividades (para puntos en calendario)
-  const fechasConActividad = useMemo(() =>
-    new Set(actividadesGuardadas.map(a => a.fecha)),
-    [actividadesGuardadas]
-  );
-
-  // Tipos de actividades en una fecha (para dots de colores)
+  const fechasConActividad = useMemo(() => new Set(actividadesGuardadas.map(a => a.fecha)), [actividadesGuardadas]);
+  
   const tiposPorFecha = useMemo(() => {
     const map: Record<string, Set<TipoActividad>> = {};
     actividadesGuardadas.forEach(a => {
@@ -247,63 +211,77 @@ export default function CronogramaPage() {
 
   // ─── Navegación de mes ────────────────────────────────────────────────────
 
-  const irMesAnterior = () => {
-    setMesActual(prev => {
-      const d = new Date(prev.year, prev.month - 1, 1);
-      return { year: d.getFullYear(), month: d.getMonth() };
-    });
-  };
+  const irMesAnterior = () => { setMesActual(prev => ({ year: new Date(prev.year, prev.month - 1, 1).getFullYear(), month: new Date(prev.year, prev.month - 1, 1).getMonth() })); };
+  const irMesSiguiente = () => { setMesActual(prev => ({ year: new Date(prev.year, prev.month + 1, 1).getFullYear(), month: new Date(prev.year, prev.month + 1, 1).getMonth() })); };
+  const irMesHoy = () => { setMesActual({ year: hoy.getFullYear(), month: hoy.getMonth() }); setFechaActiva(HOY_ISO); };
 
-  const irMesSiguiente = () => {
-    setMesActual(prev => {
-      const d = new Date(prev.year, prev.month + 1, 1);
-      return { year: d.getFullYear(), month: d.getMonth() };
-    });
-  };
+  // ─── CRUD Actividades (Supabase) ──────────────────────────────────────────
 
-  const irMesHoy = () => {
-    setMesActual({ year: hoy.getFullYear(), month: hoy.getMonth() });
-    setFechaActiva(HOY_ISO);
-  };
-
-  // ─── CRUD actividades ─────────────────────────────────────────────────────
-
-  const guardarActividad = () => {
-    if (!tituloNuevo.trim()) { setErrorNuevaActividad('Ponle un título a la actividad.'); return; }
-    if (minutosDesdeHora(horaFinNuevo) <= minutosDesdeHora(horaInicioNuevo)) {
-      setErrorNuevaActividad('La hora de fin debe ser después de la hora de inicio.'); return;
-    }
-
-    if (actividadEditando) {
-      const actualizadas = actividadesGuardadas.map(a =>
-        a.id === actividadEditando.id
-          ? { ...a, fecha: fechaNueva, tipo: tipoNuevo, horaInicio: horaInicioNuevo, horaFin: horaFinNuevo, titulo: tituloNuevo.trim(), ubicacion: ubicacionNuevo.trim() }
-          : a
-      );
-      setActividadesGuardadas(actualizadas);
-      guardarActividadesEnStorage(actualizadas);
-      setBloqueSeleccionado(actualizadas.find(a => a.id === actividadEditando.id) ?? null);
-      setActividadEditando(null);
-      setFechaActiva(fechaNueva);
-      setVista('detallesActividad');
-    } else {
-      const nueva: BloqueHorario = {
-        id: Date.now().toString(),
-        fecha: fechaNueva,
-        tipo: tipoNuevo,
-        horaInicio: horaInicioNuevo,
-        horaFin: horaFinNuevo,
-        titulo: tituloNuevo.trim(),
-        ubicacion: ubicacionNuevo.trim(),
-      };
-      const actualizadas = [...actividadesGuardadas, nueva];
-      setActividadesGuardadas(actualizadas);
-      guardarActividadesEnStorage(actualizadas);
-      setFechaActiva(fechaNueva);
+  const guardarCronogramaConfig = async () => {
+    setIsSaving(true);
+    try {
+      const nuevoConfig = await crearCronograma(nombreCronograma, colorCronograma, recordatorios);
+      setCronogramaId(nuevoConfig.id);
       setVista('vistaSemanal');
+    } catch (error) {
+      console.error("Error al crear la configuración", error);
+    } finally {
+      setIsSaving(false);
     }
-    setErrorNuevaActividad(null);
-    setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase');
+  };
+
+  const guardarActividadDB = async () => {
+    if (!cronogramaId) { setErrorNuevaActividad('Ocurrió un error. El cronograma no está inicializado.'); return; }
+    if (!tituloNuevo.trim()) { setErrorNuevaActividad('Ponle un título a la actividad.'); return; }
+    if (minutosDesdeHora(horaFinNuevo) <= minutosDesdeHora(horaInicioNuevo)) { setErrorNuevaActividad('La hora de fin debe ser después de la hora de inicio.'); return; }
+
+    setIsSaving(true);
+    try {
+      if (actividadEditando) {
+        const respuesta = await actualizarActividad(actividadEditando.id, {
+          titulo: tituloNuevo, ubicacion: ubicacionNuevo, tipo: tipoNuevo, fecha: fechaNueva, horaInicio: horaInicioNuevo, horaFin: horaFinNuevo
+        });
+        if (respuesta) {
+          setActividadesGuardadas(prev => prev.map(a => a.id === respuesta.id ? respuesta : a));
+          setBloqueSeleccionado(respuesta);
+          setFechaActiva(fechaNueva);
+          setVista('detallesActividad');
+        }
+      } else {
+        const respuesta = await insertarActividad(cronogramaId, {
+          fecha: fechaNueva, tipo: tipoNuevo, horaInicio: horaInicioNuevo, horaFin: horaFinNuevo, titulo: tituloNuevo, ubicacion: ubicacionNuevo
+        });
+        if (respuesta) {
+          setActividadesGuardadas(prev => [...prev, respuesta]);
+          setFechaActiva(fechaNueva);
+          setVista('vistaSemanal');
+        }
+      }
+      setErrorNuevaActividad(null);
+      setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase');
+    } catch (error) {
+      setErrorNuevaActividad('Hubo un error al guardar la actividad.');
+    } finally {
+      setIsSaving(false);
+      setActividadEditando(null);
+    }
+  };
+
+  const eliminarActividadSeleccionadaDB = async () => {
+    if (!bloqueSeleccionado) return;
+    setIsSaving(true);
+    try {
+      const success = await eliminarActividad(bloqueSeleccionado.id);
+      if (success) {
+        setActividadesGuardadas(prev => prev.filter(a => a.id !== bloqueSeleccionado.id));
+        setBloqueSeleccionado(null);
+        setVista('vistaSemanal');
+      }
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const abrirEdicionActividad = () => {
@@ -319,15 +297,6 @@ export default function CronogramaPage() {
     setVista('agregarActividad');
   };
 
-  const eliminarActividadSeleccionada = () => {
-    if (!bloqueSeleccionado) return;
-    const actualizadas = actividadesGuardadas.filter(a => a.id !== bloqueSeleccionado.id);
-    setActividadesGuardadas(actualizadas);
-    guardarActividadesEnStorage(actualizadas);
-    setBloqueSeleccionado(null);
-    setVista('vistaSemanal');
-  };
-
   // ─── Helpers UI ──────────────────────────────────────────────────────────
 
   const toggleSelection = (item: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
@@ -336,7 +305,6 @@ export default function CronogramaPage() {
 
   const seleccionarFechaYIrDia = (iso: string) => {
     setFechaActiva(iso);
-    // Sincronizar mes visible si el día seleccionado es de otro mes
     const d = new Date(iso + 'T00:00:00');
     setMesActual({ year: d.getFullYear(), month: d.getMonth() });
     setSubVista('dia');
@@ -350,7 +318,8 @@ export default function CronogramaPage() {
       case 'paso4': setVista('paso3'); break;
       case 'paso5': setVista('paso4'); break;
       case 'vistaSemanal':
-        primeraVezEnEstaSesion ? setVista('paso5') : router.push('/home.2'); break;
+        // FIX PRINCIPAL: Al presionar atrás desde la vista semanal, te devuelve al inicio.
+        router.push('/home.2'); break;
       case 'agregarActividad':
         setTituloNuevo(''); setUbicacionNuevo(''); setTipoNuevo('Clase'); setErrorNuevaActividad(null);
         actividadEditando ? (setActividadEditando(null), setVista('detallesActividad')) : setVista('vistaSemanal');
@@ -360,16 +329,13 @@ export default function CronogramaPage() {
     }
   };
 
-  // Formatea "YYYY-MM-DD" → "27 may."
-  const formatearFechaCorta = (iso: string) => {
-    const d = new Date(iso + 'T00:00:00');
-    return `${d.getDate()} ${MESES_NOMBRE[d.getMonth()].slice(0, 3).toLowerCase()}.`;
-  };
-
   if (cargando) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-medium text-slate-500 animate-pulse">Cargando tu calendario...</p>
+        </div>
       </div>
     );
   }
@@ -380,7 +346,7 @@ export default function CronogramaPage() {
 
         {/* HEADER */}
         <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-100 bg-white z-20">
-          <button onClick={manejarFlechaAtras} className="p-2 -ml-2 text-slate-700 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-50">
+          <button onClick={manejarFlechaAtras} disabled={isSaving} className="p-2 -ml-2 text-slate-700 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-50 disabled:opacity-50">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
@@ -667,7 +633,6 @@ export default function CronogramaPage() {
               {/* ── SUB-VISTA MES ── */}
               {subVista === 'mes' && (
                 <div className="p-5 space-y-4 animate-fadeIn">
-
                   {/* Navegación de mes */}
                   <div className="flex items-center justify-between">
                     <button onClick={irMesAnterior} className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500">
@@ -676,7 +641,6 @@ export default function CronogramaPage() {
                       </svg>
                     </button>
 
-                    {/* Título clickeable → abre picker */}
                     <button
                       onClick={() => { setPickerYear(mesActual.year); setPickerAbierto(true); }}
                       className={`flex items-center gap-1.5 text-sm font-bold text-[#2A3B50] hover:${estilos.text} transition-colors px-2 py-1 rounded-xl hover:bg-slate-50`}
@@ -694,14 +658,10 @@ export default function CronogramaPage() {
                     </button>
                   </div>
 
-                  {/* Cabecera días */}
                   <div className="grid grid-cols-7 gap-1 text-center">
-                    {DIAS_SEMANA_CORTO.map(d => (
-                      <span key={d} className="text-[9px] font-bold text-slate-400">{d}</span>
-                    ))}
+                    {DIAS_SEMANA_CORTO.map(d => <span key={d} className="text-[9px] font-bold text-slate-400">{d}</span>)}
                   </div>
 
-                  {/* Cuadrícula dinámica */}
                   <div className="space-y-1">
                     {semanasMes.map((semana, i) => (
                       <div key={i} className="grid grid-cols-7 gap-1">
@@ -718,7 +678,6 @@ export default function CronogramaPage() {
                                 ${esActivo ? `${estilos.bg} text-white shadow-md` : esHoyReal ? `border-2 ${estilos.border} ${estilos.text}` : 'text-slate-700 hover:bg-slate-100'}`}
                             >
                               {fecha.getDate()}
-                              {/* Dots de colores por tipo */}
                               {tipos.length > 0 && !esActivo && (
                                 <div className="absolute bottom-1 flex gap-0.5">
                                   {tipos.slice(0, 3).map(t => (
@@ -733,7 +692,6 @@ export default function CronogramaPage() {
                     ))}
                   </div>
 
-                  {/* Leyenda + botón Hoy */}
                   <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-1 items-center justify-between">
                     <div className="flex flex-wrap gap-x-4 gap-y-1">
                       {tiposActividad.map(t => (
@@ -743,81 +701,33 @@ export default function CronogramaPage() {
                         </div>
                       ))}
                     </div>
-                    <button
-                      onClick={irMesHoy}
-                      className={`text-[10px] font-bold ${estilos.text} border ${estilos.border} ${estilos.bgLight} px-2.5 py-1 rounded-lg transition-colors`}
-                    >
-                      Hoy
-                    </button>
+                    <button onClick={irMesHoy} className={`text-[10px] font-bold ${estilos.text} border ${estilos.border} ${estilos.bgLight} px-2.5 py-1 rounded-lg transition-colors`}>Hoy</button>
                   </div>
                 </div>
               )}
 
               {/* ── PICKER MES/AÑO ── */}
               {pickerAbierto && (
-                <div
-                  className="absolute inset-0 z-50 flex items-end bg-black/30 animate-fadeIn"
-                  onClick={() => setPickerAbierto(false)}
-                >
-                  <div
-                    className="w-full bg-white rounded-t-3xl p-5 pb-8 animate-slideUp"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {/* Handle */}
+                <div className="absolute inset-0 z-50 flex items-end bg-black/30 animate-fadeIn" onClick={() => setPickerAbierto(false)}>
+                  <div className="w-full bg-white rounded-t-3xl p-5 pb-8 animate-slideUp" onClick={e => e.stopPropagation()}>
                     <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-
-                    {/* Selector de año */}
                     <div className="flex items-center justify-between mb-4">
-                      <button
-                        onClick={() => setPickerYear(y => y - 1)}
-                        className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                        </svg>
-                      </button>
+                      <button onClick={() => setPickerYear(y => y - 1)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg></button>
                       <span className="text-base font-black text-[#2A3B50]">{pickerYear}</span>
-                      <button
-                        onClick={() => setPickerYear(y => y + 1)}
-                        className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                        </svg>
-                      </button>
+                      <button onClick={() => setPickerYear(y => y + 1)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
                     </div>
-
-                    {/* Grid de meses */}
                     <div className="grid grid-cols-4 gap-2">
                       {MESES_NOMBRE.map((nombre, idx) => {
                         const esSeleccionado = mesActual.month === idx && mesActual.year === pickerYear;
                         const esHoyMes = hoy.getMonth() === idx && hoy.getFullYear() === pickerYear;
                         return (
-                          <button
-                            key={nombre}
-                            onClick={() => {
-                              setMesActual({ year: pickerYear, month: idx });
-                              setPickerAbierto(false);
-                            }}
-                            className={`py-2.5 rounded-xl text-xs font-bold transition-all
-                              ${esSeleccionado
-                                ? `${estilos.bg} text-white shadow-md`
-                                : esHoyMes
-                                  ? `border-2 ${estilos.border} ${estilos.text}`
-                                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                              }`}
-                          >
-                            {nombre.slice(0, 3)}
-                          </button>
+                          <button key={nombre} onClick={() => { setMesActual({ year: pickerYear, month: idx }); setPickerAbierto(false); }}
+                            className={`py-2.5 rounded-xl text-xs font-bold transition-all ${esSeleccionado ? `${estilos.bg} text-white shadow-md` : esHoyMes ? `border-2 ${estilos.border} ${estilos.text}` : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                          >{nombre.slice(0, 3)}</button>
                         );
                       })}
                     </div>
-
-                    {/* Ir a hoy */}
-                    <button
-                      onClick={() => { irMesHoy(); setPickerAbierto(false); }}
-                      className={`mt-4 w-full py-3 ${estilos.bgLight} ${estilos.text} rounded-2xl text-xs font-bold border ${estilos.border} transition-colors`}
-                    >
+                    <button onClick={() => { irMesHoy(); setPickerAbierto(false); }} className={`mt-4 w-full py-3 ${estilos.bgLight} ${estilos.text} rounded-2xl text-xs font-bold border ${estilos.border} transition-colors`}>
                       Ir a hoy — {MESES_NOMBRE[hoy.getMonth()]} {hoy.getFullYear()}
                     </button>
                   </div>
@@ -835,12 +745,8 @@ export default function CronogramaPage() {
                     </div>
                   ) : (
                     (() => {
-                      // Agrupar por fecha
                       const grupos: Record<string, BloqueHorario[]> = {};
-                      actividadesOrdenadas.forEach(a => {
-                        if (!grupos[a.fecha]) grupos[a.fecha] = [];
-                        grupos[a.fecha].push(a);
-                      });
+                      actividadesOrdenadas.forEach(a => { if (!grupos[a.fecha]) grupos[a.fecha] = []; grupos[a.fecha].push(a); });
                       return Object.entries(grupos).map(([fecha, acts]) => (
                         <div key={fecha}>
                           <p className="text-[10px] font-bold text-slate-400 mb-2 capitalize">
@@ -868,41 +774,26 @@ export default function CronogramaPage() {
               {/* FAB */}
               <button
                 onClick={() => {
-                  setActividadEditando(null);
-                  setFechaNueva(fechaActiva);
-                  setTipoNuevo('Clase');
-                  setTituloNuevo('');
-                  setUbicacionNuevo('');
-                  setHoraInicioNuevo('07:00 a. m.');
-                  setHoraFinNuevo('08:00 a. m.');
-                  setErrorNuevaActividad(null);
-                  setVista('agregarActividad');
+                  setActividadEditando(null); setFechaNueva(fechaActiva); setTipoNuevo('Clase');
+                  setTituloNuevo(''); setUbicacionNuevo(''); setHoraInicioNuevo('07:00 a. m.');
+                  setHoraFinNuevo('08:00 a. m.'); setErrorNuevaActividad(null); setVista('agregarActividad');
                 }}
                 className={`absolute bottom-4 right-6 w-12 h-12 ${estilos.bg} text-white rounded-full shadow-xl flex items-center justify-center font-bold text-xl ${estilos.hoverBg} transition-all active:scale-95 z-30`}
-              >
-                +
-              </button>
+              >+</button>
             </div>
           )}
 
           {/* AGREGAR / EDITAR ACTIVIDAD */}
           {vista === 'agregarActividad' && (
             <div className="p-6 space-y-4 animate-fadeIn">
-              {/* Tipo */}
               <div className="flex gap-2">
                 {tiposActividad.map(t => (
-                  <button key={t} onClick={() => setTipoNuevo(t)}
-                    className={`flex-1 text-[11px] font-bold px-2 py-1.5 rounded-xl border transition-colors ${tipoNuevo === t ? coloresPorTipo[t] : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'}`}>
-                    {t}
-                  </button>
+                  <button key={t} onClick={() => setTipoNuevo(t)} className={`flex-1 text-[11px] font-bold px-2 py-1.5 rounded-xl border transition-colors ${tipoNuevo === t ? coloresPorTipo[t] : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'}`}>{t}</button>
                 ))}
               </div>
 
-              {/* Selector de fecha con mini-calendario */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500">Fecha</label>
-
-                {/* Barra de días de la semana de la fecha nueva */}
                 {(() => {
                   const d = new Date(fechaNueva + 'T00:00:00');
                   const dow = (d.getDay() + 6) % 7;
@@ -914,23 +805,17 @@ export default function CronogramaPage() {
                         <button onClick={() => { const prev = new Date(fechaNueva + 'T00:00:00'); prev.setDate(prev.getDate() - 7); setFechaNueva(fechaISO(prev)); }} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
                         </button>
-                        <span className="text-[10px] font-bold text-slate-500">
-                          {lun.getDate()} – {dias7[6].getDate()} {MESES_NOMBRE[dias7[6].getMonth()].slice(0,3)}
-                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">{lun.getDate()} – {dias7[6].getDate()} {MESES_NOMBRE[dias7[6].getMonth()].slice(0,3)}</span>
                         <button onClick={() => { const next = new Date(fechaNueva + 'T00:00:00'); next.setDate(next.getDate() + 7); setFechaNueva(fechaISO(next)); }} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                         </button>
                       </div>
                       <div className="flex justify-between">
                         {dias7.map(dd => {
-                          const iso = fechaISO(dd);
-                          const sel = fechaNueva === iso;
-                          const esHoyReal = iso === HOY_ISO;
+                          const iso = fechaISO(dd); const sel = fechaNueva === iso; const esHoyReal = iso === HOY_ISO;
                           return (
-                            <button key={iso} onClick={() => setFechaNueva(iso)}
-                              className={`flex flex-col items-center p-2 rounded-xl w-11 transition-all text-[9px] font-bold ${sel ? `${estilos.bg} text-white shadow-md scale-105` : esHoyReal ? `border ${estilos.border} ${estilos.text}` : 'text-slate-500 hover:bg-slate-50'}`}>
-                              <span>{DIAS_SEMANA_CORTO[(dd.getDay() + 6) % 7]}</span>
-                              <span className="text-xs font-black mt-0.5">{dd.getDate()}</span>
+                            <button key={iso} onClick={() => setFechaNueva(iso)} className={`flex flex-col items-center p-2 rounded-xl w-11 transition-all text-[9px] font-bold ${sel ? `${estilos.bg} text-white shadow-md scale-105` : esHoyReal ? `border ${estilos.border} ${estilos.text}` : 'text-slate-500 hover:bg-slate-50'}`}>
+                              <span>{DIAS_SEMANA_CORTO[(dd.getDay() + 6) % 7]}</span><span className="text-xs font-black mt-0.5">{dd.getDate()}</span>
                             </button>
                           );
                         })}
@@ -940,17 +825,14 @@ export default function CronogramaPage() {
                 })()}
               </div>
 
-              {/* Título y ubicación */}
               <div className="space-y-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">Título de la actividad</label>
-                  <input value={tituloNuevo} onChange={e => setTituloNuevo(e.target.value)} placeholder="Ej. Cálculo diferencial"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
+                  <input value={tituloNuevo} onChange={e => setTituloNuevo(e.target.value)} placeholder="Ej. Cálculo diferencial" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">Ubicación / Aula</label>
-                  <input value={ubicacionNuevo} onChange={e => setUbicacionNuevo(e.target.value)} placeholder="Ej. Aula 201"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
+                  <input value={ubicacionNuevo} onChange={e => setUbicacionNuevo(e.target.value)} placeholder="Ej. Aula 201" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -967,9 +849,7 @@ export default function CronogramaPage() {
                     </div>
                   ))}
                 </div>
-                {errorNuevaActividad && (
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-xs text-rose-700 font-medium text-center">{errorNuevaActividad}</div>
-                )}
+                {errorNuevaActividad && <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-xs text-rose-700 font-medium text-center">{errorNuevaActividad}</div>}
               </div>
             </div>
           )}
@@ -987,14 +867,11 @@ export default function CronogramaPage() {
               </div>
               <div className="flex gap-3">
                 <button onClick={abrirEdicionActividad} className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
-                  </svg>
-                  Editar
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg> Editar
                 </button>
-                <button onClick={() => { if (window.confirm('¿Seguro que quieres eliminar esta actividad?')) eliminarActividadSeleccionada(); }}
-                  className="flex-1 py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors">
-                  Eliminar
+                <button onClick={() => { if (window.confirm('¿Seguro que quieres eliminar esta actividad?')) eliminarActividadSeleccionadaDB(); }}
+                  disabled={isSaving} className="flex-1 py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors disabled:opacity-50">
+                  {isSaving ? 'Eliminando...' : 'Eliminar'}
                 </button>
               </div>
             </div>
@@ -1005,17 +882,22 @@ export default function CronogramaPage() {
         {vista !== 'vistaSemanal' && vista !== 'detallesActividad' && (
           <div className="p-6 bg-white border-t border-slate-100 sm:rounded-b-[40px] z-20">
             <button
+              disabled={isSaving}
               onClick={() => {
                 if (vista === 'paso1') setVista('paso2');
                 else if (vista === 'paso2') setVista('paso3');
                 else if (vista === 'paso3') setVista('paso4');
                 else if (vista === 'paso4') setVista('paso5');
-                else if (vista === 'paso5') { marcarCronogramaConfigurado(); setVista('vistaSemanal'); }
-                else if (vista === 'agregarActividad') guardarActividad();
+                else if (vista === 'paso5') guardarCronogramaConfig(); // Enviar a BD en el último paso
+                else if (vista === 'agregarActividad') guardarActividadDB(); // Guardar/editar tarea
               }}
-              className={`w-full py-3.5 ${estilos.bg} ${estilos.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all`}
+              className={`w-full py-3.5 ${estilos.bg} ${estilos.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all flex justify-center disabled:opacity-75`}
             >
-              {vista === 'paso1' ? "Crear mi cronograma" : vista === 'paso5' ? "Crear cronograma" : vista === 'agregarActividad' ? (actividadEditando ? "Guardar cambios" : "Guardar actividad") : "Continuar"}
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                vista === 'paso1' ? "Crear mi cronograma" : vista === 'paso5' ? "Crear cronograma" : vista === 'agregarActividad' ? (actividadEditando ? "Guardar cambios" : "Guardar actividad") : "Continuar"
+              )}
             </button>
           </div>
         )}

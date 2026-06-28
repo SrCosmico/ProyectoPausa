@@ -1,85 +1,179 @@
 import { createClient } from '@/lib/supabase/client';
+import { type BloqueHorario, type CronogramaConfig, type TipoActividad } from '@/models/cronograma';
 import { EstadoEmocionalId } from '@/models/estadoActual';
-import { type BloqueHorario } from '@/models/cronograma';
 
 const getSupabase = () => createClient();
 
-// ── Helpers DELATE (operan sobre estado local, sin BD) ─────────────────────
-export const deleteSelectedDay = (days: string[], day: string) =>
-  days.filter((d) => d !== day);
+// ── R — Obtener Configuración del Cronograma ──────────────────────────────
+export const obtenerCronogramaUsuario = async (): Promise<CronogramaConfig | null> => {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
-export const deleteSelectedActivity = (activities: string[], activity: string) =>
-  activities.filter((a) => a !== activity);
-
-interface CronogramaActivity { id: string; name: string; location?: string; startTime: string; endTime: string; }
-
-export const deleteCronogramaActivity = (
-  activities: CronogramaActivity[],
-  id: string
-): CronogramaActivity[] => activities.filter((a) => a.id !== id);
-
-// ── C — Insertar actividad en actividades_cronograma ──────────────────────
-export const insertarCronogramaActividad = async (
-  userId: string,
-  cronogramaId: string,
-  titulo: string,
-  ubicacion: string,
-  tipoActividad: string
-) => {
-  const { data, error } = await getSupabase()
-    .from('actividades_cronograma')
-    .insert([{
-      user_id:        userId,
-      cronograma_id:  cronogramaId,
-      titulo:         titulo.trim() || 'Actividad sin título',
-      ubicacion:      ubicacion.trim() || null,
-      tipo_actividad: tipoActividad,
-    }])
-    .select();
+  const { data, error } = await supabase
+    .from('cronogramas')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
 
   if (error) {
-    console.error('Error al insertar actividad de cronograma:', error.message);
-    return { data: null, error };
+    console.error('Error al obtener cronograma:', error.message);
+    return null;
   }
-  return { data, error: null };
+  return data as CronogramaConfig | null;
 };
 
-// ── C — Estado emocional del cuestionario (paso 2) ────────────────────────
+// ── C — Crear Configuración del Cronograma (Onboarding) ───────────────────
+export const crearCronograma = async (nombre: string, color: string, recordatorios: boolean) => {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { data, error } = await supabase
+    .from('cronogramas')
+    .insert([{ user_id: user.id, nombre, color, recordatorios }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as CronogramaConfig;
+};
+
+// ── R — Leer Todas las Actividades ────────────────────────────────────────
+export const obtenerActividadesCronograma = async (): Promise<BloqueHorario[]> => {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('actividades_cronograma')
+    .select('*')
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error('Error obteniendo actividades:', error.message);
+    return [];
+  }
+
+  // Mapeamos de base de datos (snake_case) al formato del frontend (camelCase)
+  return data.map((act: any) => ({
+    id: act.id,
+    fecha: act.fecha,
+    tipo: act.tipo_actividad as TipoActividad,
+    horaInicio: act.hora_inicio,
+    horaFin: act.hora_fin,
+    titulo: act.titulo,
+    ubicacion: act.ubicacion || '',
+  }));
+};
+
+// ── C — Insertar Actividad ────────────────────────────────────────────────
+export const insertarActividad = async (
+  cronogramaId: string,
+  actividad: Omit<BloqueHorario, 'id'>
+): Promise<BloqueHorario | null> => {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('actividades_cronograma')
+    .insert([{
+      cronograma_id: cronogramaId,
+      user_id: user.id,
+      titulo: actividad.titulo.trim() || 'Sin título',
+      ubicacion: actividad.ubicacion.trim() || null,
+      tipo_actividad: actividad.tipo,
+      fecha: actividad.fecha,
+      hora_inicio: actividad.horaInicio,
+      hora_fin: actividad.horaFin,
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error insertando actividad:', error.message);
+    return null;
+  }
+
+  return {
+    id: data.id,
+    fecha: data.fecha,
+    tipo: data.tipo_actividad as TipoActividad,
+    horaInicio: data.hora_inicio,
+    horaFin: data.hora_fin,
+    titulo: data.titulo,
+    ubicacion: data.ubicacion || '',
+  };
+};
+
+// ── U — Actualizar Actividad ──────────────────────────────────────────────
+export const actualizarActividad = async (
+  id: string,
+  actividad: Partial<Omit<BloqueHorario, 'id'>>
+) => {
+  const supabase = getSupabase();
+  
+  const actualizacion: any = {};
+  if (actividad.titulo) actualizacion.titulo = actividad.titulo;
+  if (actividad.ubicacion !== undefined) actualizacion.ubicacion = actividad.ubicacion;
+  if (actividad.tipo) actualizacion.tipo_actividad = actividad.tipo;
+  if (actividad.fecha) actualizacion.fecha = actividad.fecha;
+  if (actividad.horaInicio) actualizacion.hora_inicio = actividad.horaInicio;
+  if (actividad.horaFin) actualizacion.hora_fin = actividad.horaFin;
+
+  const { data, error } = await supabase
+    .from('actividades_cronograma')
+    .update(actualizacion)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error actualizando actividad:', error.message);
+    return null;
+  }
+
+  return {
+    id: data.id,
+    fecha: data.fecha,
+    tipo: data.tipo_actividad as TipoActividad,
+    horaInicio: data.hora_inicio,
+    horaFin: data.hora_fin,
+    titulo: data.titulo,
+    ubicacion: data.ubicacion || '',
+  };
+};
+
+// ── D — Eliminar Actividad ────────────────────────────────────────────────
+export const eliminarActividad = async (id: string): Promise<boolean> => {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('actividades_cronograma')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error al eliminar actividad:', error.message);
+    return false;
+  }
+  return true;
+};
+
+// ── C — Estado emocional del cuestionario (Mantenido) ─────────────────────
 export const insertarEstadoEmocionalActual = async (
   userId: string,
   estadoId: EstadoEmocionalId
 ) => {
-  const { data, error } = await getSupabase()
+  const supabase = getSupabase();
+  const { data, error } = await supabase
     .from('cuestionario_onboarding')
     .upsert({ user_id: userId, estado_emocional_id: estadoId }, { onConflict: 'user_id' })
     .select();
 
   if (error) {
-    console.error('Error al guardar estado emocional en onboarding:', error.message);
+    console.error('Error al guardar estado emocional:', error.message);
     return { data: null, error };
   }
   return { data, error: null };
 };
-
-// ── R — Bloques de ejemplo (datos estáticos de presentación) ──────────────
-const _bloquesCronograma: BloqueHorario[] = [
-  { id: '1', hora: '07:00', titulo: 'Cálculo diferencial', subtitulo: 'Aula 201 (07:00 - 08:30)', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  { id: '2', hora: '09:00', titulo: 'Física I',            subtitulo: 'Aula 102 (08:40 - 10:10)', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { id: '3', hora: '10:30', titulo: 'Estudio personal',   subtitulo: 'Repaso de ejercicios',      color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { id: '4', hora: '12:00', titulo: 'Almuerzo',           subtitulo: 'Descanso y comida',          color: 'bg-orange-50 text-orange-700 border-orange-200' },
-  { id: '5', hora: '13:00', titulo: 'Química general',    subtitulo: 'Lab 3 (13:10 - 14:40)',      color: 'bg-purple-50 text-purple-700 border-purple-200' },
-];
-
-export const leerBloquesCronograma   = (): BloqueHorario[]           => _bloquesCronograma;
-export const leerBloquePorId          = (id: string)                  => _bloquesCronograma.find((b) => b.id === id);
-export const leerBloquesPorTipo       = (tipo: string): BloqueHorario[] =>
-  _bloquesCronograma.filter((b) => b.titulo.toLowerCase().includes(tipo.toLowerCase()));
-
-// ── U — Sin tabla dedicada aún (no-op documentado) ───────────────────────
-export async function actualizarTarea(
-  tareaId: string,
-  nuevosDatos: { hora?: string; estado?: string; descripcion?: string }
-) {
-  console.warn('[cronograma] actualizarTarea requiere tabla tareas_cronograma. Pendiente de crear.', tareaId, nuevosDatos);
-  return { data: null, error: null };
-}
