@@ -1,3 +1,4 @@
+// lib/supabase/cronograma.ts
 // DELATE
 
 /**
@@ -50,7 +51,7 @@ const supabase = createClient()
 
 /**
  * LETRA C: PANTALLA CRONOGRAMA ACADÉMICO - AGREGAR ACTIVIDAD
- * Inserta un bloque horario o evento específico asignado a un cronograma.
+ * Inserta un bloque horario o evento específico asignado a un cronograma (versión local/legacy).
  */
 export const insertarCronogramaActividad = async (
   userId: string,
@@ -86,14 +87,6 @@ export const insertarCronogramaActividad = async (
 // CONVERSIÓN DE HORA EN ESPAÑOL -> FORMATO 24H PARA POSTGRES
 // ============================================================
 
-/**
- * Convierte una hora con formato en español, ej: "07:00 a. m." o "07:00 p. m.",
- * al formato 24 horas "HH:MM:SS" que Postgres entiende para columnas time/timestamp.
- *
- * Esto soluciona el error:
- *   Supabase: time zone "a." not recognized
- * que ocurre cuando se manda el string "07:00 a. m." directo a una columna time.
- */
 export function convertirHoraAFormato24(horaTexto: string): string {
   const match = horaTexto
     .trim()
@@ -101,7 +94,6 @@ export function convertirHoraAFormato24(horaTexto: string): string {
     .match(/(\d{1,2}):(\d{2})\s*([ap])\.?\s*m\.?/i)
 
   if (!match) {
-    // Si ya viene en formato 24h ("HH:MM" o "HH:MM:SS"), lo dejamos pasar
     const matchSimple = horaTexto.trim().match(/^(\d{1,2}):(\d{2})(:\d{2})?$/)
     if (matchSimple) {
       const [, h, m] = matchSimple
@@ -122,7 +114,7 @@ export function convertirHoraAFormato24(horaTexto: string): string {
 }
 
 // ============================================================
-// INSERT REAL EN SUPABASE: tabla "actividades_cronograma"
+// INSERT / READ / DELETE REAL EN SUPABASE: "actividades_cronograma"
 // ============================================================
 
 export interface NuevaActividadCronograma {
@@ -130,22 +122,27 @@ export interface NuevaActividadCronograma {
   titulo: string
   ubicacion?: string | null
   tipo_actividad: string
-  /** Aceptan formato español "07:00 a. m." o ya en 24h "07:00" */
+  /** Formato "YYYY-MM-DD" */
+  fecha: string
+  /** Acepta formato español "07:00 a. m." o ya en 24h "07:00" */
   hora_inicio: string
   hora_fin: string
   dias_semana?: string[]
 }
 
-export interface ActividadCronogramaGuardada extends NuevaActividadCronograma {
-  id: string | number
+export interface ActividadCronogramaGuardada {
+  id: string
+  user_id: string
+  titulo: string
+  ubicacion: string | null
+  tipo_actividad: string
+  fecha: string
+  hora_inicio: string
+  hora_fin: string
+  dias_semana: string[]
   created_at?: string
 }
 
-/**
- * Inserta una actividad real en la tabla "actividades_cronograma" de Supabase.
- * Convierte automáticamente las horas en español a formato 24h antes de enviarlas,
- * evitando el error "time zone ... not recognized".
- */
 export async function crearActividadCronograma(
   actividad: NuevaActividadCronograma
 ): Promise<{ data: ActividadCronogramaGuardada[] | null; error: Error | null }> {
@@ -158,6 +155,7 @@ export async function crearActividadCronograma(
       titulo: actividad.titulo.trim() || 'Actividad sin título',
       ubicacion: actividad.ubicacion?.trim() || null,
       tipo_actividad: actividad.tipo_actividad,
+      fecha: actividad.fecha,
       hora_inicio: horaInicioFormateada,
       hora_fin: horaFinFormateada,
       dias_semana: actividad.dias_semana ?? [],
@@ -181,7 +179,6 @@ export async function crearActividadCronograma(
   }
 }
 
-/** Devuelve todas las actividades guardadas en Supabase de un usuario. */
 export async function leerActividadesCronogramaUsuario(
   userId: string
 ): Promise<ActividadCronogramaGuardada[]> {
@@ -189,6 +186,7 @@ export async function leerActividadesCronogramaUsuario(
     .from('actividades_cronograma')
     .select('*')
     .eq('user_id', userId)
+    .order('fecha', { ascending: true })
     .order('hora_inicio', { ascending: true })
 
   if (error) {
@@ -199,9 +197,8 @@ export async function leerActividadesCronogramaUsuario(
   return (data ?? []) as ActividadCronogramaGuardada[]
 }
 
-/** Elimina una actividad del cronograma por su ID. */
 export async function eliminarActividadCronograma(
-  actividadId: string | number
+  actividadId: string
 ): Promise<boolean> {
   const { error } = await supabase
     .from('actividades_cronograma')
@@ -218,7 +215,6 @@ export async function eliminarActividadCronograma(
 
 /**
  * LETRA C: PANTALLA ESTADO ACTUAL (PASO 2)
- * Registra la respuesta del usuario sobre cómo se ha sentido últimamente en el cuestionario de diagnóstico inicial.
  */
 export const insertarEstadoEmocionalActual = async (
   userId: string,
@@ -243,58 +239,25 @@ export const insertarEstadoEmocionalActual = async (
 }
 
 // ============================================================
-// CRUD: Letra "R" pantalla de cronograma
+// CRUD: Letra "R" pantalla de cronograma (datos de ejemplo legacy)
 // ============================================================
 
 const _bloquesCronograma: BloqueHorario[] = [
-  {
-    id: '1',
-    hora: '07:00',
-    titulo: 'Cálculo diferencial',
-    subtitulo: 'Aula 201 (07:00 - 08:30)',
-    color: 'bg-purple-50 text-purple-700 border-purple-200',
-  },
-  {
-    id: '2',
-    hora: '09:00',
-    titulo: 'Física I',
-    subtitulo: 'Aula 102 (08:40 - 10:10)',
-    color: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  {
-    id: '3',
-    hora: '10:30',
-    titulo: 'Estudio personal',
-    subtitulo: 'Repaso de ejercicios',
-    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  },
-  {
-    id: '4',
-    hora: '12:00',
-    titulo: 'Almuerzo',
-    subtitulo: 'Descanso y comida',
-    color: 'bg-orange-50 text-orange-700 border-orange-200',
-  },
-  {
-    id: '5',
-    hora: '13:00',
-    titulo: 'Química general',
-    subtitulo: 'Laboratorio 3 (13:10 - 14:40)',
-    color: 'bg-purple-50 text-purple-700 border-purple-200',
-  },
+  { id: '1', hora: '07:00', titulo: 'Cálculo diferencial', subtitulo: 'Aula 201 (07:00 - 08:30)', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { id: '2', hora: '09:00', titulo: 'Física I', subtitulo: 'Aula 102 (08:40 - 10:10)', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { id: '3', hora: '10:30', titulo: 'Estudio personal', subtitulo: 'Repaso de ejercicios', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { id: '4', hora: '12:00', titulo: 'Almuerzo', subtitulo: 'Descanso y comida', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  { id: '5', hora: '13:00', titulo: 'Química general', subtitulo: 'Laboratorio 3 (13:10 - 14:40)', color: 'bg-purple-50 text-purple-700 border-purple-200' },
 ]
 
-/** Devuelve todos los bloques horarios de la semana actual. */
 export function leerBloquesCronograma(): BloqueHorario[] {
   return _bloquesCronograma
 }
 
-/** Busca y devuelve un bloque del cronograma por su ID. */
 export function leerBloquePorId(id: string): BloqueHorario | undefined {
   return _bloquesCronograma.find((b) => b.id === id)
 }
 
-/** Filtra bloques del cronograma por tipo de actividad (match parcial en título). */
 export function leerBloquesPorTipo(tipo: string): BloqueHorario[] {
   return _bloquesCronograma.filter((b) =>
     b.titulo.toLowerCase().includes(tipo.toLowerCase())
