@@ -1,5 +1,4 @@
 // lib/supabase/cronograma.ts
-// DELATE
 
 /**
  * Función para borrar un día seleccionado del cronograma en el estado local.
@@ -114,7 +113,7 @@ export function convertirHoraAFormato24(horaTexto: string): string {
 }
 
 // ============================================================
-// INSERT / READ / DELETE REAL EN SUPABASE: "actividades_cronograma"
+// INSERT / READ / UPDATE / DELETE REAL EN SUPABASE: "actividades_cronograma"
 // ============================================================
 
 export interface NuevaActividadCronograma {
@@ -175,6 +174,36 @@ export async function crearActividadCronograma(
   } catch (err) {
     const mensaje = err instanceof Error ? err.message : 'Error desconocido'
     console.error('Error al preparar la actividad para guardar:', mensaje)
+    return { data: null, error: new Error(mensaje) }
+  }
+}
+
+export async function actualizarActividadCronograma(
+  actividadId: string,
+  actividad: Partial<NuevaActividadCronograma>
+): Promise<{ data: ActividadCronogramaGuardada[] | null; error: Error | null }> {
+  try {
+    const payload: any = { ...actividad }
+    if (actividad.titulo) payload.titulo = actividad.titulo.trim()
+    if (actividad.ubicacion !== undefined) payload.ubicacion = actividad.ubicacion?.trim() || null
+    if (actividad.hora_inicio) payload.hora_inicio = convertirHoraAFormato24(actividad.hora_inicio)
+    if (actividad.hora_fin) payload.hora_fin = convertirHoraAFormato24(actividad.hora_fin)
+
+    const { data, error } = await supabase
+      .from('actividades_cronograma')
+      .update(payload)
+      .eq('id', actividadId)
+      .select()
+
+    if (error) {
+      console.error('Error al actualizar la actividad en Supabase:', error.message)
+      return { data: null, error: new Error(error.message) }
+    }
+
+    return { data: data as ActividadCronogramaGuardada[], error: null }
+  } catch (err) {
+    const mensaje = err instanceof Error ? err.message : 'Error desconocido'
+    console.error('Error al procesar actualización:', mensaje)
     return { data: null, error: new Error(mensaje) }
   }
 }
