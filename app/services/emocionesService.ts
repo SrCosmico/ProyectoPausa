@@ -1,7 +1,7 @@
 // app/services/emocionesService.ts — Sistema de puntuación numérica de bienestar
 import supabase from '@/lib/supabase';
 import { RegistroEmocion, Recomendacion } from '@/app/types';
-import { ESTADO_A_NIVEL, NIVEL_A_EMOJI, NivelBienestar } from '@/models/monitoreo';
+import { ESTADO_A_NIVEL, NIVEL_A_EMOJI, NivelBienestar, obtenerFechaLocalHoy } from '@/models/monitoreo';
 
 const RECOMENDACIONES_DUMMY: Recomendacion[] = [
   { estado_animo: 'bien',    consejo: '¡Vas por buen camino! Sigue con tus hábitos de bienestar.' },
@@ -10,6 +10,15 @@ const RECOMENDACIONES_DUMMY: Recomendacion[] = [
   { estado_animo: 'triste',  consejo: 'Escribe en tu diario lo que sientes. Liberar emociones ayuda.' },
   { estado_animo: 'ansioso', consejo: 'Realiza el ejercicio 4-7-8 para calmar tu sistema nervioso.' },
 ];
+
+/** Igual que obtenerFechaLocalHoy() de models/monitoreo.ts pero para N días atrás,
+ *  corrigiendo el offset de zona horaria local antes de convertir a "YYYY-MM-DD". */
+function obtenerFechaLocalHaceNDias(n: number): string {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() - n);
+  const offset = fecha.getTimezoneOffset() * 60000;
+  return new Date(fecha.getTime() - offset).toISOString().split('T')[0];
+}
 
 export const guardarEmocion = async (emocion: RegistroEmocion) => {
   const { data, error } = await supabase
@@ -47,17 +56,29 @@ export const obtenerRecomendacionPorAnimo = async (estadoAnimo: string) => {
   return recomendacion ?? RECOMENDACIONES_DUMMY[0];
 };
 
+/**
+ * LETRA R: HISTORIAL SEMANAL (ÚNICA FUENTE DE VERDAD)
+ * Devuelve solo los registros de los últimos 7 días (incluyendo hoy),
+ * ordenados del más reciente al más antiguo. Reemplaza por completo a
+ * la versión simulada que existía en lib/supabase/monitoreo.ts.
+ */
 export const leerHistorialEmocionalSemanal = async (userId: string) => {
+  const fechaDesde = obtenerFechaLocalHaceNDias(6); // hoy + 6 atrás = ventana de 7 días
+  const fechaHasta = obtenerFechaLocalHoy();
+
   const { data, error } = await supabase
     .from('historial_emociones')
     .select('*')
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .gte('dia', fechaDesde)
+    .lte('dia', fechaHasta)
+    .order('dia', { ascending: false });
 
   if (error) {
-    console.error("Error al leer:", error);
+    console.error("Error al leer historial semanal:", error);
     return [];
   }
-  return data || [];
+  return data ?? [];
 };
 
 /**
@@ -71,7 +92,6 @@ export const insertarRegistros = async (registro: {
   estado: string;
   nota?: string | null;
 }) => {
-  // Derivamos el emoji del nivel para visualización, pero guardamos el número en la BD
   const emojiDinamico = NIVEL_A_EMOJI[registro.nivel];
 
   const { data, error } = await supabase
@@ -79,9 +99,9 @@ export const insertarRegistros = async (registro: {
     .insert([{
       user_id:  registro.user_id,
       dia:      registro.fecha,
-      nivel:    registro.nivel,      // Número 1-5 (clave del sistema)
-      estado:   registro.estado,     // Texto legible ("Bien", "Mal", etc.)
-      emoji:    emojiDinamico,       // Derivado, nunca guardado manualmente
+      nivel:    registro.nivel,
+      estado:   registro.estado,
+      emoji:    emojiDinamico,
       nota:     registro.nota ?? null,
     }])
     .select();
@@ -111,7 +131,6 @@ export const actualizarRegistroEmocional = async (id: string, cambios: {
   estado?: string;
   nota?: string | null;
 }) => {
-  // Recalculamos el emoji al actualizar para mantener consistencia
   const emojiDinamico = cambios.nivel ? NIVEL_A_EMOJI[cambios.nivel] : undefined;
 
   const { data, error } = await supabase

@@ -4,10 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 // DELATE
 import { deleteItem } from '@/lib/supabase/preferenciasApoyo';
-
-// ==========================================
-// INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO
-// ==========================================
+import { guardarPreferenciasOnboarding } from '@/lib/supabase/onboarding';
 
 export type PreferenciaId =
   | "ejercicios_calma"
@@ -27,11 +24,11 @@ export interface OpcionPreferencia {
 export interface PantallaPreferenciasApoyo {
   paso: number;
   totalPasos: number;
-  pregunta: string;       // "¿Qué tipo de apoyo te gustaría recibir en Pausa?"
-  instruccion: string;    // "Elige lo que más te gustaría usar"
+  pregunta: string;
+  instruccion: string;
   opciones: OpcionPreferencia[];
   botonContinuar: string;
-  botonVolver: string;    // Se mantiene en la interfaz para respetar el tipado
+  botonVolver: string;
 }
 
 export const opcionesPreferenciasData: Omit<OpcionPreferencia, "seleccionado">[] = [
@@ -43,7 +40,6 @@ export const opcionesPreferenciasData: Omit<OpcionPreferencia, "seleccionado">[]
   { id: "chat_ia",             label: "Hablar con alguien (IA)" },
 ];
 
-// Mapeo local de íconos/emojis para las preferencias de apoyo
 const mapeoIconos: Record<PreferenciaId, string> = {
   ejercicios_calma: "🧘",
   tips_antistres: "💡",
@@ -56,7 +52,6 @@ const mapeoIconos: Record<PreferenciaId, string> = {
 export default function PreferenciasApoyoPage() {
   const router = useRouter();
 
-  // --- ESTADO LOCAL DE SELECCIÓN ---
   const [seleccionados, setSeleccionados] = useState<Record<PreferenciaId, boolean>>({
     ejercicios_calma: false,
     tips_antistres: false,
@@ -66,7 +61,6 @@ export default function PreferenciasApoyoPage() {
     chat_ia: false,
   });
 
-  // --- ESTRUCTURA DE LA PANTALLA ---
   const datosPreferencias: PantallaPreferenciasApoyo = {
     paso: 4,
     totalPasos: 6,
@@ -82,20 +76,24 @@ export default function PreferenciasApoyoPage() {
     botonVolver: "Volver"
   };
 
-  // Cambiar el estado de selección (Permite selección múltiple)
   const toggleOpcionId = (id: PreferenciaId) => {
     setSeleccionados(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const manejarContinuar = () => {
+    const preferenciasSeleccionadas = (Object.keys(seleccionados) as PreferenciaId[]).filter(
+      (id) => seleccionados[id]
+    );
+    guardarPreferenciasOnboarding(preferenciasSeleccionadas);
+    router.push('/frecuencia.2');
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
-      {/* Contenedor Mobile-First */}
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
         
-        {/* BLOQUE SUPERIOR: Progreso y Cuestionario */}
         <div className="pt-4">
           
-          {/* Flecha de regreso hacia Factores de Impacto */}
           <button 
             onClick={() => router.push('/factoresImpacto.2')} 
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none rounded-full hover:bg-slate-50 active:scale-95"
@@ -106,7 +104,6 @@ export default function PreferenciasApoyoPage() {
             </svg>
           </button>
 
-          {/* Barra de progreso visual (Paso 4 de 6 -> ~66%) */}
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
             <div className="bg-[#4A72A6] h-full w-4/6 rounded-full transition-all duration-300" />
           </div>
@@ -114,7 +111,6 @@ export default function PreferenciasApoyoPage() {
             Paso {datosPreferencias.paso} de {datosPreferencias.totalPasos}
           </p>
 
-          {/* Textos del Encabezado */}
           <h3 className="text-xl font-bold text-[#2A3B50] mt-4 leading-snug">
             {datosPreferencias.pregunta}
           </h3>
@@ -122,7 +118,6 @@ export default function PreferenciasApoyoPage() {
             {datosPreferencias.instruccion}
           </p>
           
-          {/* Listado de Opciones */}
           <div className="space-y-3 mt-6">
             {datosPreferencias.opciones.map((opcion) => (
               <button
@@ -139,7 +134,6 @@ export default function PreferenciasApoyoPage() {
                   <span className="text-sm font-medium text-[#475569]">{opcion.label}</span>
                 </div>
 
-                {/* Casilla de verificación (Checkbox) */}
                 <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
                   opcion.seleccionado ? 'bg-[#4A72A6] border-[#4A72A6]' : 'border-slate-300'
                 }`}>
@@ -154,11 +148,9 @@ export default function PreferenciasApoyoPage() {
           </div>
         </div>
 
-        {/* BLOQUE INFERIOR: Botón de acción principal */}
         <div className="mt-8 pb-4 w-full">
-          {/* Botón Continuar hacia Frecuencia */}
           <button 
-            onClick={() => router.push('/frecuencia.2')}
+            onClick={manejarContinuar}
             className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
           >
             {datosPreferencias.botonContinuar}

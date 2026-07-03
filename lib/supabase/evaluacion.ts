@@ -1,47 +1,75 @@
-//pantalla evaluacion 
+//pantalla evaluacion
+import { createClient } from '@/lib/supabase/client';
 import {
   type PreguntaPSS4,
   type OpcionRespuestaEstres,
   type RecomendacionDinamica,
 } from "@/models/evaluacion";
+
+const supabase = createClient();
+
+export interface ResultadoEvaluacionDB {
+  id: string;
+  user_id: string;
+  puntaje_total: number;
+  nivel_estres: "Bajo" | "Moderado" | "Alto";
+  respuestas_json: Record<string, number>;
+  evaluado_at: string;
+}
+
 /**
  * LETRA C: PANTALLA EVALUACIÓN (TEST PSS-4)
- * Almacena de manera permanente el puntaje total obtenido, el nivel de estrés clasificado
- * y la clave-valor de las respuestas individuales para el seguimiento clínico e histórico.
+ * Persiste el resultado en la tabla `evaluaciones_estres` de Supabase
+ * (antes solo escribía en localStorage). Requiere RLS por user_id.
  */
 export const insertarResultadoEvaluacionEstres = async (
   userId: string,
   puntajeTotal: number,
   nivelEstres: "Bajo" | "Moderado" | "Alto",
   respuestasIndividuales: Record<string, number>
-) => {
-  const resultado = {
-    user_id: userId,
-    puntaje_total: puntajeTotal,
-    nivel_estres: nivelEstres,
-    respuestas_json: respuestasIndividuales,
-    evaluado_at: new Date().toISOString(),
-  };
+): Promise<ResultadoEvaluacionDB[]> => {
+  const { data, error } = await supabase
+    .from('evaluaciones_estres')
+    .insert([
+      {
+        user_id: userId,
+        puntaje_total: puntajeTotal,
+        nivel_estres: nivelEstres,
+        respuestas_json: respuestasIndividuales,
+      },
+    ])
+    .select();
 
-  if (typeof window !== 'undefined') {
-    const historial = JSON.parse(
-      localStorage.getItem(`evaluaciones_estres_${userId}`) ?? '[]'
-    ) as Array<typeof resultado>;
-    historial.push(resultado);
-    localStorage.setItem(
-      `evaluaciones_estres_${userId}`,
-      JSON.stringify(historial)
-    );
+  if (error) {
+    console.error('Error al guardar la evaluación PSS-4 en Supabase:', error.message);
+    throw new Error(error.message);
   }
 
-  return [resultado];
+  return (data ?? []) as ResultadoEvaluacionDB[];
+};
+
+/** LETRA R: Historial de evaluaciones PSS-4, de la más reciente a la más antigua. */
+export const leerHistorialEvaluacionesEstres = async (
+  userId: string
+): Promise<ResultadoEvaluacionDB[]> => {
+  const { data, error } = await supabase
+    .from('evaluaciones_estres')
+    .select('*')
+    .eq('user_id', userId)
+    .order('evaluado_at', { ascending: false });
+
+  if (error) {
+    console.error('Error al leer evaluaciones PSS-4:', error.message);
+    return [];
+  }
+
+  return (data ?? []) as ResultadoEvaluacionDB[];
 };
 
 // ============================================================
-// CRUD: Letra "R" pantalla de evaluacion (PSS-4)
+// CRUD: Letra "R" pantalla de evaluacion (PSS-4) — sin cambios
 // ============================================================
 
-// Datos definidos localmente porque viven en la page, no en models/evaluacion.ts
 const _preguntasPSS4: PreguntaPSS4[] = [
   {
     id: "p1",
@@ -77,17 +105,14 @@ const _opcionesPSS4: OpcionRespuestaEstres[] = [
   { texto: "Muy a menudo", puntosBase: 4 },
 ];
 
-/** Devuelve las 4 preguntas del test PSS-4. */
 export function leerPreguntasPSS4(): PreguntaPSS4[] {
   return _preguntasPSS4;
 }
 
-/** Devuelve la pregunta activa del PSS-4 según el paso actual (base 1). */
 export function leerPreguntaActualPSS4(paso: number): PreguntaPSS4 | undefined {
   return _preguntasPSS4[paso - 1];
 }
 
-/** Devuelve las opciones de respuesta del PSS-4 marcando cuál seleccionó el usuario. */
 export function leerOpcionesRespuestaPSS4(
   preguntaId: string,
   respuestas: Record<string, number>
@@ -98,10 +123,6 @@ export function leerOpcionesRespuestaPSS4(
   }));
 }
 
-/**
- * Calcula el puntaje PSS-4 (aplica inversión donde corresponde) y
- * devuelve el nivel de estrés percibido con sus recomendaciones.
- */
 export function leerResultadoPSS4(respuestas: Record<string, number>): {
   puntaje: number;
   nivel: "Bajo" | "Moderado" | "Alto";

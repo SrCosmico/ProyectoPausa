@@ -2,10 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-// ==========================================
-// INTERFACES Y DATOS PROPORCIONADOS
-// ==========================================
+import { guardarEstadoActualOnboarding } from '@/lib/supabase/onboarding';
 
 export type EstadoEmocionalId =
   | "muy_mal"
@@ -43,10 +40,8 @@ export const opcionesEstadoData: Omit<OpcionEstadoActual, "seleccionado">[] = [
 export default function EstadoActualPage() {
   const router = useRouter();
   
-  // Estado exclusivo para controlar la selección del usuario en esta pantalla
   const [seleccionadoId, setSeleccionadoId] = useState<EstadoEmocionalId>("bien");
 
-  // Construcción del objeto reactivo implementando la interfaz PantallaEstadoActual
   const datosEstadoActual: PantallaEstadoActual = {
     paso: 2,
     totalPasos: 6,
@@ -60,14 +55,17 @@ export default function EstadoActualPage() {
     botonVolver: "Volver"
   };
 
+  const manejarContinuar = () => {
+    guardarEstadoActualOnboarding(seleccionadoId);
+    router.push('/factoresImpacto.2');
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
-      {/* Contenedor Esqueleto Mobile-First */}
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
         
         <div className="pt-4">
           
-          {/* Flecha de retroceder: Redirección real a la ruta física de la pantalla anterior */}
           <button 
             onClick={() => router.push('/motivos.2')} 
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none"
@@ -78,7 +76,6 @@ export default function EstadoActualPage() {
             </svg>
           </button>
 
-          {/* Indicador de progreso visual en barra */}
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
             <div className="bg-[#4A72A6] h-full w-2/6 rounded-full" />
           </div>
@@ -87,7 +84,6 @@ export default function EstadoActualPage() {
             Paso {datosEstadoActual.paso} de {datosEstadoActual.totalPasos}
           </p>
 
-          {/* Textos de encabezado */}
           <h3 className="text-xl font-bold text-[#2A3B50] mt-4 leading-snug">
             {datosEstadoActual.pregunta}
           </h3>
@@ -95,7 +91,6 @@ export default function EstadoActualPage() {
             {datosEstadoActual.instruccion}
           </p>
           
-          {/* Listado de Opciones Exclusivas */}
           <div className="space-y-3 mt-6">
             {datosEstadoActual.opciones.map((opcion) => (
               <button
@@ -121,7 +116,6 @@ export default function EstadoActualPage() {
                   </div>
                 </div>
 
-                {/* Indicador de Estado Circular (Estilo Radio Button) */}
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
                   opcion.seleccionado ? 'border-[#4A72A6]' : 'border-slate-300'
                 }`}>
@@ -134,10 +128,9 @@ export default function EstadoActualPage() {
           </div>
         </div>
 
-        {/* Bloque de Acción Inferior: Envía a la siguiente ruta del flujo */}
         <div className="mt-8 pb-4">
           <button 
-            onClick={() => router.push('/factoresImpacto.2')}
+            onClick={manejarContinuar}
             className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
           >
             {datosEstadoActual.botonContinuar}
@@ -148,5 +141,3 @@ export default function EstadoActualPage() {
     </div>
   );
 }
- 
-        

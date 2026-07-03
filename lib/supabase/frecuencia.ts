@@ -1,43 +1,31 @@
-// pantalla frecuencia
-import { FrecuenciaId } from "@/models/frecuencia";
-import {
-  opcionesFrecuenciaData,
-  type OpcionFrecuencia,
-} from "@/models/frecuencia";
-/**
- * LETRA C: PANTALLA FRECUENCIA (PASO 5)
- * Almacena la respuesta del usuario referente a la frecuencia de sus síntomas de estrés o ansiedad.
- */
+import { createClient } from '@/lib/supabase/client';
+import { FrecuenciaId, opcionesFrecuenciaData, type OpcionFrecuencia } from '@/models/frecuencia';
+
+const getSupabase = () => createClient();
+
+/** C/U — Upsert de frecuencia de estrés en el cuestionario de onboarding */
 export const insertarFrecuenciaEstresAnsiedad = async (
   userId: string,
   frecuenciaId: FrecuenciaId
 ) => {
-  const registro = {
-    user_id: userId,
-    paso: 5,
-    frecuencia_estres_id: frecuenciaId,
-    creado_at: new Date().toISOString(),
-  };
+  const { data, error } = await getSupabase()
+    .from('cuestionario_onboarding')
+    .upsert(
+      { user_id: userId, frecuencia_estres: frecuenciaId },
+      { onConflict: 'user_id' }
+    )
+    .select();
 
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('frecuenciaEstresId', frecuenciaId);
-    localStorage.setItem(
-      `frecuencia_estres_${userId}`,
-      JSON.stringify(registro)
-    );
+  if (error) {
+    console.error('Error al guardar frecuencia de estrés:', error.message);
+    return { data: null, error };
   }
-
-  return [registro];
+  return { data, error: null };
 };
 
-// ============================================================
-// CRUD: Letra "R" pantalla de frecuencia
-// ============================================================
+// ── R ─────────────────────────────────────────────────────────────────────
 
-/** Devuelve las opciones de frecuencia marcando cuál está seleccionada. */
-export function leerOpcionesFrecuencia(
-  seleccionadoId: FrecuenciaId | null
-): OpcionFrecuencia[] {
+export function leerOpcionesFrecuencia(seleccionadoId: FrecuenciaId | null): OpcionFrecuencia[] {
   return opcionesFrecuenciaData.map((item) => ({
     ...item,
     seleccionado: item.id === seleccionadoId,

@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import supabase from '@/lib/supabase';
+import { insertarResultadoEvaluacionEstres } from '@/lib/supabase/evaluacion';
 
 // ==========================================
 // CONFIGURACIÓN Y TIPOS DE LA ESCALA VALIDADA PSS-4
@@ -29,6 +31,9 @@ export interface RecomendacionDinamica {
   icono: string;
   texto: string;
 }
+
+// Tipo explícito del nivel de estrés (usado también por insertarResultadoEvaluacionEstres)
+export type NivelEstresPSS4 = "Bajo" | "Moderado" | "Alto";
 
 export const preguntasPSS4Data: PreguntaPSS4[] = [
   { 
@@ -61,13 +66,32 @@ export const opcionesPSS4Data: OpcionRespuestaEstres[] = [
   { texto: "Muy a menudo", puntosBase: 4 },
 ];
 
+// ==========================================
+// TRIAJE: UMBRAL DE CLASIFICACIÓN PSS-4
+// ==========================================
+// Escala 0-16 puntos (4 preguntas x 0-4 pts, con reversión en p2 y p3).
+// Bajo: 0-5 | Moderado: 6-12 | Alto: 13-16
+const UMBRAL_MODERADO = 6;
+const UMBRAL_ALTO = 13;
+
+function clasificarNivelEstres(puntajeTotal: number): NivelEstresPSS4 {
+  if (puntajeTotal >= UMBRAL_ALTO) return "Alto";
+  if (puntajeTotal >= UMBRAL_MODERADO) return "Moderado";
+  return "Bajo";
+}
+
 export default function EvaluacionFlujoPage() {
   const router = useRouter();
 
-  // --- ESTADOS LOCALES ---
+  // --- ESTADOS LOCALES DEL CUESTIONARIO ---
   const [pasoActual, setPasoActual] = useState<number>(0); 
   const [respuestas, setRespuestas] = useState<Record<string, number>>({});
   const [animarCambio, setAnimarCambio] = useState<boolean>(false);
+
+  // --- ESTADOS DE PERSISTENCIA (guardado en Supabase) ---
+  const [guardando, setGuardando] = useState<boolean>(false);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const [exitoGuardado, setExitoGuardado] = useState<boolean>(false);
 
   const preguntaActual = preguntasPSS4Data[pasoActual - 1];
 
@@ -105,10 +129,12 @@ export default function EvaluacionFlujoPage() {
       puntajeTotal += p.esInversa ? (4 - puntosAsignados) : puntosAsignados;
     });
 
-    if (puntajeTotal <= 5) {
+    const nivel = clasificarNivelEstres(puntajeTotal);
+
+    if (nivel === "Bajo") {
       return { 
         puntaje: puntajeTotal,
-        nivel: "Bajo", 
+        nivel, 
         colorText: "text-emerald-600",
         colorBg: "bg-emerald-50/60 border-emerald-100", 
         porcentajeBarra: "15%",
@@ -119,16 +145,15 @@ export default function EvaluacionFlujoPage() {
           { icono: "🚀", texto: "¡Gran balance! Sigue manteniendo tus hábitos actuales" }
         ] as RecomendacionDinamica[]
       };
-    } else if (puntajeTotal <= 12) {
+    } else if (nivel === "Moderado") {
       return { 
         puntaje: puntajeTotal,
-        nivel: "Moderado", 
+        nivel, 
         colorText: "text-indigo-900",
         colorBg: "bg-purple-50 border-purple-100", 
         porcentajeBarra: "52%",
         mensaje: "Estás experimentando un nivel moderado de estrés. Es normal sentirse así ocasionalmente, pero es importante prestar atención a tu bienestar.",
         emoji: "😐",
-        // Vinculado exactamente a tu mockup original
         recomendaciones: [
           { icono: "🧘", texto: "Prueba una meditación de 5 minutos" },
           { icono: "🍃", texto: "Revisa tus técnicas anti-estrés" }
@@ -137,7 +162,7 @@ export default function EvaluacionFlujoPage() {
     } else {
       return { 
         puntaje: puntajeTotal,
-        nivel: "Alto", 
+        nivel, 
         colorText: "text-rose-600",
         colorBg: "bg-rose-50 border-rose-100", 
         porcentajeBarra: "88%",
@@ -152,6 +177,53 @@ export default function EvaluacionFlujoPage() {
   };
 
   const infoResultado = pasoActual === 5 ? calcularResultadoEstres() : null;
+
+  // ==========================================
+  // PERSISTENCIA: GUARDAR RESULTADO EN SUPABASE
+  // ==========================================
+  const handleGuardarResultado = async () => {
+    if (!infoResultado || guardando) return;
+
+    setGuardando(true);
+    setErrorGuardado(null);
+
+    try {
+      // 1. Obtener el usuario de la sesión activa antes de persistir
+      const { data: { user }, error: errorAuth } = await supabase.auth.getUser();
+
+      if (errorAuth || !user) {
+        setErrorGuardado('Debes iniciar sesión para guardar tu resultado.');
+        setGuardando(false);
+        return;
+      }
+
+      // 2. Persistir usando la función existente, con el nivel ya triado
+      const resultadoGuardado = await insertarResultadoEvaluacionEstres(
+        user.id,
+        infoResultado.puntaje,
+        infoResultado.nivel, // ya tipado como "Bajo" | "Moderado" | "Alto"
+        respuestas
+      );
+
+      // La función devuelve un array con el registro insertado
+      if (!resultadoGuardado || resultadoGuardado.length === 0) {
+        throw new Error('No se pudo confirmar el guardado del resultado.');
+      }
+
+      setExitoGuardado(true);
+
+      // Pequeña pausa para que el usuario vea la confirmación antes de navegar
+      setTimeout(() => {
+        router.push('/home.2');
+      }, 900);
+
+    } catch (err) {
+      console.error('Error al guardar la evaluación PSS-4:', err);
+      setErrorGuardado('Hubo un problema al guardar tu resultado. Intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
@@ -313,7 +385,7 @@ export default function EvaluacionFlujoPage() {
           )}
 
           {/* ========================================================= */}
-          {/* PANTALLA 5 (PANTALLA DE RESULTADOS ACTUALIZADA CONDICIONAL)*/}
+          {/* PANTALLA 5 (PANTALLA DE RESULTADOS + GUARDADO REAL)       */}
           {/* ========================================================= */}
           {pasoActual === 5 && infoResultado && (
             <div className="space-y-5 animate-fade-in">
@@ -382,16 +454,40 @@ export default function EvaluacionFlujoPage() {
                 </div>
               </div>
 
+              {/* FEEDBACK DE GUARDADO */}
+              {errorGuardado && (
+                <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-xl">
+                  ⚠️ {errorGuardado}
+                </div>
+              )}
+              {exitoGuardado && (
+                <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold rounded-xl">
+                  ✅ Resultado guardado. Redirigiendo...
+                </div>
+              )}
+
               <div className="pt-2 space-y-2.5">
                 <button 
-                  onClick={() => router.push('/home.2')}
-                  className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 rounded-2xl shadow-sm text-sm"
+                  onClick={handleGuardarResultado}
+                  disabled={guardando || exitoGuardado}
+                  className={`w-full font-semibold py-4 rounded-2xl shadow-sm text-sm flex items-center justify-center gap-2 transition-all ${
+                    guardando || exitoGuardado
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-[#4A72A6] hover:bg-[#3B5E8C] text-white active:scale-[0.99]'
+                  }`}
                 >
-                  Guardar resultado
+                  {guardando && (
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {guardando ? 'Guardando...' : exitoGuardado ? 'Guardado ✓' : 'Guardar resultado'}
                 </button>
                 <button 
                   onClick={() => cambiarPasoSeguro(0)}
-                  className="w-full bg-white border border-slate-200 text-slate-500 hover:text-slate-700 font-semibold py-3.5 rounded-2xl text-xs"
+                  disabled={guardando}
+                  className="w-full bg-white border border-slate-200 text-slate-500 hover:text-slate-700 font-semibold py-3.5 rounded-2xl text-xs disabled:opacity-50"
                 >
                   Volver al inicio
                 </button>

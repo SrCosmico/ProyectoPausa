@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import supabase from '@/lib/supabase';
+import { insertarEstadoEmocional } from '@/lib/supabase/comoTeSientesHoy';
 
 // ==========================================
 // INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO
@@ -18,23 +20,23 @@ export interface OpcionEmocionalHoy {
 export interface HerramientaSugerida {
   id: string;
   nombre: string;
-  descripcion: string;       // "Ejercicio de 5 minutos"
+  descripcion: string;
   icono?: string;
 }
 
 export interface PantallaComoTeSientesHoy {
-  titulo: string;            // "¿Cómo te sientes hoy?"
-  subtitulo: string;         // "Tu bienestar es importante"
+  titulo: string;
+  subtitulo: string;
   opciones: OpcionEmocionalHoy[];
   estadoSeleccionado?: NivelEmocionalHoy;
   campoAdicional: {
-    label: string;           // "Cuéntanos más (opcional)"
+    label: string;
     placeholder: string;
     texto: string;
-    maxCaracteres: number;   // 200
+    maxCaracteres: number;
   };
   herramientasRecomendadas: HerramientaSugerida[];
-  botonGuardar: string;      // "Guardar mi estado"
+  botonGuardar: string;
 }
 
 export const opcionesEmocionalesData: Omit<OpcionEmocionalHoy, "seleccionado">[] = [
@@ -51,7 +53,12 @@ export default function ComoTeSientesHoyPage() {
   // --- ESTADOS LOCALES ---
   const [estadoSeleccionado, setEstadoSeleccionado] = useState<NivelEmocionalHoy | null>(null);
   const [textoComentario, setTextoComentario] = useState<string>("");
+
+  // --- ESTADOS DE PERSISTENCIA (guardado real en Supabase) ---
+  const [guardando, setGuardando] = useState<boolean>(false);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
   const [mostrarExito, setMostrarExito] = useState<boolean>(false);
+  const [mensajeExito, setMensajeExito] = useState<string>("¡Guardado exitosamente!");
 
   // --- MAPEO DE DATOS A TU INTERFAZ ---
   const datosPantalla: PantallaComoTeSientesHoy = {
@@ -68,28 +75,63 @@ export default function ComoTeSientesHoyPage() {
       texto: textoComentario,
       maxCaracteres: 200
     },
-    herramientasRecomendadas: [], // Se limpia según la instrucción de quitar respiración consciente
+    herramientasRecomendadas: [],
     botonGuardar: "Guardar mi estado"
   };
 
-  // Manejador del guardado
-  const manejarGuardar = (e: React.FormEvent) => {
+  // ==========================================
+  // PERSISTENCIA: GUARDAR ESTADO EN SUPABASE (UPSERT)
+  // ==========================================
+  const manejarGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!estadoSeleccionado) return;
+    if (!estadoSeleccionado || guardando) return;
 
-    // Activa la animación del mensaje de éxito
-    setMostrarExito(true);
+    setGuardando(true);
+    setErrorGuardado(null);
 
-    // Redirige al Home.2 de forma automática tras 2 segundos
-    setTimeout(() => {
-      router.push('/home.2');
-    }, 2000);
+    try {
+      // 1. Obtener el user_id de la sesión activa
+      const { data: { user }, error: errorAuth } = await supabase.auth.getUser();
+
+      if (errorAuth || !user) {
+        setErrorGuardado('Debes iniciar sesión para guardar tu estado emocional.');
+        setGuardando(false);
+        return;
+      }
+
+      // 2. Upsert manual: actualiza si ya hay registro de hoy, inserta si no
+      const { error, fueActualizacion } = await insertarEstadoEmocional(
+        user.id,
+        estadoSeleccionado,
+        textoComentario
+      );
+
+      if (error) {
+        setErrorGuardado('Hubo un problema al guardar tu estado. Intenta de nuevo.');
+        setGuardando(false);
+        return;
+      }
+
+      // 3. Mensaje de éxito dinámico según si fue creación o actualización
+      setMensajeExito(fueActualizacion ? '¡Estado actualizado!' : '¡Guardado exitosamente!');
+      setMostrarExito(true);
+
+      // 4. Redirige al Home tras mostrar el mensaje brevemente
+      setTimeout(() => {
+        router.push('/home.2');
+      }, 1800);
+
+    } catch (err) {
+      console.error('Error inesperado al guardar el estado emocional:', err);
+      setErrorGuardado('Ocurrió un error inesperado. Intenta de nuevo.');
+      setGuardando(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-purple-100 relative overflow-hidden">
       
-      {/* ALERTA GLOBAL DE ÉXITO (Toast animado superior) */}
+      {/* ALERTA GLOBAL DE ÉXITO (Toast animado superior, mensaje dinámico) */}
       {mostrarExito && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50 w-11/12 max-w-xs bg-emerald-500 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-fade-in-down border border-emerald-400">
           <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -97,7 +139,7 @@ export default function ComoTeSientesHoyPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
             </svg>
           </div>
-          <span className="text-sm font-bold tracking-wide">¡Guardado exitosamente!</span>
+          <span className="text-sm font-bold tracking-wide">{mensajeExito}</span>
         </div>
       )}
 
@@ -111,6 +153,7 @@ export default function ComoTeSientesHoyPage() {
             onClick={() => router.push('/home.2')} 
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none rounded-full hover:bg-slate-50 active:scale-95"
             aria-label="Regresar al inicio"
+            disabled={guardando}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
@@ -135,7 +178,8 @@ export default function ComoTeSientesHoyPage() {
                   key={opcion.estado}
                   type="button"
                   onClick={() => setEstadoSeleccionado(opcion.estado)}
-                  className="flex flex-col items-center flex-1 focus:outline-none group relative"
+                  disabled={guardando}
+                  className="flex flex-col items-center flex-1 focus:outline-none group relative disabled:opacity-50"
                 >
                   {/* Círculo contenedor del Emoji */}
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ${
@@ -148,7 +192,7 @@ export default function ComoTeSientesHoyPage() {
                     </span>
                   </div>
                   
-                  {/* Etiqueta del estado (aparece sutilmente o resalta si está activa) */}
+                  {/* Etiqueta del estado */}
                   <span className={`text-[10px] font-bold mt-2 tracking-wide transition-colors duration-200 ${
                     opcion.seleccionado ? 'text-[#4A72A6]' : 'text-slate-400 group-hover:text-slate-600'
                   }`}>
@@ -180,9 +224,17 @@ export default function ComoTeSientesHoyPage() {
               onChange={(e) => setTextoComentario(e.target.value)}
               placeholder={datosPantalla.campoAdicional.placeholder}
               rows={5}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-medium text-slate-700 placeholder-slate-400 outline-none focus:border-[#4A72A6] focus:bg-white focus:shadow-inner resize-none transition-all duration-200"
+              disabled={guardando}
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-medium text-slate-700 placeholder-slate-400 outline-none focus:border-[#4A72A6] focus:bg-white focus:shadow-inner resize-none transition-all duration-200 disabled:opacity-60"
             />
           </div>
+
+          {/* FEEDBACK DE ERROR */}
+          {errorGuardado && (
+            <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-xl">
+              ⚠️ {errorGuardado}
+            </div>
+          )}
         </div>
 
         {/* BLOQUE INFERIOR: Acción Principal */}
@@ -190,14 +242,20 @@ export default function ComoTeSientesHoyPage() {
           <button
             type="button"
             onClick={manejarGuardar}
-            disabled={!estadoSeleccionado || mostrarExito}
-            className={`w-full font-semibold py-4 px-6 rounded-2xl shadow-lg transition-all active:scale-[0.99] text-base text-center ${
-              estadoSeleccionado && !mostrarExito
+            disabled={!estadoSeleccionado || guardando || mostrarExito}
+            className={`w-full font-semibold py-4 px-6 rounded-2xl shadow-lg transition-all active:scale-[0.99] text-base text-center flex items-center justify-center gap-2 ${
+              estadoSeleccionado && !guardando && !mostrarExito
                 ? 'bg-[#4A72A6] hover:bg-[#3B5E8C] text-white shadow-blue-900/10 cursor-pointer' 
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
             }`}
           >
-            {mostrarExito ? "Procesando..." : datosPantalla.botonGuardar}
+            {guardando && (
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
+            {guardando ? "Guardando..." : mostrarExito ? "Procesando..." : datosPantalla.botonGuardar}
           </button>
         </div>
 

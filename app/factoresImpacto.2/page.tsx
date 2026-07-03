@@ -3,11 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 // DELATE
-import { deleteItem } from '@/lib/supabase/factoresImpacto'; // Importamos la interfaz desde un archivo separado
-
-// ==========================================
-// INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO
-// ==========================================
+import { deleteItem } from '@/lib/supabase/factoresImpacto';
+import { guardarFactoresOnboarding } from '@/lib/supabase/onboarding';
 
 export type FactorId =
   | "estres_academico"
@@ -28,12 +25,12 @@ export interface OpcionFactor {
 export interface PantallaFactoresImpacto {
   paso: number;
   totalPasos: number;
-  pregunta: string;       // "¿Qué situaciones afectan más tu bienestar?"
-  instruccion: string;    // "Puedes elegir más de una opción"
+  pregunta: string;
+  instruccion: string;
   opciones: OpcionFactor[];
-  otroTexto: string;      // valor del campo libre "Otro"
+  otroTexto: string;
   botonContinuar: string;
-  botonVolver: string;    // Se mantiene en la interfaz para cumplir el tipado
+  botonVolver: string;
 }
 
 export const opcionesFactoresData: Omit<OpcionFactor, "seleccionado">[] = [
@@ -59,7 +56,6 @@ const mapeoIconos: Record<FactorId, string> = {
 export default function FactoresImpactoPage() {
   const router = useRouter();
 
-  // --- ESTADOS LOCALES ---
   const [seleccionados, setSeleccionados] = useState<Record<FactorId, boolean>>({
     estres_academico: false,
     sobrecarga_tareas: false,
@@ -70,9 +66,8 @@ export default function FactoresImpactoPage() {
     otro: false,
   });
   const [otroTexto, setOtroTexto] = useState<string>('');
-  const [envioSimulado, setEnvioSimulado] = useState<boolean>(false); // Estado para simular el envío
+  const [envioSimulado, setEnvioSimulado] = useState<boolean>(false);
 
-  // --- ESTRUCTURA DE DATOS ---
   const datosFactores: PantallaFactoresImpacto = {
     paso: 3,
     totalPasos: 6,
@@ -89,31 +84,33 @@ export default function FactoresImpactoPage() {
     botonVolver: "Volver"
   };
 
-  // Alternar selección de opciones
   const toggleOpcionId = (id: FactorId) => {
     setSeleccionados(prev => ({ ...prev, [id]: !prev[id] }));
-    // Si desmarcan "Otro", limpiamos la simulación
     if (id === 'otro' && seleccionados['otro']) {
       setEnvioSimulado(false);
     }
   };
 
-  // Función para simular el envío del texto personalizado
   const manejarEnvioSimulado = () => {
     if (otroTexto.trim() !== '') {
       setEnvioSimulado(true);
     }
   };
 
+  const manejarContinuar = () => {
+    const factoresSeleccionados = (Object.keys(seleccionados) as FactorId[]).filter(
+      (id) => seleccionados[id]
+    );
+    guardarFactoresOnboarding(factoresSeleccionados, otroTexto);
+    router.push('/preferenciasApoyo.2');
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
-      {/* Contenedor Mobile-First */}
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
         
-        {/* BLOQUE SUPERIOR: Progreso y Listado */}
         <div className="pt-4">
           
-          {/* Flecha única de retroceso hacia Estado Actual */}
           <button 
             onClick={() => router.push('/estadoActual.2')} 
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none rounded-full hover:bg-slate-50 active:scale-95"
@@ -124,7 +121,6 @@ export default function FactoresImpactoPage() {
             </svg>
           </button>
 
-          {/* Barra de progreso */}
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
             <div className="bg-[#4A72A6] h-full w-3/6 rounded-full transition-all duration-300" />
           </div>
@@ -132,7 +128,6 @@ export default function FactoresImpactoPage() {
             Paso {datosFactores.paso} de {datosFactores.totalPasos}
           </p>
 
-          {/* Enunciados */}
           <h3 className="text-xl font-bold text-[#2A3B50] mt-4 leading-snug">
             {datosFactores.pregunta}
           </h3>
@@ -140,7 +135,6 @@ export default function FactoresImpactoPage() {
             {datosFactores.instruccion}
           </p>
           
-          {/* Opciones */}
           <div className="space-y-3 mt-6">
             {datosFactores.opciones.map((opcion) => (
               <div key={opcion.id} className="w-full">
@@ -157,7 +151,6 @@ export default function FactoresImpactoPage() {
                     <span className="text-sm font-medium text-[#475569]">{opcion.label}</span>
                   </div>
 
-                  {/* Checkbox */}
                   <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
                     opcion.seleccionado ? 'bg-[#4A72A6] border-[#4A72A6]' : 'border-slate-300'
                   }`}>
@@ -169,7 +162,6 @@ export default function FactoresImpactoPage() {
                   </div>
                 </button>
 
-                {/* Sub-pantalla de entrada "Otro" con simulación de envío */}
                 {opcion.id === 'otro' && opcion.seleccionado && (
                   <div className="mt-2 px-1 space-y-2 dynamic-input-animation">
                     <div className="relative flex items-center">
@@ -178,7 +170,7 @@ export default function FactoresImpactoPage() {
                         value={datosFactores.otroTexto}
                         onChange={(e) => {
                           setOtroTexto(e.target.value);
-                          if (envioSimulado) setEnvioSimulado(false); // Reinicia si vuelve a escribir
+                          if (envioSimulado) setEnvioSimulado(false);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') manejarEnvioSimulado();
@@ -187,7 +179,6 @@ export default function FactoresImpactoPage() {
                         className="w-full pl-4 pr-12 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A72A6] focus:bg-white text-slate-700 transition-colors placeholder:text-slate-400"
                       />
                       
-                      {/* Botón de envío simulado */}
                       <button
                         onClick={manejarEnvioSimulado}
                         className="absolute right-2 p-2 text-[#4A72A6] hover:text-[#3B5E8C] transition-colors rounded-lg hover:bg-slate-200/50"
@@ -199,7 +190,6 @@ export default function FactoresImpactoPage() {
                       </button>
                     </div>
 
-                    {/* Feedback visual de la simulación */}
                     {envioSimulado && (
                       <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 pl-1 transition-all">
                         ✨ ¡Especificación guardada con éxito!
@@ -212,10 +202,9 @@ export default function FactoresImpactoPage() {
           </div>
         </div>
 
-        {/* BLOQUE INFERIOR: Solo botón de continuar */}
         <div className="mt-8 pb-4 w-full">
           <button 
-            onClick={() => router.push('/preferenciasApoyo.2')}
+            onClick={manejarContinuar}
             className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
           >
             {datosFactores.botonContinuar}

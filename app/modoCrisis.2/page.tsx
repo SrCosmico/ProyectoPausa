@@ -4,63 +4,120 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 // ==========================================
-// INTERFACES Y DATOS DE RECURSOS DE APOYO
+// FUENTE ÚNICA DE VERDAD: CONTACTOS
 // ==========================================
 
-interface PuntoApoyo {
+type CategoriaContacto = "ucv" | "emergencia";
+
+interface ContactoEmergencia {
   id: string;
   nombre: string;
   descripcion: string;
+  categoria: CategoriaContacto;
   ubicacion: string;
   horario: string;
   telefono?: string;
   email?: string;
   esEmergencia?: boolean;
-}
-
-interface SeccionAcordeon {
-  id: string;
-  titulo: string;
-  icono: string;
+  // Datos para el mapa
+  lat?: number;
+  lng?: number;
   color: string;
-  colorBg: string;
-  puntos: PuntoApoyo[];
+  icono: string;
 }
 
-const SECCIONES_APOYO: SeccionAcordeon[] = [
+const CONTACTOS: ContactoEmergencia[] = [
+  {
+    id: "dbe",
+    nombre: "División de Bienestar Estudiantil (DBE)",
+    descripcion: "Servicio de orientación y acompañamiento psicológico gratuito para estudiantes de pregrado.",
+    categoria: "ucv",
+    ubicacion: "Ciudad Universitaria, Edificio de Rectorado, Piso 1",
+    horario: "Lun–Vie, 8:00 a.m. – 12:00 p.m. y 1:00 p.m. – 5:00 p.m.",
+    telefono: "(0212) 605-4111",
+    email: "bienestar@ucv.edu.ve",
+    lat: 10.4880,
+    lng: -66.8902,
+    color: "#4A72A6",
+    icono: "🏛️",
+  },
+  {
+    id: "esc_psico",
+    nombre: "Clínica Psicológica — Escuela de Psicología",
+    descripcion: "Atención clínica supervisada por profesionales. Solicita cita con antelación.",
+    categoria: "ucv",
+    ubicacion: "Facultad de Humanidades y Educación, Escuela de Psicología",
+    horario: "Lun–Vie, 8:00 a.m. – 12:00 p.m.",
+    telefono: "(0212) 605-2711",
+    lat: 10.4872,
+    lng: -66.8915,
+    color: "#7C3AED",
+    icono: "🧠",
+  },
+  {
+    id: "esc_medicina",
+    nombre: "Departamento de Psiquiatría — Facultad de Medicina",
+    descripcion: "Consulta médica especializada para situaciones de salud mental que requieran evaluación clínica.",
+    categoria: "ucv",
+    ubicacion: "Ciudad Universitaria, Facultad de Medicina, Piso 3",
+    horario: "Lun–Vie, 9:00 a.m. – 1:00 p.m.",
+    telefono: "(0212) 605-3822",
+    lat: 10.4865,
+    lng: -66.8888,
+    color: "#059669",
+    icono: "🏥",
+  },
+  {
+    id: "inpsasel",
+    nombre: "INPSASEL — Línea de Salud Mental",
+    descripcion: "Atención psicológica de emergencia disponible las 24 horas del día.",
+    categoria: "emergencia",
+    ubicacion: "Av. José Félix Sosa, Caracas (sede central)",
+    horario: "24 horas, 7 días a la semana",
+    telefono: "0800-SALUD-00 (0800-72583-00)",
+    esEmergencia: true,
+    lat: 10.4915,
+    lng: -66.8860,
+    color: "#EA580C",
+    icono: "📞",
+  },
+  {
+    id: "bomberos",
+    nombre: "Cuerpo de Bomberos Universitarios UCV",
+    descripcion: "Primeros auxilios y emergencias médicas dentro del campus universitario.",
+    categoria: "emergencia",
+    ubicacion: "Ciudad Universitaria, Portón principal",
+    horario: "24 horas, 7 días a la semana",
+    telefono: "(0212) 605-4444",
+    esEmergencia: true,
+    lat: 10.4893,
+    lng: -66.8875,
+    color: "#E11D48",
+    icono: "🚒",
+  },
+  {
+    id: "emergencias_nacionales",
+    nombre: "Emergencias Nacionales",
+    descripcion: "Número único de emergencias para situaciones de riesgo vital inmediato.",
+    categoria: "emergencia",
+    ubicacion: "Nacional (Venezuela)",
+    horario: "24 horas, 7 días a la semana",
+    telefono: "911",
+    esEmergencia: true,
+    color: "#E11D48",
+    icono: "🚨",
+  },
+];
+
+// Agrupamos dinámicamente para el acordeón
+const SECCIONES_APOYO = [
   {
     id: "ucv",
     titulo: "Apoyo psicológico UCV",
     icono: "🏛️",
     color: "text-[#4A72A6]",
     colorBg: "bg-blue-50 border-blue-100",
-    puntos: [
-      {
-        id: "dbe",
-        nombre: "División de Bienestar Estudiantil (DBE)",
-        descripcion: "Servicio de orientación y acompañamiento psicológico gratuito para estudiantes de pregrado.",
-        ubicacion: "Ciudad Universitaria, Edificio de Rectorado, Piso 1",
-        horario: "Lun–Vie, 8:00 a.m. – 12:00 p.m. y 1:00 p.m. – 5:00 p.m.",
-        telefono: "(0212) 605-4111",
-        email: "bienestar@ucv.edu.ve",
-      },
-      {
-        id: "esc_psico",
-        nombre: "Clínica Psicológica — Escuela de Psicología",
-        descripcion: "Atención clínica supervisada por profesionales. Solicita cita con antelación.",
-        ubicacion: "Facultad de Humanidades y Educación, Escuela de Psicología",
-        horario: "Lun–Vie, 8:00 a.m. – 12:00 p.m.",
-        telefono: "(0212) 605-2711",
-      },
-      {
-        id: "esc_medicina",
-        nombre: "Departamento de Psiquiatría — Facultad de Medicina",
-        descripcion: "Consulta médica especializada para situaciones de salud mental que requieran evaluación clínica.",
-        ubicacion: "Ciudad Universitaria, Facultad de Medicina, Piso 3",
-        horario: "Lun–Vie, 9:00 a.m. – 1:00 p.m.",
-        telefono: "(0212) 605-3822",
-      },
-    ],
+    puntos: CONTACTOS.filter((c) => c.categoria === "ucv"),
   },
   {
     id: "emergencia",
@@ -68,124 +125,17 @@ const SECCIONES_APOYO: SeccionAcordeon[] = [
     icono: "🚨",
     color: "text-rose-700",
     colorBg: "bg-rose-50 border-rose-100",
-    puntos: [
-      {
-        id: "inpsasel",
-        nombre: "INPSASEL — Línea de Salud Mental",
-        descripcion: "Atención psicológica de emergencia disponible las 24 horas del día.",
-        ubicacion: "Nacional (Venezuela)",
-        horario: "24 horas, 7 días a la semana",
-        telefono: "0800-SALUD-00 (0800-72583-00)",
-        esEmergencia: true,
-      },
-      {
-        id: "bomberos",
-        nombre: "Cuerpo de Bomberos Universitarios UCV",
-        descripcion: "Primeros auxilios y emergencias médicas dentro del campus universitario.",
-        ubicacion: "Ciudad Universitaria, Portón principal",
-        horario: "24 horas, 7 días a la semana",
-        telefono: "(0212) 605-4444",
-        esEmergencia: true,
-      },
-      {
-        id: "emergencias",
-        nombre: "Emergencias Nacionales",
-        descripcion: "Número único de emergencias para situaciones de riesgo vital inmediato.",
-        ubicacion: "Nacional (Venezuela)",
-        horario: "24 horas, 7 días a la semana",
-        telefono: "911",
-        esEmergencia: true,
-      },
-    ],
+    puntos: CONTACTOS.filter((c) => c.categoria === "emergencia"),
   },
 ];
+
+// Filtramos dinámicamente solo los que tienen coordenadas para el mapa
+const PUNTOS_MAPA = CONTACTOS.filter((c) => c.lat !== undefined && c.lng !== undefined);
 
 // ==========================================
 // MAPA INTERACTIVO CON LEAFLET
 // ==========================================
 
-interface PuntoMapa {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  ubicacion: string;
-  horario: string;
-  telefono?: string;
-  email?: string;
-  lat: number;
-  lng: number;
-  color: string;
-  icono: string;
-  esEmergencia?: boolean;
-}
-
-const PUNTOS_MAPA: PuntoMapa[] = [
-  {
-    id: 'dbe',
-    nombre: 'División de Bienestar Estudiantil',
-    descripcion: 'Orientación y acompañamiento psicológico gratuito para estudiantes.',
-    ubicacion: 'Edificio de Rectorado, Piso 1',
-    horario: 'Lun–Vie, 8:00 a.m. – 5:00 p.m.',
-    telefono: '(0212) 605-4111',
-    email: 'bienestar@ucv.edu.ve',
-    lat: 10.4880,
-    lng: -66.8902,
-    color: '#4A72A6',
-    icono: '🏛️',
-  },
-  {
-    id: 'psico',
-    nombre: 'Clínica Psicológica — Psicología',
-    descripcion: 'Atención clínica supervisada. Solicita cita con antelación.',
-    ubicacion: 'Facultad de Humanidades, Escuela de Psicología',
-    horario: 'Lun–Vie, 8:00 a.m. – 12:00 p.m.',
-    telefono: '(0212) 605-2711',
-    lat: 10.4872,
-    lng: -66.8915,
-    color: '#7C3AED',
-    icono: '🧠',
-  },
-  {
-    id: 'medicina',
-    nombre: 'Depto. Psiquiatría — Medicina',
-    descripcion: 'Consulta médica especializada en salud mental.',
-    ubicacion: 'Facultad de Medicina, Piso 3',
-    horario: 'Lun–Vie, 9:00 a.m. – 1:00 p.m.',
-    telefono: '(0212) 605-3822',
-    lat: 10.4865,
-    lng: -66.8888,
-    color: '#059669',
-    icono: '🏥',
-  },
-  {
-    id: 'bomberos',
-    nombre: 'Bomberos Universitarios UCV',
-    descripcion: 'Primeros auxilios y emergencias médicas en el campus.',
-    ubicacion: 'Ciudad Universitaria, Portón principal',
-    horario: '24 horas, 7 días',
-    telefono: '(0212) 605-4444',
-    lat: 10.4893,
-    lng: -66.8875,
-    color: '#E11D48',
-    icono: '🚒',
-    esEmergencia: true,
-  },
-  {
-    id: 'inpsasel',
-    nombre: 'INPSASEL — Línea de Salud Mental',
-    descripcion: 'Atención psicológica de emergencia disponible las 24 horas.',
-    ubicacion: 'Av. José Félix Sosa, Caracas (sede central)',
-    horario: '24 horas, 7 días a la semana',
-    telefono: '0800-72583-00',
-    lat: 10.4915,
-    lng: -66.8860,
-    color: '#EA580C',
-    icono: '📞',
-    esEmergencia: true,
-  },
-];
-
-// CAMBIO 1: CDN cambiado de unpkg → jsDelivr (más confiable en móviles Android)
 const LEAFLET_CSS_URL = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS_URL  = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
 
@@ -226,7 +176,7 @@ function MapaUCV() {
   const mapInstanceRef    = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const intentosRef       = useRef(0);
-  const [puntoSeleccionado, setPuntoSeleccionado] = useState<PuntoMapa | null>(null);
+  const [puntoSeleccionado, setPuntoSeleccionado] = useState<ContactoEmergencia | null>(null);
   const [estadoMapa, setEstadoMapa]               = useState<'cargando' | 'listo' | 'error'>('cargando');
 
   useEffect(() => {
@@ -238,9 +188,6 @@ function MapaUCV() {
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error(mensaje)), ms)),
       ]);
 
-    // CAMBIO 2: esperar a que el contenedor tenga dimensiones reales antes de
-    // inicializar Leaflet. En Android el layout puede tardar varios frames en
-    // estabilizarse, y si Leaflet se monta con offsetWidth=0 el mapa nunca renderiza.
     const esperarDimensiones = (el: HTMLDivElement, maxMs = 4000): Promise<void> =>
       new Promise((resolve, reject) => {
         if (el.offsetWidth > 0 && el.offsetHeight > 0) { resolve(); return; }
@@ -261,11 +208,9 @@ function MapaUCV() {
 
         if (cancelado || !mapRef.current || mapInstanceRef.current) return;
 
-        // Esperar dimensiones reales (crítico en Android)
         await esperarDimensiones(mapRef.current);
         if (cancelado || !mapRef.current || mapInstanceRef.current) return;
 
-        // CAMBIO 3a: tap:false evita que Leaflet duplique eventos táctiles en Android WebView
         const map = L.map(mapRef.current, {
           center:          [10.4878, -66.8895],
           zoom:            16,
@@ -276,8 +221,6 @@ function MapaUCV() {
 
         mapInstanceRef.current = map;
 
-        // CartoDB Positron: no bloquea localhost ni WebViews de Android,
-        // no requiere API key, y es más liviano que OSM para móviles.
         const capaTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
           attribution: '© OpenStreetMap © CARTO',
           subdomains:  'abcd',
@@ -311,12 +254,10 @@ function MapaUCV() {
             </div>
           `;
           const icon   = L.divIcon({ html: iconHtml, className: '', iconSize: [40, 40], iconAnchor: [20, 40] });
-          const marker = L.marker([punto.lat, punto.lng], { icon }).addTo(map);
-          marker.on('click', () => { map.panTo([punto.lat, punto.lng]); setPuntoSeleccionado(punto); });
+          const marker = L.marker([punto.lat!, punto.lng!], { icon }).addTo(map);
+          marker.on('click', () => { map.panTo([punto.lat!, punto.lng!]); setPuntoSeleccionado(punto); });
         });
 
-        // CAMBIO 3c: doble rAF encadenado en lugar de setTimeout para invalidateSize,
-        // garantiza que el DOM ya pintó el contenedor antes de que Leaflet lo mida.
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             if (!cancelado && mapInstanceRef.current) {
@@ -331,8 +272,7 @@ function MapaUCV() {
           resizeObserverRef.current = observer;
         }
       } catch (err) {
-        console.error('Error cargando el mapa de puntos de apoyo:', err);
-        // Reintentar una vez (cubre red intermitente en Android)
+        console.error('Error cargando el mapa:', err);
         if (!cancelado && intentosRef.current < 1) {
           intentosRef.current += 1;
           setTimeout(iniciarMapa, 1500);
@@ -371,7 +311,6 @@ function MapaUCV() {
         <div className="absolute bottom-0 left-0 right-0 z-[1000] animate-slideUp">
           <div className="bg-white rounded-t-[28px] shadow-2xl px-5 pt-4 pb-6">
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div
@@ -427,18 +366,20 @@ function MapaUCV() {
                   Llamar ahora
                 </a>
               )}
-              <a
-                href={`https://maps.google.com/?q=${puntoSeleccionado.lat},${puntoSeleccionado.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                </svg>
-                Ir a ubicación
-              </a>
+              {puntoSeleccionado.lat && puntoSeleccionado.lng && (
+                <a
+                  href={`https://maps.google.com/?q=${puntoSeleccionado.lat},${puntoSeleccionado.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                  </svg>
+                  Ir a ubicación
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -451,11 +392,7 @@ function MapaUCV() {
 // COMPONENTE ACORDEÓN INDIVIDUAL
 // ==========================================
 
-interface AccordionItemProps {
-  punto: PuntoApoyo;
-}
-
-function AccordionItem({ punto }: AccordionItemProps) {
+function AccordionItem({ punto }: { punto: ContactoEmergencia }) {
   const [abierto, setAbierto] = useState(false);
 
   return (

@@ -1,55 +1,38 @@
-// DELATE
-
-/**
- * Función para borrar un elemento del estado local.
- */
-export const deleteItem = (
-  currentList: string[],
-  itemToRemove: string
-): string[] => {
-  return currentList.filter((item) => item !== itemToRemove)
-}
-
-// pantalla preferencias de apoyo
+import { createClient } from '@/lib/supabase/client';
 import {
   opcionesPreferenciasData,
   mapeoIconos as iconosPreferencias,
   type OpcionPreferencia,
-} from '@/models/preferenciasApoyo'
+} from '@/models/preferenciasApoyo';
 
-/**
- * LETRA C: PANTALLA PREFERENCIAS DE APOYO
- * Registra los tipos de apoyo seleccionados por el estudiante
- * durante su proceso de inducción y configuración inicial.
- */
+const getSupabase = () => createClient();
+
+// Mantiene compatibilidad con import existente en preferenciasApoyo.2
+export const deleteItem = (list: string[], item: string): string[] =>
+  list.filter((i) => i !== item);
+
+/** C/U — Upsert de preferencias de apoyo en el cuestionario de onboarding */
 export const insertarPreferenciasApoyo = async (
   userId: string,
   preferenciasSeleccionadas: string[]
 ) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(
-      `preferencias_apoyo_${userId}`,
-      JSON.stringify({
-        preferencias: preferenciasSeleccionadas,
-        creado_at: new Date().toISOString(),
-      })
+  const { data, error } = await getSupabase()
+    .from('cuestionario_onboarding')
+    .upsert(
+      { user_id: userId, preferencias: preferenciasSeleccionadas },
+      { onConflict: 'user_id' }
     )
+    .select();
+
+  if (error) {
+    console.error('Error al guardar preferencias de apoyo:', error.message);
+    return { data: null, error };
   }
+  return { data, error: null };
+};
 
-  return [
-    {
-      user_id: userId,
-      preferencias: preferenciasSeleccionadas,
-      creado_at: new Date().toISOString(),
-    },
-  ]
-}
+// ── R ─────────────────────────────────────────────────────────────────────
 
-// ============================================================
-// CRUD: Letra "R" pantalla de preferenciasApoyo
-// ============================================================
-
-/** Devuelve las preferencias de apoyo con emoji y estado de selección. */
 export function leerOpcionesPreferenciasApoyo(
   seleccionados: Record<string, boolean>
 ): OpcionPreferencia[] {
@@ -57,5 +40,5 @@ export function leerOpcionesPreferenciasApoyo(
     ...item,
     icono: iconosPreferencias[item.id],
     seleccionado: seleccionados[item.id] ?? false,
-  }))
+  }));
 }

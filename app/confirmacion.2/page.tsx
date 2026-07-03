@@ -1,11 +1,8 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-// ==========================================
-// INTERFACES Y DATOS PROPORCIONADOS POR EL USUARIO
-// ==========================================
+import { guardarOnboardingEnSupabase } from '@/lib/supabase/onboarding';
 
 export interface BeneficioItem {
   id: string;
@@ -16,14 +13,14 @@ export interface BeneficioItem {
 export interface PantallaConfirmacion {
   paso: number;
   totalPasos: number;
-  titulo: string;          // "¡Gracias! 💜"
-  subtitulo: string;       // "Con tus respuestas podemos personalizar tu experiencia."
+  titulo: string;
+  subtitulo: string;
   seccionBeneficios: {
-    titulo: string;        // "Esto encontrarás en Pausa"
+    titulo: string;
     items: BeneficioItem[];
   };
   ilustracionUrl?: string;
-  botonComenzar: string;   // "Comenzar mi refugio +"
+  botonComenzar: string;
 }
 
 export const beneficiosData: BeneficioItem[] = [
@@ -32,7 +29,6 @@ export const beneficiosData: BeneficioItem[] = [
   { id: "3", descripcion: "Seguimiento de tu bienestar de forma segura." },
 ];
 
-// Mapeo de íconos amigables para la sección de beneficios
 const mapeoIconosBeneficios: Record<string, string> = {
   "1": "✨",
   "2": "🧰",
@@ -41,8 +37,20 @@ const mapeoIconosBeneficios: Record<string, string> = {
 
 export default function ConfirmacionPage() {
   const router = useRouter();
+  const [guardando, setGuardando] = useState(true);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
 
-  // --- ESTRUCTURA DE LA PANTALLA SEGÚN TU INTERFAZ ---
+  // Apenas el usuario llega aquí, persistimos TODAS sus respuestas
+  // del cuestionario como metadata del usuario en Supabase Auth.
+  useEffect(() => {
+    const persistirOnboarding = async () => {
+      const { error } = await guardarOnboardingEnSupabase();
+      if (error) setErrorGuardado(error);
+      setGuardando(false);
+    };
+    persistirOnboarding();
+  }, []);
+
   const datosConfirmacion: PantallaConfirmacion = {
     paso: 6,
     totalPasos: 6,
@@ -60,13 +68,10 @@ export default function ConfirmacionPage() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-purple-100">
-      {/* Contenedor Mobile-First */}
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
         
-        {/* BLOQUE SUPERIOR: Progreso Total y Celebración */}
         <div className="pt-4 flex flex-col flex-1">
           
-          {/* Barra de progreso COMPLETAMENTE LLENA (Paso 6 de 6 -> 100%) */}
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
             <div className="bg-[#4A72A6] h-full w-full rounded-full transition-all duration-500 animate-pulse" />
           </div>
@@ -79,7 +84,6 @@ export default function ConfirmacionPage() {
             </p>
           </div>
 
-          {/* Encabezado Principal y Mensaje de Éxito */}
           <div className="text-center mt-8 px-2">
             <h2 className="text-3xl font-extrabold text-[#2A3B50] tracking-tight">
               {datosConfirmacion.titulo}
@@ -87,9 +91,13 @@ export default function ConfirmacionPage() {
             <p className="text-sm text-[#64748B] mt-3 leading-relaxed max-w-xs mx-auto">
               {datosConfirmacion.subtitulo}
             </p>
+            {errorGuardado && (
+              <p className="text-[11px] text-rose-500 font-semibold mt-3">
+                No pudimos guardar todas tus respuestas, pero puedes seguir usando Pausa.
+              </p>
+            )}
           </div>
 
-          {/* Ilustración o Isotipo de Éxito Simulado */}
           <div className="my-8 flex justify-center relative">
             <div className="absolute inset-0 bg-purple-100 rounded-full blur-3xl opacity-40 w-32 h-32 mx-auto" />
             <div className="w-24 h-24 bg-purple-50 rounded-full flex items-center justify-center border border-purple-100 shadow-sm relative z-10 animate-bounce-slow">
@@ -99,7 +107,6 @@ export default function ConfirmacionPage() {
             </div>
           </div>
 
-          {/* Tarjeta de Beneficios */}
           <div className="bg-slate-50/80 border border-slate-100 rounded-3xl p-5 mt-auto shadow-inner">
             <h4 className="text-xs font-bold text-[#8C9BAE] tracking-widest uppercase mb-4 text-center sm:text-left">
               {datosConfirmacion.seccionBeneficios.titulo}
@@ -121,14 +128,13 @@ export default function ConfirmacionPage() {
 
         </div>
 
-        {/* BLOQUE INFERIOR: Botón de Entrada triunfal a la App */}
         <div className="mt-8 pb-4 w-full">
-          {/* Redirige de forma directa al Dashboard / Home principal */}
           <button 
             onClick={() => router.push('/home.2')}
-            className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-xl shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center tracking-wide flex items-center justify-center gap-2"
+            disabled={guardando}
+            className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-xl shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center tracking-wide flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            {datosConfirmacion.botonComenzar}
+            {guardando ? "Guardando tus respuestas..." : datosConfirmacion.botonComenzar}
           </button>
         </div>
 
