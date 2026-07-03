@@ -73,6 +73,8 @@ export default function HomePage() {
   const [yaRegistroHoy, setYaRegistroHoy] = useState(false);
   const [loadingLogout, setLoadingLogout] = useState(false);
 
+  const [rachaActual] = useState(12);
+
   const { preguntaActual, mostrarCheckin, guardarEmocionTemporal } = useQuizState();
 
   useEffect(() => {
@@ -168,21 +170,48 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* BOTÓN LOGOUT */}
-              <button
-                onClick={handleLogout}
-                disabled={loadingLogout}
-                title="Cerrar sesión"
-                className="p-2.5 rounded-full bg-slate-50 border border-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:scale-95 transition-all duration-150 flex items-center justify-center disabled:opacity-50"
-              >
-                {loadingLogout ? (
-                  <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
-                  </svg>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+
+  {/* BOTÓN RACHA */}
+  <button
+    onClick={() => router.push('/Racha.2')}
+    className="flex items-center gap-1 px-3 py-2 rounded-full bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-all active:scale-95"
+  >
+    <span className="text-lg">🔥</span>
+
+    <span className="text-sm font-bold text-orange-600">
+      {rachaActual}
+    </span>
+  </button>
+
+  {/* BOTÓN LOGOUT */}
+  <button
+    onClick={handleLogout}
+    disabled={loadingLogout}
+    title="Cerrar sesión"
+    className="p-2.5 rounded-full bg-slate-50 border border-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:scale-95 transition-all duration-150 flex items-center justify-center disabled:opacity-50"
+  >
+    {loadingLogout ? (
+      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+    ) : (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={2}
+        stroke="currentColor"
+        className="w-5 h-5"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"
+        />
+      </svg>
+    )}
+  </button>
+
+</div>
             </div>
 
             {/* CHECK-IN EMOCIONAL */}
