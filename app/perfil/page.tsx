@@ -134,7 +134,7 @@ export default function PerfilPage() {
       icono: '📊',
       titulo: 'Historial emocional',
       descripcion: 'Revisa tu evolución de bienestar',
-      ruta: '/monitoreo.2',
+      ruta: '/monitoreo',
     },
     {
       id: 'privacidad',
@@ -165,7 +165,7 @@ export default function PerfilPage() {
         {/* HEADER */}
         <div className="px-6 pt-6 pb-4 flex items-center justify-between bg-white border-b border-slate-100 flex-shrink-0">
           <button
-            onClick={() => router.push('/home.2')}
+            onClick={() => router.push('/home')}
             className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">

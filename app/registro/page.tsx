@@ -33,7 +33,7 @@ export default function RegisterView() {
         data: { session },
       } = await supabase.auth.getSession();
       if (session) {
-        router.push('/home.2');
+        router.push('/home');
       }
     };
     verificarSesion();
@@ -77,7 +77,7 @@ export default function RegisterView() {
       localStorage.setItem('alumnoNombre', formData.nombre.trim());
       localStorage.setItem('alumnoFacultad', formData.facultad);
       // ↑ FIN CAMBIO
-      router.push('/bienvenida.2');
+      router.push('/bienvenida');
     }
   };
 

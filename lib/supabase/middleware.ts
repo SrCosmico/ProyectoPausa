@@ -8,6 +8,23 @@ import { NextResponse, type NextRequest } from 'next/server'
  */
 const RUTAS_PUBLICAS = ['/login', '/registro', '/']
 
+const RUTAS_ANTIGUAS: Record<string, string> = {
+  '/home.2': '/home',
+  '/evaluacion.2': '/evaluacion',
+  '/meditacion.2': '/meditacion',
+  '/monitoreo.2': '/monitoreo',
+  '/cronograma.2': '/cronograma',
+  '/contrasena.2': '/contrasena',
+  '/modoCrisis.2': '/modoCrisis',
+  '/registroEmocional.2': '/registroEmocional',
+  '/preferenciasApoyo.2': '/preferenciasApoyo',
+  '/factoresImpacto.2': '/factoresImpacto',
+  '/estadoActual.2': '/estadoActual',
+  '/motivos.2': '/motivos',
+  '/bienvenida.2': '/bienvenida',
+  '/frecuencia.2': '/frecuencia',
+}
+
 function esRutaPublica(pathname: string): boolean {
   return RUTAS_PUBLICAS.includes(pathname)
 }
@@ -62,10 +79,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Con sesión activa entrando a login/registro -> /home.2
+  // Con sesión activa entrando a login/registro -> /home
   if (user && (pathname === '/login' || pathname === '/registro')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/home.2'
+    url.pathname = '/home'
+    return NextResponse.redirect(url)
+  }
+
+  const rutaAntigua = RUTAS_ANTIGUAS[pathname]
+  if (rutaAntigua) {
+    const url = request.nextUrl.clone()
+    url.pathname = rutaAntigua
     return NextResponse.redirect(url)
   }
 

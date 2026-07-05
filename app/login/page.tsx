@@ -17,7 +17,7 @@ export default function LoginView() {
     const verificarSesion = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        router.push('/home.2');
+        router.push('/home');
       }
     };
     verificarSesion();
@@ -39,7 +39,7 @@ export default function LoginView() {
 
     // Si el usuario es válido, se le redirige al Home
     if (data?.user) {
-      router.push('/home.2');
+      router.push('/home');
     }
   };
 
