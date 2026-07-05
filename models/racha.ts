@@ -17,20 +17,22 @@ export interface CheckinDia {
   parejaRegistro: boolean;
   completo: boolean; // ambos registraron ese día
   protegido: boolean; // se cubrió con un protector de racha
+  antesDePareja: boolean; // día anterior a que la pareja se activara (no cuenta)
 }
 
 export interface EstadoRachaPareja {
   parejaId: string | null;
   tieneParejaActiva: boolean;
-  esperandoAceptacion: boolean; // invitación enviada, pareja aún no acepta
+  esperandoAceptacion: boolean;
   correoInvitado: string | null;
+  nombrePareja: string | null;
   rachaActual: number;
   rachaMaxima: number;
   protectoresDisponibles: number;
   protectoresUsadosEsteMes: number;
-  activadaHoy: boolean; // true si hoy ambos ya registraron su emoción
-  historialDias: CheckinDia[]; // últimos 7 días, del más antiguo al más reciente
-  mensajeMotivador: string | null; // solo presente cuando activadaHoy es true
+  activadaHoy: boolean;
+  historialDias: CheckinDia[];
+  mensajeMotivador: string | null;
 }
 
 export const MAX_PROTECTORES_MES = 4;
@@ -51,12 +53,10 @@ export function obtenerMensajeMotivadorAleatorio(): string {
   ];
 }
 
-/** Devuelve el mes en formato "YYYY-MM" para agrupar protectores. */
 export function obtenerMesActual(fecha: Date = new Date()): string {
   return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Fecha local (no UTC) en formato YYYY-MM-DD. */
 export function obtenerFechaLocalISO(fecha: Date = new Date()): string {
   const offset = fecha.getTimezoneOffset() * 60000;
   return new Date(fecha.getTime() - offset).toISOString().split("T")[0];

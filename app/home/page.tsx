@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuizState } from '@/hooks/useQuizState';
 import { obtenerNombreUsuarioLocal } from '@/lib/supabase/home';
-import { cargarQuizState, obtenerUsuarioIdLocal } from '@/lib/supabase/quizState';
 import supabase from '@/lib/supabase';
 import { cerrarSesion } from '@/app/services/authService';
+import { calcularEstadoRachaPareja } from '@/lib/supabase/racha';
+import type { EstadoRachaPareja } from '@/models/racha';
 
 export type NivelEmocional = "Muy mal" | "Mal" | "Regular" | "Bien" | "Muy bien";
 export type TabNavegacionId = "inicio" | "evaluacion" | "recursos" | "perfil";
@@ -65,10 +66,6 @@ const mapeoIconosHerramientas: Record<string, string> = {
   ia:         "💬",
 };
 
-// ==========================================
-// PERSONALIZACIÓN SEGÚN METADATA DEL ONBOARDING
-// ==========================================
-
 function personalizarOrdenHerramientas(
   base: AccesoRapido[],
   motivos: string[]
@@ -117,37 +114,6 @@ function personalizarUmbralCrisis(frecuenciaEstres: string) {
   }
 }
 
-// ==========================================
-// RACHA (STREAK) — calculada a partir del historial local del quiz
-// ==========================================
-
-/**
- * Cuenta los días consecutivos (terminando hoy) en los que el usuario
- * registró al menos un check-in. Si hoy aún no ha registrado, la racha
- * se sigue mostrando basada en ayer (no se rompe hasta medianoche).
- */
-function calcularRachaDias(timestamps: string[]): number {
-  if (timestamps.length === 0) return 0;
-
-  const diasConRegistro = new Set(
-    timestamps.map((t) => new Date(t).toDateString())
-  );
-
-  let racha = 0;
-  const cursor = new Date();
-
-  if (!diasConRegistro.has(cursor.toDateString())) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  while (diasConRegistro.has(cursor.toDateString())) {
-    racha += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return racha;
-}
-
 export default function HomePage() {
   const router = useRouter();
   const [usuarioNombre, setUsuarioNombre]   = useState('Usuario');
@@ -155,7 +121,9 @@ export default function HomePage() {
   const [loadingLogout, setLoadingLogout]   = useState(false);
   const [herramientas, setHerramientas]     = useState<AccesoRapido[]>(accesoRapidoData);
   const [saludo, setSaludo]                 = useState('Nos alegra que estés aquí');
-  const [rachaDias, setRachaDias]           = useState(0);
+
+  // ── Racha en pareja: se lee siempre de Supabase, nunca de localStorage ──
+  const [estadoRacha, setEstadoRacha] = useState<EstadoRachaPareja | null>(null);
 
   const { preguntaActual, mostrarCheckin, guardarEmocionTemporal } = useQuizState();
 
@@ -175,10 +143,9 @@ export default function HomePage() {
       const hoy = new Date().toLocaleDateString();
       if (registroFecha === hoy) setYaRegistroHoy(true);
 
-      // --- Racha: se calcula del historial guardado por el quiz diario ---
-      const userId = obtenerUsuarioIdLocal();
-      const { historial } = cargarQuizState(userId);
-      setRachaDias(calcularRachaDias(historial.map((h) => h.timestamp)));
+      // --- Racha real en pareja, calculada contra Supabase ---
+      const racha = await calcularEstadoRachaPareja(session.user.id);
+      setEstadoRacha(racha);
 
       // --- Personalización a partir de los datos del cuestionario de onboarding ---
       const metadata = session.user?.user_metadata;
@@ -210,11 +177,10 @@ export default function HomePage() {
     }
   };
 
-  const manejarClickEmoji = (item: EmojiEstado) => {
+  const manejarClickEmoji = async (item: EmojiEstado) => {
     guardarEmocionTemporal(item.estado, item.emoji);
     localStorage.setItem('fechaUltimoRegistro', new Date().toLocaleDateString());
     setYaRegistroHoy(true);
-    setRachaDias((prev) => (prev > 0 ? prev + (yaRegistroHoy ? 0 : 1) : 1));
     router.push('/registroEmocional');
   };
 
@@ -233,6 +199,12 @@ export default function HomePage() {
     accesoRapido: herramientas,
     navegacion: navegacionData.map((item) => ({ ...item, activo: item.id === "inicio" })),
   };
+
+  // Textos del botón de racha según el estado real de la pareja
+  const rachaDias = estadoRacha?.rachaActual ?? 0;
+  const tituloBotonRacha = !estadoRacha?.tieneParejaActiva
+    ? 'Vincula a tu pareja para empezar una racha'
+    : `Racha con ${estadoRacha.nombrePareja}: ${rachaDias} ${rachaDias === 1 ? 'día' : 'días'}`;
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
@@ -262,11 +234,15 @@ export default function HomePage() {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
-                {/* BOTÓN DE RACHA -> navega a /racha.2 */}
+                {/* BOTÓN DE RACHA -> navega a /racha, dato real desde Supabase */}
                 <button
                   onClick={() => router.push('/racha')}
-                  title={`Ver mi racha: ${rachaDias} ${rachaDias === 1 ? 'día' : 'días'}`}
-                  className="flex items-center gap-1 bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 text-orange-600 px-3 py-2 rounded-full shadow-sm hover:shadow-md hover:border-orange-200 active:scale-95 transition-all duration-150"
+                  title={tituloBotonRacha}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-full shadow-sm active:scale-95 transition-all duration-150 border ${
+                    estadoRacha?.tieneParejaActiva
+                      ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-100 text-orange-600 hover:shadow-md hover:border-orange-200'
+                      : 'bg-slate-50 border-slate-100 text-slate-400 hover:text-slate-600'
+                  }`}
                 >
                   <span className="text-base leading-none">🔥</span>
                   <span className="text-xs font-extrabold leading-none tabular-nums">
@@ -291,6 +267,24 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
+
+            {/* Mini aviso si aún no hay pareja vinculada */}
+            {estadoRacha && !estadoRacha.tieneParejaActiva && !estadoRacha.esperandoAceptacion && (
+              <button
+                onClick={() => router.push('/racha')}
+                className="mt-4 w-full text-left px-4 py-3 bg-orange-50 border border-orange-100 rounded-2xl text-[11px] font-semibold text-orange-700 hover:bg-orange-100 transition-colors"
+              >
+                🔥 Vincula a tu pareja y empiecen su racha de bienestar juntos →
+              </button>
+            )}
+            {estadoRacha?.esperandoAceptacion && (
+              <button
+                onClick={() => router.push('/racha')}
+                className="mt-4 w-full text-left px-4 py-3 bg-amber-50 border border-amber-100 rounded-2xl text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                ⏳ Invitación enviada a {estadoRacha.correoInvitado}, esperando que acepte →
+              </button>
+            )}
 
             {/* CHECK-IN EMOCIONAL */}
             {mostrarCheckin && (

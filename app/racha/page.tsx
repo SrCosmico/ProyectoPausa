@@ -7,7 +7,6 @@ import {
   calcularEstadoRachaPareja,
   invitarPareja,
   aceptarInvitacionPareja,
-  leerNombrePareja,
 } from "@/lib/supabase/racha";
 import type { EstadoRachaPareja } from "@/models/racha";
 
@@ -19,7 +18,6 @@ export default function RachaPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [estado, setEstado] = useState<EstadoRachaPareja | null>(null);
-  const [nombrePareja, setNombrePareja] = useState<string>("");
 
   const [correoInvitacion, setCorreoInvitacion] = useState("");
   const [enviandoInvitacion, setEnviandoInvitacion] = useState(false);
@@ -30,20 +28,6 @@ export default function RachaPage() {
   const cargarEstado = useCallback(async (uid: string) => {
     const resultado = await calcularEstadoRachaPareja(uid);
     setEstado(resultado);
-
-    if (resultado.tieneParejaActiva && resultado.parejaId) {
-      // Buscamos el nombre del compañero/a a partir de la pareja
-      const { data } = await supabase
-        .from("parejas")
-        .select("user_id_1, user_id_2")
-        .eq("id", resultado.parejaId)
-        .maybeSingle();
-
-      if (data) {
-        const parejaUid = data.user_id_1 === uid ? data.user_id_2 : data.user_id_1;
-        if (parejaUid) setNombrePareja(await leerNombrePareja(parejaUid));
-      }
-    }
   }, []);
 
   useEffect(() => {
@@ -100,7 +84,6 @@ export default function RachaPage() {
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4">
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col sm:rounded-[40px] overflow-y-auto">
 
-        {/* HEADER */}
         <div className="bg-white p-6 border-b border-slate-100">
           <button
             onClick={() => router.push("/home")}
@@ -125,7 +108,6 @@ export default function RachaPage() {
             </div>
           )}
 
-          {/* ========== SIN PAREJA: invitar o aceptar ========== */}
           {!estado?.parejaId && (
             <div className="space-y-4">
               <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3">
@@ -165,7 +147,6 @@ export default function RachaPage() {
             </div>
           )}
 
-          {/* ========== PAREJA PENDIENTE ========== */}
           {estado?.esperandoAceptacion && (
             <div className="bg-white rounded-3xl p-6 border border-amber-100 shadow-sm text-center space-y-2">
               <span className="text-4xl">⏳</span>
@@ -177,7 +158,6 @@ export default function RachaPage() {
             </div>
           )}
 
-          {/* ========== PAREJA ACTIVA: dashboard de racha ========== */}
           {estado?.tieneParejaActiva && (
             <>
               {estado.mensajeMotivador && (
@@ -190,16 +170,14 @@ export default function RachaPage() {
               )}
 
               <div className="bg-gradient-to-r from-orange-400 to-orange-500 rounded-3xl p-6 text-white shadow-lg">
-                <p className="text-sm opacity-90">Racha actual con {nombrePareja || "tu pareja"}</p>
+                <p className="text-sm opacity-90">Racha actual con {estado.nombrePareja}</p>
                 <h2 className="text-5xl font-extrabold mt-2">{estado.rachaActual}</h2>
                 <p className="mt-2 text-orange-100">
                   {estado.rachaActual === 1 ? "día seguido" : "días seguidos"}
                 </p>
                 <div className="mt-4 pt-4 border-t border-white/20 flex justify-between text-xs font-semibold">
                   <span>🏆 Récord: {estado.rachaMaxima} días</span>
-                  <span>
-                    🛡️ {estado.protectoresDisponibles}/4 protectores este mes
-                  </span>
+                  <span>🛡️ {estado.protectoresDisponibles}/4 protectores este mes</span>
                 </div>
               </div>
 
@@ -214,26 +192,32 @@ export default function RachaPage() {
                         <span className="text-[10px] font-bold text-slate-400">{letraDia}</span>
                         <div
                           className={`w-9 h-9 rounded-full flex items-center justify-center text-base ${
-                            dia.completo
+                            dia.antesDePareja
+                              ? "bg-slate-50 opacity-40"
+                              : dia.completo
                               ? "bg-emerald-100"
                               : dia.protegido
                               ? "bg-blue-100"
                               : "bg-slate-100"
                           }`}
                           title={
-                            dia.completo
+                            dia.antesDePareja
+                              ? "Antes de formar pareja"
+                              : dia.completo
                               ? "Ambos registraron su emoción"
                               : dia.protegido
                               ? "Protegido con racha protectora"
                               : "Día incompleto"
                           }
                         >
-                          {dia.completo ? "🔥" : dia.protegido ? "🛡️" : "·"}
+                          {dia.antesDePareja ? "—" : dia.completo ? "🔥" : dia.protegido ? "🛡️" : "·"}
                         </div>
-                        <div className="flex gap-0.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${dia.yoRegistre ? "bg-emerald-400" : "bg-slate-200"}`} />
-                          <span className={`w-1.5 h-1.5 rounded-full ${dia.parejaRegistro ? "bg-emerald-400" : "bg-slate-200"}`} />
-                        </div>
+                        {!dia.antesDePareja && (
+                          <div className="flex gap-0.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${dia.yoRegistre ? "bg-emerald-400" : "bg-slate-200"}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full ${dia.parejaRegistro ? "bg-emerald-400" : "bg-slate-200"}`} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}

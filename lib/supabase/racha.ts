@@ -11,14 +11,13 @@ import {
 
 const getSupabase = () => createClient();
 
-const VENTANA_HISTORIAL_DIAS = 60;
+const VENTANA_HISTORIAL_MAX_DIAS = 90;
 const DIAS_MOSTRADOS_UI = 7;
 
 // ============================================================
 // C — Vincular pareja
 // ============================================================
 
-/** Invita a otro usuario por correo a formar pareja de racha. */
 export async function invitarPareja(userId: string, correoPareja: string) {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -34,7 +33,6 @@ export async function invitarPareja(userId: string, correoPareja: string) {
   return { data: data as Pareja, error: null };
 }
 
-/** El usuario invitado acepta la invitación pendiente dirigida a su correo. */
 export async function aceptarInvitacionPareja() {
   const supabase = getSupabase();
   const { data, error } = await supabase.rpc('aceptar_invitacion_pareja');
@@ -50,7 +48,6 @@ export async function aceptarInvitacionPareja() {
 // R — Lecturas base
 // ============================================================
 
-/** Devuelve la pareja (pendiente o activa) más reciente del usuario, o null. */
 export async function leerParejaDelUsuario(userId: string): Promise<Pareja | null> {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -74,7 +71,6 @@ function idParejaContraria(pareja: Pareja, miUserId: string): string | null {
   return null;
 }
 
-/** Nombre del/de la compañera de racha, para mostrar en la UI. */
 export async function leerNombrePareja(parejaUserId: string): Promise<string> {
   const supabase = getSupabase();
   const { data } = await supabase
@@ -85,7 +81,6 @@ export async function leerNombrePareja(parejaUserId: string): Promise<string> {
   return data?.nombre || 'Tu pareja';
 }
 
-/** Mapa fecha -> { u1, u2 } indicando si cada quien registró su emoción ese día. */
 async function leerCheckinsRango(
   userId: string,
   parejaUserId: string,
@@ -94,6 +89,8 @@ async function leerCheckinsRango(
 ): Promise<Record<string, { u1: boolean; u2: boolean }>> {
   const supabase = getSupabase();
   const mapa: Record<string, { u1: boolean; u2: boolean }> = {};
+
+  if (fechaDesde > fechaHasta) return mapa;
 
   const { data, error } = await supabase
     .from('historial_emociones')
@@ -176,10 +173,6 @@ async function actualizarRachaMaximaSiCorresponde(parejaId: string, rachaActual:
   if (error) console.error('Error al actualizar racha máxima:', error.message);
 }
 
-// ============================================================
-// C — Usar protector de racha
-// ============================================================
-
 async function usarProtectorRacha(
   parejaId: string,
   fecha: string,
@@ -190,8 +183,7 @@ async function usarProtectorRacha(
     .from('protectores_racha')
     .insert([{ pareja_id: parejaId, fecha, usado_por: userId }]);
 
-  // Si error es por duplicado (unique violation), igual lo consideramos "ya cubierto"
-  if (error && !error.message.includes('duplicate')) {
+  if (error && !error.message.toLowerCase().includes('duplicate')) {
     console.error('Error al usar protector de racha:', error.message);
     return { exito: false };
   }
@@ -208,6 +200,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     tieneParejaActiva: false,
     esperandoAceptacion: false,
     correoInvitado: null,
+    nombrePareja: null,
     rachaActual: 0,
     rachaMaxima: 0,
     protectoresDisponibles: MAX_PROTECTORES_MES,
@@ -232,11 +225,21 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   const parejaUserId = idParejaContraria(pareja, userId);
   if (!parejaUserId) return { ...vacio, parejaId: pareja.id };
 
+  const nombrePareja = await leerNombrePareja(parejaUserId);
+
+  // ── LÍMITE CLAVE: la racha nunca puede empezar antes de que la pareja exista ──
+  const fechaCreacionPareja = new Date(pareja.creado_at);
+  const parejaFechaISO = obtenerFechaLocalISO(fechaCreacionPareja);
+
   const hoy = new Date();
   const hoyISO = obtenerFechaLocalISO(hoy);
-  const desde = new Date(hoy);
-  desde.setDate(desde.getDate() - VENTANA_HISTORIAL_DIAS);
-  const desdeISO = obtenerFechaLocalISO(desde);
+
+  const limiteVentana = new Date(hoy);
+  limiteVentana.setDate(limiteVentana.getDate() - VENTANA_HISTORIAL_MAX_DIAS);
+  const limiteVentanaISO = obtenerFechaLocalISO(limiteVentana);
+
+  // La fecha desde la que consultamos nunca es anterior a la creación de la pareja
+  const desdeISO = parejaFechaISO > limiteVentanaISO ? parejaFechaISO : limiteVentanaISO;
 
   const checkins = await leerCheckinsRango(userId, parejaUserId, desdeISO, hoyISO);
   const fechasProtegidas = await leerFechasProtegidas(pareja.id);
@@ -244,8 +247,6 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
 
   const hoyCompleto = Boolean(checkins[hoyISO]?.u1 && checkins[hoyISO]?.u2);
 
-  // Si hoy aún no está completo, no lo contamos como "roto" todavía:
-  // el día sigue en curso. Empezamos a contar la racha desde ayer.
   const cursor = new Date(hoy);
   if (!hoyCompleto) cursor.setDate(cursor.getDate() - 1);
 
@@ -254,10 +255,13 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   let protectoresRestantesMes =
     MAX_PROTECTORES_MES - (await contarProtectoresDelMes(pareja.id, mesEnCurso));
 
-  for (let i = 0; i < VENTANA_HISTORIAL_DIAS; i++) {
+  while (true) {
     const fechaCursorISO = obtenerFechaLocalISO(cursor);
-    const mesCursor = obtenerMesActual(cursor);
 
+    // Nunca contar (ni consumir protectores) en días anteriores a la pareja
+    if (fechaCursorISO < parejaFechaISO) break;
+
+    const mesCursor = obtenerMesActual(cursor);
     if (mesCursor !== mesEnCurso) {
       mesEnCurso = mesCursor;
       protectoresRestantesMes =
@@ -268,8 +272,6 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     const completo = Boolean(dia?.u1 && dia?.u2);
     let protegido = fechasProtegidas.has(fechaCursorISO);
 
-    // Auto-protección: si falta el check-in de alguien y quedan protectores
-    // disponibles este mes, se usa uno automáticamente para salvar la racha.
     if (!completo && !protegido && protectoresRestantesMes > 0) {
       const { exito } = await usarProtectorRacha(pareja.id, fechaCursorISO, userId);
       if (exito) {
@@ -312,6 +314,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       parejaRegistro,
       completo: yoRegistre && parejaRegistro,
       protegido: fechasProtegidas.has(fechaISO),
+      antesDePareja: fechaISO < parejaFechaISO,
     });
   }
 
@@ -320,6 +323,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     tieneParejaActiva: true,
     esperandoAceptacion: false,
     correoInvitado: pareja.correo_invitado,
+    nombrePareja,
     rachaActual,
     rachaMaxima,
     protectoresDisponibles: Math.max(0, MAX_PROTECTORES_MES - protectoresUsadosEsteMes),
@@ -329,5 +333,3 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     mensajeMotivador: hoyCompleto ? obtenerMensajeMotivadorAleatorio() : null,
   };
 }
-
-export { leerParejaDelUsuario as default };
