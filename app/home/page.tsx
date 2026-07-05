@@ -40,12 +40,12 @@ export const emojiEstadosData: EmojiEstado[] = [
 ];
 
 export const accesoRapidoData: AccesoRapido[] = [
-  { id: "evaluacion",  titulo: "Evaluación rápida",        descripcion: "Conoce tu bienestar",                ruta: "/evaluacion"  },
-  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                ruta: "/meditacion"  },
-  { id: "antistres",   titulo: "Monitoreo emocional",       descripcion: "Revisa tu progreso y tus registros", ruta: "/monitoreo"   },
-  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                ruta: "/cronograma"  },
-  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena"  },
-  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis"  },
+  { id: "evaluacion",  titulo: "Evaluación rápida",        descripcion: "Conoce tu bienestar",                ruta: "/evaluacion.2"  },
+  { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                ruta: "/meditacion.2"  },
+  { id: "antistres",   titulo: "Monitoreo emocional",       descripcion: "Revisa tu progreso y tus registros", ruta: "/monitoreo.2"   },
+  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                ruta: "/cronograma.2"  },
+  { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2"  },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
   { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: ""               },
 ];
 
@@ -136,7 +136,6 @@ function calcularRachaDias(timestamps: string[]): number {
   let racha = 0;
   const cursor = new Date();
 
-  // Si hoy no hay registro, empezamos a contar desde ayer
   if (!diasConRegistro.has(cursor.toDateString())) {
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -215,13 +214,7 @@ export default function HomePage() {
     guardarEmocionTemporal(item.estado, item.emoji);
     localStorage.setItem('fechaUltimoRegistro', new Date().toLocaleDateString());
     setYaRegistroHoy(true);
-    setRachaDias((prev) => {
-      const hoy = new Date().toDateString();
-      const ayer = new Date();
-      ayer.setDate(ayer.getDate() - 1);
-      // Si ya veníamos de racha activa (ayer u hoy), sumamos; si no, arrancamos en 1
-      return prev > 0 ? prev + (yaRegistroHoy ? 0 : 1) : 1;
-    });
+    setRachaDias((prev) => (prev > 0 ? prev + (yaRegistroHoy ? 0 : 1) : 1));
     router.push('/registroEmocional');
   };
 
@@ -268,17 +261,18 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* BADGE DE RACHA */}
-                {rachaDias > 0 && (
-                  <div
-                    title={`${rachaDias} ${rachaDias === 1 ? 'día' : 'días'} de racha`}
-                    className="flex items-center gap-1 bg-orange-50 border border-orange-100 text-orange-600 px-2.5 py-1.5 rounded-full shadow-sm select-none"
-                  >
-                    <span className="text-sm leading-none">🔥</span>
-                    <span className="text-xs font-extrabold leading-none">{rachaDias}</span>
-                  </div>
-                )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* BOTÓN DE RACHA -> navega a /racha.2 */}
+                <button
+                  onClick={() => router.push('/racha')}
+                  title={`Ver mi racha: ${rachaDias} ${rachaDias === 1 ? 'día' : 'días'}`}
+                  className="flex items-center gap-1 bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 text-orange-600 px-3 py-2 rounded-full shadow-sm hover:shadow-md hover:border-orange-200 active:scale-95 transition-all duration-150"
+                >
+                  <span className="text-base leading-none">🔥</span>
+                  <span className="text-xs font-extrabold leading-none tabular-nums">
+                    {rachaDias}
+                  </span>
+                </button>
 
                 {/* BOTÓN LOGOUT */}
                 <button
