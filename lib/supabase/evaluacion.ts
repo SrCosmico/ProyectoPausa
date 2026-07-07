@@ -13,14 +13,14 @@ export interface ResultadoEvaluacionDB {
   user_id: string;
   puntaje_total: number;
   nivel_estres: "Bajo" | "Moderado" | "Alto";
-  respuestas_json: Record<string, number>;
-  evaluado_at: string;
+  respuestas: Record<string, number>;
+  creado_at: string;
 }
 
 /**
  * LETRA C: PANTALLA EVALUACIÓN (TEST PSS-4)
- * Persiste el resultado en la tabla `evaluaciones_estres` de Supabase
- * (antes solo escribía en localStorage). Requiere RLS por user_id.
+ * Persiste el resultado en la tabla `evaluaciones_estres` de Supabase.
+ * Requiere RLS por user_id.
  */
 export const insertarResultadoEvaluacionEstres = async (
   userId: string,
@@ -35,7 +35,7 @@ export const insertarResultadoEvaluacionEstres = async (
         user_id: userId,
         puntaje_total: puntajeTotal,
         nivel_estres: nivelEstres,
-        respuestas_json: respuestasIndividuales,
+        respuestas: respuestasIndividuales,
       },
     ])
     .select();
@@ -56,7 +56,7 @@ export const leerHistorialEvaluacionesEstres = async (
     .from('evaluaciones_estres')
     .select('*')
     .eq('user_id', userId)
-    .order('evaluado_at', { ascending: false });
+    .order('creado_at', { ascending: false });
 
   if (error) {
     console.error('Error al leer evaluaciones PSS-4:', error.message);
