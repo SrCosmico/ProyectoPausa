@@ -86,7 +86,7 @@ export default function LoginView() {
               type="email"
               required
               disabled={loading}
-              placeholder="usuario@ucv.ve"
+              placeholder="usuario@gmail.com"
               className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
