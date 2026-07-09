@@ -47,7 +47,7 @@ export const accesoRapidoData: AccesoRapido[] = [
   { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                ruta: "/cronograma.2"  },
   { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2"  },
   { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
-  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: ""               },
+  { id: "ia",          titulo: "Racha con amigos",          descripcion: "Cuídense juntos cada día",           ruta: "/racha"         },
 ];
 
 export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
@@ -63,7 +63,7 @@ const mapeoIconosHerramientas: Record<string, string> = {
   cronograma: "📅",
   diario:     "🔐",
   crisis:     "🚨",
-  ia:         "💬",
+  ia:         "🔥",
 };
 
 function personalizarOrdenHerramientas(
@@ -121,9 +121,7 @@ export default function HomePage() {
   const [loadingLogout, setLoadingLogout]   = useState(false);
   const [herramientas, setHerramientas]     = useState<AccesoRapido[]>(accesoRapidoData);
   const [saludo, setSaludo]                 = useState('Nos alegra que estés aquí');
-
-  // ── Racha en pareja: se lee siempre de Supabase, nunca de localStorage ──
-  const [estadoRacha, setEstadoRacha] = useState<EstadoRachaPareja | null>(null);
+  const [estadoRacha, setEstadoRacha]       = useState<EstadoRachaPareja | null>(null);
 
   const { preguntaActual, mostrarCheckin, guardarEmocionTemporal } = useQuizState();
 
@@ -143,11 +141,9 @@ export default function HomePage() {
       const hoy = new Date().toLocaleDateString();
       if (registroFecha === hoy) setYaRegistroHoy(true);
 
-      // --- Racha real en pareja, calculada contra Supabase ---
       const racha = await calcularEstadoRachaPareja(session.user.id);
       setEstadoRacha(racha);
 
-      // --- Personalización a partir de los datos del cuestionario de onboarding ---
       const metadata = session.user?.user_metadata;
       if (metadata?.onboarding_completado) {
         const motivos: string[] = metadata.motivos_principales ?? [];
@@ -200,7 +196,6 @@ export default function HomePage() {
     navegacion: navegacionData.map((item) => ({ ...item, activo: item.id === "inicio" })),
   };
 
-  // Textos del botón de racha según el estado real de la pareja
   const rachaDias = estadoRacha?.rachaActual ?? 0;
   const tituloBotonRacha = !estadoRacha?.tieneParejaActiva
     ? 'Vincula a tu pareja para empezar una racha'
@@ -234,7 +229,6 @@ export default function HomePage() {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
-                {/* BOTÓN DE RACHA -> navega a /racha, dato real desde Supabase */}
                 <button
                   onClick={() => router.push('/racha')}
                   title={tituloBotonRacha}
@@ -245,12 +239,9 @@ export default function HomePage() {
                   }`}
                 >
                   <span className="text-base leading-none">🔥</span>
-                  <span className="text-xs font-extrabold leading-none tabular-nums">
-                    {rachaDias}
-                  </span>
+                  <span className="text-xs font-extrabold leading-none tabular-nums">{rachaDias}</span>
                 </button>
 
-                {/* BOTÓN LOGOUT */}
                 <button
                   onClick={handleLogout}
                   disabled={loadingLogout}
@@ -268,7 +259,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Mini aviso si aún no hay pareja vinculada */}
             {estadoRacha && !estadoRacha.tieneParejaActiva && !estadoRacha.esperandoAceptacion && (
               <button
                 onClick={() => router.push('/racha')}
@@ -322,7 +312,6 @@ export default function HomePage() {
               Herramientas recomendadas
             </h4>
 
-            {/* Grid 2 columnas para herramientas normales */}
             <div className="grid grid-cols-2 gap-3 mb-3">
               {datosHome.accesoRapido
                 .filter(item => item.id !== 'crisis')
