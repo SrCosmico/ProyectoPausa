@@ -17,6 +17,52 @@ interface OpcionMenu {
   accion?: () => void;
 }
 
+// ─── Tipos y claves para notificaciones ──────────────────────────────────────
+
+interface ConfigNotificaciones {
+  recordatoriosDiario: boolean;
+  recordatoriosCronograma: boolean;
+  alertasBienestar: boolean;
+  modoCrisisAutomatico: boolean;
+  resumenSemanal: boolean;
+}
+
+const NOTIF_KEY = (uid: string) => `notif_config_${uid}`;
+
+const defaultNotif: ConfigNotificaciones = {
+  recordatoriosDiario: true,
+  recordatoriosCronograma: true,
+  alertasBienestar: true,
+  modoCrisisAutomatico: true,
+  resumenSemanal: false,
+};
+
+const leerNotif = (uid: string): ConfigNotificaciones => {
+  try {
+    const raw = localStorage.getItem(NOTIF_KEY(uid));
+    return raw ? { ...defaultNotif, ...JSON.parse(raw) } : defaultNotif;
+  } catch {
+    return defaultNotif;
+  }
+};
+
+const guardarNotif = (uid: string, config: ConfigNotificaciones) => {
+  localStorage.setItem(NOTIF_KEY(uid), JSON.stringify(config));
+};
+
+// ─── Toggle reutilizable ─────────────────────────────────────────────────────
+
+function Toggle({ activo, onChange }: { activo: boolean; onChange: () => void }) {
+  return (
+    <button
+      onClick={onChange}
+      className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${activo ? 'bg-[#4A72A6]' : 'bg-slate-200'}`}
+    >
+      <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform ${activo ? 'translate-x-4' : 'translate-x-0'}`} />
+    </button>
+  );
+}
+
 export default function PerfilPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,7 +79,7 @@ export default function PerfilPage() {
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [guardandoNombre, setGuardandoNombre] = useState(false);
 
-  // --- Modal de cuenta y seguridad (correo / contraseña) ---
+  // --- Modal de cuenta y seguridad ---
   const [modalCuenta, setModalCuenta] = useState(false);
   const [nuevoCorreo, setNuevoCorreo] = useState('');
   const [guardandoCorreo, setGuardandoCorreo] = useState(false);
@@ -46,6 +92,11 @@ export default function PerfilPage() {
   const [errorContrasena, setErrorContrasena] = useState<string | null>(null);
   const [exitoContrasena, setExitoContrasena] = useState(false);
 
+  // --- Modal de notificaciones ---
+  const [modalNotif, setModalNotif] = useState(false);
+  const [notif, setNotif] = useState<ConfigNotificaciones>(defaultNotif);
+  const [guardadoNotif, setGuardadoNotif] = useState(false);
+
   useEffect(() => {
     const init = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -54,6 +105,7 @@ export default function PerfilPage() {
       setUserId(user.id);
       setCorreo(user.email || '');
       setNuevoCorreo(user.email || '');
+      setNotif(leerNotif(user.id));
 
       const { data: perfil } = await supabase
         .from('perfiles')
@@ -179,6 +231,21 @@ export default function PerfilPage() {
     setGuardandoContrasena(false);
   };
 
+  // --- Notificaciones ---
+  const abrirNotif = () => {
+    setNotif(leerNotif(userId));
+    setGuardadoNotif(false);
+    setModalNotif(true);
+  };
+
+  const toggleNotif = (clave: keyof ConfigNotificaciones) => {
+    const nueva = { ...notif, [clave]: !notif[clave] };
+    setNotif(nueva);
+    guardarNotif(userId, nueva);
+    setGuardadoNotif(true);
+    setTimeout(() => setGuardadoNotif(false), 2000);
+  };
+
   const handleLogout = async () => {
     if (loadingLogout) return;
     setLoadingLogout(true);
@@ -205,6 +272,13 @@ export default function PerfilPage() {
       titulo: 'Historial emocional',
       descripcion: 'Revisa tu calendario y tus evaluaciones',
       ruta: '/historial',
+    },
+    {
+      id: 'notificaciones',
+      icono: '🔔',
+      titulo: 'Notificaciones',
+      descripcion: 'Elige qué avisos quieres recibir',
+      accion: abrirNotif,
     },
     {
       id: 'cuenta',
@@ -367,6 +441,100 @@ export default function PerfilPage() {
               >
                 {guardandoNombre ? 'Guardando...' : 'Guardar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL NOTIFICACIONES */}
+      {modalNotif && (
+        <div
+          className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4"
+          onClick={() => setModalNotif(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-[#2A3B50]">Notificaciones</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Elige qué avisos quieres recibir</p>
+              </div>
+              <button onClick={() => setModalNotif(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            {/* Confirmación guardado */}
+            {guardadoNotif && (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-2.5">
+                <span className="text-emerald-500 text-sm">✅</span>
+                <p className="text-[11px] font-semibold text-emerald-700">Preferencias guardadas</p>
+              </div>
+            )}
+
+            {/* Grupo: Diario */}
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Diario emocional</p>
+              <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100">
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-xs font-bold text-slate-700">Recordatorio diario</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Aviso para escribir en tu diario cada día</p>
+                  </div>
+                  <Toggle activo={notif.recordatoriosDiario} onChange={() => toggleNotif('recordatoriosDiario')} />
+                </div>
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-xs font-bold text-slate-700">Resumen semanal</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Un informe de cómo estuvo tu semana emocional</p>
+                  </div>
+                  <Toggle activo={notif.resumenSemanal} onChange={() => toggleNotif('resumenSemanal')} />
+                </div>
+              </div>
+            </div>
+
+            {/* Grupo: Cronograma */}
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Cronograma</p>
+              <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100">
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-xs font-bold text-slate-700">Recordatorios de actividades</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Aviso 15 min antes de cada actividad programada</p>
+                  </div>
+                  <Toggle activo={notif.recordatoriosCronograma} onChange={() => toggleNotif('recordatoriosCronograma')} />
+                </div>
+              </div>
+            </div>
+
+            {/* Grupo: Bienestar */}
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Bienestar</p>
+              <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100">
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-xs font-bold text-slate-700">Alertas de bienestar bajo</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Notificación cuando tus registros sean bajos varios días seguidos</p>
+                  </div>
+                  <Toggle activo={notif.alertasBienestar} onChange={() => toggleNotif('alertasBienestar')} />
+                </div>
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-xs font-bold text-slate-700">Modo crisis automático</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Activa el modo crisis si tu bienestar es crítico esta semana</p>
+                  </div>
+                  <Toggle activo={notif.modoCrisisAutomatico} onChange={() => toggleNotif('modoCrisisAutomatico')} />
+                </div>
+              </div>
+            </div>
+
+            {/* Nota informativa */}
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
+              <span className="text-sm flex-shrink-0 mt-0.5">ℹ️</span>
+              <p className="text-[10px] text-[#4A72A6] font-medium leading-relaxed">
+                Las notificaciones se guardan en este dispositivo. Para recibir avisos push, asegúrate de que los permisos del navegador estén habilitados.
+              </p>
             </div>
           </div>
         </div>
