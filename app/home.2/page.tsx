@@ -41,12 +41,11 @@ export const emojiEstadosData: EmojiEstado[] = [
 export const accesoRapidoData: AccesoRapido[] = [
   { id: "evaluacion",  titulo: "Evaluación rápida",        descripcion: "Conoce tu bienestar",                ruta: "/evaluacion.2"  },
   { id: "meditacion",  titulo: "Meditación y respiración",  descripcion: "Encuentra tu calma",                ruta: "/meditacion.2"  },
-  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios", ruta: "/monitoreo.2"   },
-  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                ruta: "/cronograma.2"  },
   { id: "registro",    titulo: "Registro emocional",        descripcion: "Tu espacio personal",               ruta: "/monitoreo.2"   },
-  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
+  { id: "cronograma",  titulo: "Cronograma académico",      descripcion: "Organiza tu semana",                ruta: "/cronograma.2"  },
+  { id: "antistres",   titulo: "Tips anti-estrés",          descripcion: "Pequeñas acciones, grandes cambios", ruta: "/monitoreo.2"   },
   { id: "diario",      titulo: "Diario personal",           descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2"  },
-  { id: "ia",          titulo: "Asistente IA de Bienestar", descripcion: "Habla con nuestro bot de apoyo",     ruta: ""               },
+  { id: "crisis",      titulo: "Modo crisis",               descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
 ];
 
 export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
@@ -221,48 +220,43 @@ export default function HomePage() {
               Herramientas recomendadas
             </h4>
 
-            <div className="grid grid-cols-1 gap-3">
-              {datosHome.accesoRapido.map((item) => {
-                const esCrisis        = item.id === "crisis";
-                const esIA            = item.id === "ia";
-                const tieneNavegacion = item.ruta !== "";
-
-                return (
+            {/* Grid 2 columnas para herramientas normales */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {datosHome.accesoRapido
+                .filter(item => item.id !== 'crisis')
+                .map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => { if (tieneNavegacion) router.push(item.ruta); }}
-                    className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-150 active:scale-[0.99] group shadow-sm ${
-                      esCrisis
-                        ? "bg-rose-50/60 border-rose-100 hover:bg-rose-50"
-                        : esIA
-                        ? "bg-rose-50/60 border-rose-100 hover:bg-rose-50"
-                        : "bg-white border-slate-100 hover:bg-slate-50"
-                    } ${!tieneNavegacion ? "cursor-default opacity-75" : "cursor-pointer"}`}
+                    onClick={() => { if (item.ruta) router.push(item.ruta); }}
+                    className="flex flex-col items-start gap-3 p-4 bg-white rounded-2xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all duration-150 active:scale-[0.98] group shadow-sm text-left"
                   >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform ${
-                      esCrisis ? "bg-rose-100" : "bg-slate-50 group-hover:bg-purple-50"
-                    }`}>
+                    <div className="w-12 h-12 rounded-2xl bg-slate-50 group-hover:bg-white flex items-center justify-center text-2xl shadow-sm transition-all group-hover:scale-110">
                       {mapeoIconosHerramientas[item.id] || "✨"}
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h5 className={`text-sm font-bold truncate ${esCrisis ? "text-rose-700" : "text-[#334155]"}`}>
-                        {item.titulo}
-                      </h5>
-                      <p className="text-xs text-[#8C9BAE] truncate mt-0.5">
-                        {item.descripcion}
-                      </p>
-                    </div>
-
-                    <div className={`text-slate-300 group-hover:translate-x-1 transition-transform flex-shrink-0 ${esCrisis ? "text-rose-300" : ""}`}>
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                      </svg>
+                    <div>
+                      <p className="text-xs font-bold text-[#334155] leading-snug">{item.titulo}</p>
+                      <p className="text-[10px] text-[#8C9BAE] mt-0.5 leading-snug">{item.descripcion}</p>
                     </div>
                   </button>
-                );
-              })}
+                ))}
             </div>
+
+            {/* Modo Crisis — ancho completo y destacado */}
+            <button
+              onClick={() => router.push('/modoCrisis.2')}
+              className="w-full flex items-center gap-4 p-5 bg-rose-500 hover:bg-rose-600 rounded-2xl transition-all duration-150 active:scale-[0.99] shadow-md shadow-rose-200 text-left"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-rose-400/50 flex items-center justify-center text-3xl flex-shrink-0">
+                🚨
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-extrabold text-white">Modo crisis</p>
+                <p className="text-xs text-rose-100 mt-0.5">Ayuda inmediata y contención</p>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 text-rose-200 flex-shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
           </div>
         </div>
 
