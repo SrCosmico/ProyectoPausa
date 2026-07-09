@@ -1,11 +1,12 @@
+// app/perfil/page.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase';
-import { cerrarSesion } from '@/app/services/authService';
+import { createClient } from '@/lib/supabase/client';
+import { actualizarCorreoUsuario, actualizarContrasenaUsuario } from '@/lib/supabase/cuenta';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+const supabase = createClient();
 
 interface OpcionMenu {
   id: string;
@@ -14,10 +15,7 @@ interface OpcionMenu {
   descripcion: string;
   ruta?: string;
   accion?: () => void;
-  peligro?: boolean;
 }
-
-// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -26,44 +24,80 @@ export default function PerfilPage() {
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
   const [foto, setFoto] = useState<string | null>(null);
+  const [userId, setUserId] = useState('');
   const [cargando, setCargando] = useState(true);
   const [loadingLogout, setLoadingLogout] = useState(false);
+  const [loadingAvatar, setLoadingAvatar] = useState(false);
+
   const [modalEditar, setModalEditar] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [guardandoNombre, setGuardandoNombre] = useState(false);
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
+  // --- Modal de cuenta y seguridad (correo / contraseña) ---
+  const [modalCuenta, setModalCuenta] = useState(false);
+  const [nuevoCorreo, setNuevoCorreo] = useState('');
+  const [guardandoCorreo, setGuardandoCorreo] = useState(false);
+  const [errorCorreo, setErrorCorreo] = useState<string | null>(null);
+  const [exitoCorreo, setExitoCorreo] = useState(false);
+
+  const [nuevaContrasena, setNuevaContrasena] = useState('');
+  const [confirmarContrasena, setConfirmarContrasena] = useState('');
+  const [guardandoContrasena, setGuardandoContrasena] = useState(false);
+  const [errorContrasena, setErrorContrasena] = useState<string | null>(null);
+  const [exitoContrasena, setExitoContrasena] = useState(false);
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/login'); return; }
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) { router.push('/login'); return; }
 
-      const user = session.user;
-      const nombreMeta = user.user_metadata?.nombre_usuario || user.user_metadata?.full_name || '';
-      setNombre(nombreMeta || user.email?.split('@')[0] || 'Estudiante');
+      setUserId(user.id);
       setCorreo(user.email || '');
-      setFoto(localStorage.getItem('userAvatar'));
+      setNuevoCorreo(user.email || '');
+
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('nombre, avatar_url')
+        .eq('id', user.id)
+        .single();
+
+      const nombreFallback =
+        user.user_metadata?.nombre_usuario ||
+        user.user_metadata?.full_name ||
+        user.email?.split('@')[0] ||
+        'Estudiante';
+
+      setNombre(perfil?.nombre || nombreFallback);
+      setFoto(perfil?.avatar_url || null);
       setCargando(false);
     };
     init();
   }, [router]);
 
-  // ─── Cambiar foto ──────────────────────────────────────────────────────────
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setFoto(result);
-        localStorage.setItem('userAvatar', result);
-      };
-      reader.readAsDataURL(e.target.files[0]);
+    setLoadingAvatar(true);
+    const ext = file.name.split('.').pop();
+    const filePath = `${userId}/avatar.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setFoto(publicUrl);
+      await supabase
+        .from('perfiles')
+        .upsert({ id: userId, avatar_url: publicUrl, updated_at: new Date().toISOString() }, { onConflict: 'id' });
     }
+    setLoadingAvatar(false);
   };
-
-  // ─── Editar nombre ─────────────────────────────────────────────────────────
 
   const abrirEditar = () => {
     setNuevoNombre(nombre);
@@ -73,10 +107,16 @@ export default function PerfilPage() {
   const guardarNombre = async () => {
     if (!nuevoNombre.trim()) return;
     setGuardandoNombre(true);
-    const { error } = await supabase.auth.updateUser({
-      data: { nombre_usuario: nuevoNombre.trim() }
-    });
-    if (!error) {
+
+    const [{ error: authError }, { error: dbError }] = await Promise.all([
+      supabase.auth.updateUser({ data: { nombre_usuario: nuevoNombre.trim() } }),
+      supabase.from('perfiles').upsert(
+        { id: userId, nombre: nuevoNombre.trim(), updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      ),
+    ]);
+
+    if (!authError && !dbError) {
       setNombre(nuevoNombre.trim());
       setModalEditar(false);
     } else {
@@ -85,12 +125,64 @@ export default function PerfilPage() {
     setGuardandoNombre(false);
   };
 
-  // ─── Cerrar sesión ─────────────────────────────────────────────────────────
+  // --- Cuenta y seguridad ---
+  const abrirCuenta = () => {
+    setNuevoCorreo(correo);
+    setErrorCorreo(null);
+    setExitoCorreo(false);
+    setNuevaContrasena('');
+    setConfirmarContrasena('');
+    setErrorContrasena(null);
+    setExitoContrasena(false);
+    setModalCuenta(true);
+  };
+
+  const guardarCorreo = async () => {
+    if (!nuevoCorreo.trim() || nuevoCorreo.trim() === correo) return;
+    setGuardandoCorreo(true);
+    setErrorCorreo(null);
+    setExitoCorreo(false);
+
+    const { error } = await actualizarCorreoUsuario(nuevoCorreo.trim());
+
+    if (error) {
+      setErrorCorreo('No se pudo actualizar el correo: ' + error);
+    } else {
+      setExitoCorreo(true);
+    }
+    setGuardandoCorreo(false);
+  };
+
+  const guardarContrasena = async () => {
+    setErrorContrasena(null);
+    setExitoContrasena(false);
+
+    if (nuevaContrasena.length < 6) {
+      setErrorContrasena('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (nuevaContrasena !== confirmarContrasena) {
+      setErrorContrasena('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setGuardandoContrasena(true);
+    const { error } = await actualizarContrasenaUsuario(nuevaContrasena);
+
+    if (error) {
+      setErrorContrasena('No se pudo actualizar la contraseña: ' + error);
+    } else {
+      setExitoContrasena(true);
+      setNuevaContrasena('');
+      setConfirmarContrasena('');
+    }
+    setGuardandoContrasena(false);
+  };
 
   const handleLogout = async () => {
     if (loadingLogout) return;
     setLoadingLogout(true);
-    const { error } = await cerrarSesion();
+    const { error } = await supabase.auth.signOut();
     if (error) {
       alert(`No se pudo cerrar sesión: ${error.message}`);
       setLoadingLogout(false);
@@ -98,8 +190,6 @@ export default function PerfilPage() {
       router.push('/login');
     }
   };
-
-  // ─── Opciones del menú ────────────────────────────────────────────────────
 
   const opcionesMenu: OpcionMenu[] = [
     {
@@ -113,24 +203,17 @@ export default function PerfilPage() {
       id: 'historial',
       icono: '📊',
       titulo: 'Historial emocional',
-      descripcion: 'Revisa tu evolución de bienestar',
-      ruta: '/monitoreo.2',
+      descripcion: 'Revisa tu calendario y tus evaluaciones',
+      ruta: '/historial',
     },
     {
-      id: 'privacidad',
+      id: 'cuenta',
       icono: '🔒',
-      titulo: 'Privacidad y seguridad',
-      descripcion: 'Gestiona tu contraseña y datos',
-    },
-    {
-      id: 'notificaciones',
-      icono: '🔔',
-      titulo: 'Notificaciones',
-      descripcion: 'Configura tus alertas y recordatorios',
+      titulo: 'Cuenta y seguridad',
+      descripcion: 'Cambia tu correo o tu contraseña',
+      accion: abrirCuenta,
     },
   ];
-
-  // ─── Render ────────────────────────────────────────────────────────────────
 
   if (cargando) {
     return (
@@ -147,7 +230,7 @@ export default function PerfilPage() {
         {/* HEADER */}
         <div className="px-6 pt-6 pb-4 flex items-center justify-between bg-white border-b border-slate-100 flex-shrink-0">
           <button
-            onClick={() => router.push('/home.2')}
+            onClick={() => router.push('/home')}
             className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
@@ -161,7 +244,7 @@ export default function PerfilPage() {
         {/* CONTENIDO */}
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
 
-          {/* Sección de avatar */}
+          {/* Avatar */}
           <div className="bg-white px-6 pt-8 pb-6 flex flex-col items-center border-b border-slate-100">
             <div className="relative mb-4">
               <div
@@ -169,13 +252,14 @@ export default function PerfilPage() {
                 className="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-50 shadow-md cursor-pointer flex items-center justify-center text-white text-3xl font-bold"
                 style={{ backgroundColor: '#A7C7D8' }}
               >
-                {foto ? (
+                {loadingAvatar ? (
+                  <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                ) : foto ? (
                   <img src={foto} alt="Perfil" className="w-full h-full object-cover" />
                 ) : (
                   <span>{nombre.charAt(0).toUpperCase()}</span>
                 )}
               </div>
-              {/* Botón de cámara */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute bottom-0 right-0 w-8 h-8 bg-[#4A72A6] rounded-full flex items-center justify-center shadow-md border-2 border-white"
@@ -193,21 +277,17 @@ export default function PerfilPage() {
               className="hidden"
               accept="image/*"
             />
-
             <h2 className="text-lg font-bold text-[#2A3B50]">{nombre}</h2>
             <p className="text-xs text-slate-400 mt-0.5">{correo}</p>
-
-            {/* Badge de estudiante UCV */}
             <div className="mt-3 flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-full px-3 py-1">
               <span className="text-xs">🎓</span>
               <span className="text-[11px] font-bold text-[#4A72A6]">Estudiante UCV</span>
             </div>
           </div>
 
-          {/* Menú de opciones */}
+          {/* Menú */}
           <div className="px-6 py-5 space-y-3">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Configuración</p>
-
             {opcionesMenu.map((item) => (
               <button
                 key={item.id}
@@ -230,7 +310,6 @@ export default function PerfilPage() {
               </button>
             ))}
 
-            {/* Cerrar sesión */}
             <div className="pt-2">
               <button
                 onClick={handleLogout}
@@ -265,7 +344,6 @@ export default function PerfilPage() {
               <h3 className="font-bold text-[#2A3B50]">Editar nombre</h3>
               <button onClick={() => setModalEditar(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
-
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1.5">Nombre de usuario</label>
               <input
@@ -275,7 +353,6 @@ export default function PerfilPage() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
               />
             </div>
-
             <div className="flex gap-3">
               <button
                 onClick={() => setModalEditar(false)}
@@ -289,6 +366,89 @@ export default function PerfilPage() {
                 className="flex-1 py-3 bg-[#4A72A6] hover:bg-[#3B5E8C] text-white rounded-2xl text-sm font-bold transition-colors disabled:opacity-40"
               >
                 {guardandoNombre ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CUENTA Y SEGURIDAD */}
+      {modalCuenta && (
+        <div
+          className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4"
+          onClick={() => setModalCuenta(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-[#2A3B50]">Cuenta y seguridad</h3>
+              <button onClick={() => setModalCuenta(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            {/* Cambiar correo */}
+            <div className="space-y-2.5 border-b border-slate-100 pb-6">
+              <label className="text-xs font-bold text-slate-500 block">Correo institucional</label>
+              <input
+                type="email"
+                value={nuevoCorreo}
+                onChange={(e) => { setNuevoCorreo(e.target.value); setExitoCorreo(false); }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
+              />
+              {errorCorreo && (
+                <p className="text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-2.5">
+                  ⚠️ {errorCorreo}
+                </p>
+              )}
+              {exitoCorreo && (
+                <p className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl p-2.5">
+                  ✅ Revisa tu nuevo correo para confirmar el cambio.
+                </p>
+              )}
+              <button
+                onClick={guardarCorreo}
+                disabled={guardandoCorreo || !nuevoCorreo.trim() || nuevoCorreo.trim() === correo}
+                className="w-full py-3 bg-[#4A72A6] hover:bg-[#3B5E8C] text-white rounded-2xl text-sm font-bold transition-colors disabled:opacity-40"
+              >
+                {guardandoCorreo ? 'Guardando...' : 'Actualizar correo'}
+              </button>
+            </div>
+
+            {/* Cambiar contraseña */}
+            <div className="space-y-2.5">
+              <label className="text-xs font-bold text-slate-500 block">Nueva contraseña</label>
+              <input
+                type="password"
+                value={nuevaContrasena}
+                onChange={(e) => { setNuevaContrasena(e.target.value); setExitoContrasena(false); }}
+                placeholder="Mínimo 6 caracteres"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
+              />
+              <label className="text-xs font-bold text-slate-500 block">Confirmar contraseña</label>
+              <input
+                type="password"
+                value={confirmarContrasena}
+                onChange={(e) => { setConfirmarContrasena(e.target.value); setExitoContrasena(false); }}
+                placeholder="Repite la contraseña"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
+              />
+              {errorContrasena && (
+                <p className="text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-2.5">
+                  ⚠️ {errorContrasena}
+                </p>
+              )}
+              {exitoContrasena && (
+                <p className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl p-2.5">
+                  ✅ Contraseña actualizada correctamente.
+                </p>
+              )}
+              <button
+                onClick={guardarContrasena}
+                disabled={guardandoContrasena || !nuevaContrasena || !confirmarContrasena}
+                className="w-full py-3 bg-[#4A72A6] hover:bg-[#3B5E8C] text-white rounded-2xl text-sm font-bold transition-colors disabled:opacity-40"
+              >
+                {guardandoContrasena ? 'Guardando...' : 'Actualizar contraseña'}
               </button>
             </div>
           </div>

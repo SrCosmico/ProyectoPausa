@@ -2,7 +2,7 @@
 
 import React, { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase'; // Importa tu cliente para verificar la sesión
+import supabase from '@/lib/supabase';
 import { registrarUsuario } from '@/app/services/authService';
 
 interface AlumnoRegistro {
@@ -17,22 +17,23 @@ interface AlumnoRegistro {
 export default function RegisterView() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState<AlumnoRegistro>({
     nombre: '',
     correo: '',
     facultad: '',
     clave: '',
     confirmarClave: '',
-    terminos: false
+    terminos: false,
   });
 
-  // Reemplazamos localStorage por la validación real de sesión de Supabase
   useEffect(() => {
     const verificarSesion = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
-        router.push('/home.2');
+        router.push('/home');
       }
     };
     verificarSesion();
@@ -45,12 +46,10 @@ export default function RegisterView() {
       alert('Las contraseñas no coinciden.');
       return;
     }
-
     if (formData.clave.length < 6) {
-      alert('Por seguridad, la contraseña debe tener al menos 6 caracteres.');
+      alert('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
-
     if (!formData.terminos) {
       alert('Debes aceptar los términos y condiciones.');
       return;
@@ -58,7 +57,6 @@ export default function RegisterView() {
 
     setLoading(true);
 
-    // Conexión real con el servicio de Supabase
     const { data, error } = await registrarUsuario(
       formData.correo.trim(),
       formData.clave.trim(),
@@ -73,19 +71,38 @@ export default function RegisterView() {
       return;
     }
 
-    // Si todo sale bien, redirigimos a la pantalla de bienvenida
     if (data?.user) {
-      router.push('/bienvenida.2');
+      // ↓ CAMBIO: guardar datos en localStorage para el cuestionario
+      localStorage.setItem('alumnoEmail', formData.correo.trim());
+      localStorage.setItem('alumnoNombre', formData.nombre.trim());
+      localStorage.setItem('alumnoFacultad', formData.facultad);
+      // ↑ FIN CAMBIO
+      router.push('/bienvenida');
     }
   };
 
   return (
     <div className="min-h-screen bg-[#FCFBF8] flex justify-center items-center p-4 font-sans text-[#1E293B]">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-gray-100 p-6 relative">
-        
-        <button onClick={() => router.back()} className="mb-6 text-gray-800" disabled={loading}>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+
+        <button
+          onClick={() => router.back()}
+          className="mb-6 text-gray-800"
+          disabled={loading}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+            />
           </svg>
         </button>
 
@@ -95,9 +112,10 @@ export default function RegisterView() {
         </div>
 
         <form onSubmit={handleRegistro} className="space-y-4">
-          
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Nombre completo</label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
+              Nombre completo
+            </label>
             <input
               type="text"
               required
@@ -110,7 +128,9 @@ export default function RegisterView() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Correo institucional UCV</label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
+              Correo institucional UCV
+            </label>
             <input
               type="email"
               required
@@ -123,7 +143,9 @@ export default function RegisterView() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Facultad / Escuela</label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
+              Facultad / Escuela
+            </label>
             <div className="relative">
               <select
                 required
@@ -154,12 +176,14 @@ export default function RegisterView() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Contraseña</label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
+              Contraseña
+            </label>
             <input
               type="password"
               required
               disabled={loading}
-              placeholder="********"
+              placeholder="Mínimo 6 caracteres"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.clave}
               onChange={(e) => setFormData({ ...formData, clave: e.target.value })}
@@ -167,7 +191,9 @@ export default function RegisterView() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Confirmar contraseña</label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
+              Confirmar contraseña
+            </label>
             <input
               type="password"
               required
@@ -199,7 +225,6 @@ export default function RegisterView() {
           >
             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
-
         </form>
       </div>
     </div>

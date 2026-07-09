@@ -44,6 +44,12 @@ export async function crearRegistroEmocional(
 
 // ============================================================
 // CRUD: Letra "R" pantalla de monitoreo
+//
+// NOTA (limpieza de duplicados): `leerHistorialEmocionalSemanal` se
+// eliminó de este archivo. Devolvía datos simulados
+// (`historialEmocionalInicial`) y duplicaba la función real, ya
+// conectada a Supabase, en `app/services/emocionesService.ts`. Esa es
+// ahora la única fuente de verdad para el historial semanal.
 // ============================================================
 
 import {
@@ -52,11 +58,6 @@ import {
   bcoTipsAntiEstres,
   type TipAntiEstres,
 } from '@/models/monitoreo'
-
-/** Devuelve el historial emocional de los últimos 7 días. */
-export function leerHistorialEmocionalSemanal(): RegistroHistorico[] {
-  return historialEmocionalInicial
-}
 
 /** Devuelve los registros emocionales anteriores a la semana actual. */
 export function leerRegistrosAnteriores(): RegistroHistorico[] {

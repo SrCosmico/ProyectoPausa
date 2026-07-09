@@ -29,9 +29,9 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts",
-    "../../Cosas/models/herramientas.ts",
-    "../../Cosas/models/home.ts",
-    "../../Cosas/models/bienestar.ts"
+    "./models/home.ts",
+    "./models/bienestar.ts",
+    "./models/comoTeSientesHoy.ts"
   ],
   "exclude": ["node_modules"]
 }
