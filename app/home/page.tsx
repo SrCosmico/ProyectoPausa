@@ -49,6 +49,7 @@ export const accesoRapidoData: AccesoRapido[] = [
   { id: "antistres",  titulo: "Monitoreo emocional",      descripcion: "Revisa tu progreso y tus registros", ruta: "/monitoreo.2"   },
   { id: "cronograma", titulo: "Cronograma académico",     descripcion: "Organiza tu semana",                ruta: "/cronograma.2"  },
   { id: "diario",     titulo: "Diario personal",          descripcion: "Escribe lo que piensas",             ruta: "/contrasena.2"  },
+  { id: "racha",      titulo: "Racha con amigos",         descripcion: "Cuídense juntos cada día",           ruta: "/racha"         },
   { id: "crisis",     titulo: "Modo crisis",              descripcion: "Ayuda inmediata y contención",       ruta: "/modoCrisis.2"  },
 ];
 
@@ -60,7 +61,7 @@ export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
 
 const mapeoIconos: Record<string, string> = {
   evaluacion: "📊", meditacion: "🧘", antistres: "📈",
-  cronograma: "📅", diario: "🔐", crisis: "🚨",
+  cronograma: "📅", diario: "🔐", crisis: "🚨", racha: "🔥",
 };
 
 // ─── Personalización ──────────────────────────────────────────────────────────
