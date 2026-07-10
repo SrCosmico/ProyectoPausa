@@ -202,10 +202,6 @@ export default function MeditacionRespiracionApp() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
           </button>
-          
-          <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center border border-slate-300">
-            <div className="w-full h-full bg-gradient-to-tr from-orange-300 to-amber-400 flex items-center justify-center text-xs font-bold text-white">JS</div>
-          </div>
         </div>
 
         {/* --- SCREEN WORKSPACE WINDOWS --- */}
