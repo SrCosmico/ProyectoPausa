@@ -213,7 +213,7 @@ export default function MeditacionRespiracionApp() {
           
           {/* STEP 1: MAIN MENU SELECTION SCREEN (HOME INTERNO DEL MÓDULO) */}
           {step === "main_menu" && (
-            <div className="space-y-6 flex-1 flex flex-col justify-between pt-2">
+            <div className="space-y-6 flex-1 flex flex-col pt-2">
               <div className="space-y-5">
                 <div>
                   <h2 className="text-2xl font-bold text-[#2A3B50]">Meditación y respiración</h2>
@@ -260,16 +260,6 @@ export default function MeditacionRespiracionApp() {
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   </button>
-                </div>
-              </div>
-
-              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 flex items-start gap-3.5 shadow-sm">
-                <span className="text-2xl mt-0.5">💜</span>
-                <div>
-                  <h5 className="text-xs font-bold text-purple-900 uppercase tracking-wide">Recomendación personalizada</h5>
-                  <p className="text-xs text-purple-700/90 font-medium mt-1 leading-relaxed">
-                    Según tu evaluación reciente, te recomendamos una sesión de respiración de 5 minutos.
-                  </p>
                 </div>
               </div>
             </div>
@@ -362,13 +352,13 @@ export default function MeditacionRespiracionApp() {
 
               <div className="my-6 flex flex-col items-center justify-center flex-1">
                 <div
-                className="relative w-64 h-64 flex items-center justify-center"
-                onTouchStart={() => setIsTouching(true)}
-                onTouchEnd={() => setIsTouching(false)}
-                onMouseDown={() => setIsTouching(true)}
-                onMouseUp={() => setIsTouching(false)}
-               onMouseLeave={() => setIsTouching(false)}
->
+                  className="relative w-64 h-64 flex items-center justify-center"
+                  onTouchStart={() => setIsTouching(true)}
+                  onTouchEnd={() => setIsTouching(false)}
+                  onMouseDown={() => setIsTouching(true)}
+                  onMouseUp={() => setIsTouching(false)}
+                  onMouseLeave={() => setIsTouching(false)}
+                >
                   <div className={`absolute inset-0 rounded-full border-8 opacity-20 transition-all duration-1000 ${
                     sessionType === "meditacion" ? "border-purple-500 scale-105 animate-pulse" :
                     visualPhase === "inhala" ? "border-emerald-500 scale-110" :
@@ -377,12 +367,12 @@ export default function MeditacionRespiracionApp() {
                   }`} />
 
                   <div
-                 className={`w-52 h-52 rounded-full shadow-inner flex flex-col items-center justify-center p-6 border border-slate-100 z-10 text-center transition-all duration-500 ${
-                  isTouching
-                 ? "bg-emerald-100 scale-110"
-                 : "bg-slate-50 scale-100"
-                  }`}
->
+                    className={`w-52 h-52 rounded-full shadow-inner flex flex-col items-center justify-center p-6 border border-slate-100 z-10 text-center transition-all duration-500 ${
+                      isTouching
+                        ? "bg-emerald-100 scale-110"
+                        : "bg-slate-50 scale-100"
+                    }`}
+                  >
                     <span className="text-2xl font-black tracking-wider text-[#2A3B50] uppercase transition-all duration-500">
                       {sessionType === "respiracion" ? currentInstruction : "MEDITA"}
                     </span>
@@ -394,7 +384,7 @@ export default function MeditacionRespiracionApp() {
 
                 <div className="mt-6 flex items-center gap-2 text-slate-700 font-semibold bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
                   <p className="text-xs text-slate-500 mt-4 text-center">
-  Mantén presionado el círculo para mejorar tu concentración durante la respiración.
+                    Mantén presionado el círculo para mejorar tu concentración durante la respiración.
                   </p>  <span>⏳</span>
                   <span className="text-sm tracking-tight font-bold">{formatTime(secondsLeft)} restantes</span>
                 </div>
