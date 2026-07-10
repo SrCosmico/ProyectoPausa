@@ -20,21 +20,21 @@ interface OpcionMenu {
 // ─── Tipos y claves para notificaciones ──────────────────────────────────────
 
 interface ConfigNotificaciones {
-  recordatoriosDiario: boolean;
-  recordatoriosCronograma: boolean;
-  alertasBienestar: boolean;
+  pushActivo: boolean;
+  sonidoActivo: boolean;
   modoCrisisAutomatico: boolean;
-  resumenSemanal: boolean;
+  recordatoriosCronograma: boolean;
+  antiestresMonitoreo: boolean;
 }
 
 const NOTIF_KEY = (uid: string) => `notif_config_${uid}`;
 
 const defaultNotif: ConfigNotificaciones = {
-  recordatoriosDiario: true,
-  recordatoriosCronograma: true,
-  alertasBienestar: true,
+  pushActivo: false,
+  sonidoActivo: true,
   modoCrisisAutomatico: true,
-  resumenSemanal: false,
+  recordatoriosCronograma: true,
+  antiestresMonitoreo: true,
 };
 
 const leerNotif = (uid: string): ConfigNotificaciones => {
@@ -50,13 +50,23 @@ const guardarNotif = (uid: string, config: ConfigNotificaciones) => {
   localStorage.setItem(NOTIF_KEY(uid), JSON.stringify(config));
 };
 
+// Pide permiso de notificaciones push al navegador y devuelve si fue concedido
+const pedirPermisoNotificaciones = async (): Promise<boolean> => {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const resultado = await Notification.requestPermission();
+  return resultado === 'granted';
+};
+
 // ─── Toggle reutilizable ─────────────────────────────────────────────────────
 
-function Toggle({ activo, onChange }: { activo: boolean; onChange: () => void }) {
+function Toggle({ activo, onChange, disabled }: { activo: boolean; onChange: () => void; disabled?: boolean }) {
   return (
     <button
       onClick={onChange}
-      className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${activo ? 'bg-[#4A72A6]' : 'bg-slate-200'}`}
+      disabled={disabled}
+      className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${activo ? 'bg-[#4A72A6]' : 'bg-slate-200'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
     >
       <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform ${activo ? 'translate-x-4' : 'translate-x-0'}`} />
     </button>
@@ -238,8 +248,22 @@ export default function PerfilPage() {
     setModalNotif(true);
   };
 
-  const toggleNotif = (clave: keyof ConfigNotificaciones) => {
-    const nueva = { ...notif, [clave]: !notif[clave] };
+  const toggleNotif = async (clave: keyof ConfigNotificaciones) => {
+    let nueva = { ...notif, [clave]: !notif[clave] };
+
+    // Si el usuario activa las notificaciones push, pedimos permiso al navegador.
+    // Si lo niega o el navegador no lo soporta, mantenemos el toggle apagado.
+    if (clave === 'pushActivo' && !notif.pushActivo) {
+      const concedido = await pedirPermisoNotificaciones();
+      if (!concedido) {
+        nueva = { ...notif, pushActivo: false };
+        // Mostrar aviso de permiso bloqueado brevemente
+        setGuardadoNotif(false);
+        alert('El navegador bloqueó los permisos de notificación. Actívalos manualmente desde la configuración del sitio (🔒 en la barra de dirección).');
+        return;
+      }
+    }
+
     setNotif(nueva);
     guardarNotif(userId, nueva);
     setGuardadoNotif(true);
@@ -460,7 +484,7 @@ export default function PerfilPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-[#2A3B50]">Notificaciones</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Elige qué avisos quieres recibir</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Configura cómo y cuándo recibir avisos</p>
               </div>
               <button onClick={() => setModalNotif(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
@@ -473,69 +497,107 @@ export default function PerfilPage() {
               </div>
             )}
 
-            {/* Grupo: Diario */}
+            {/* Grupo: General */}
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Diario emocional</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">General</p>
               <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100">
+
+                {/* Push */}
                 <div className="flex items-center justify-between px-4 py-3.5">
-                  <div className="flex-1 min-w-0 pr-4">
-                    <p className="text-xs font-bold text-slate-700">Recordatorio diario</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Aviso para escribir en tu diario cada día</p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
+                    <div className="w-8 h-8 rounded-xl bg-[#4A72A6]/10 flex items-center justify-center text-base flex-shrink-0">🔔</div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">Notificaciones push</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Recibir avisos aunque no estés en la app</p>
+                    </div>
                   </div>
-                  <Toggle activo={notif.recordatoriosDiario} onChange={() => toggleNotif('recordatoriosDiario')} />
+                  <Toggle activo={notif.pushActivo} onChange={() => toggleNotif('pushActivo')} />
                 </div>
+
+                {/* Sonido */}
                 <div className="flex items-center justify-between px-4 py-3.5">
-                  <div className="flex-1 min-w-0 pr-4">
-                    <p className="text-xs font-bold text-slate-700">Resumen semanal</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Un informe de cómo estuvo tu semana emocional</p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${notif.pushActivo ? 'bg-[#4A72A6]/10' : 'bg-slate-100'}`}>
+                      {notif.sonidoActivo ? '🔊' : '🔇'}
+                    </div>
+                    <div>
+                      <p className={`text-xs font-bold ${notif.pushActivo ? 'text-slate-700' : 'text-slate-400'}`}>Sonido de notificación</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {notif.pushActivo ? 'Reproducir sonido al llegar un aviso' : 'Activa las notificaciones push primero'}
+                      </p>
+                    </div>
                   </div>
-                  <Toggle activo={notif.resumenSemanal} onChange={() => toggleNotif('resumenSemanal')} />
+                  <Toggle
+                    activo={notif.sonidoActivo}
+                    onChange={() => toggleNotif('sonidoActivo')}
+                    disabled={!notif.pushActivo}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Grupo: Cronograma */}
+            {/* Grupo: Avisos específicos */}
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Cronograma</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Avisos</p>
               <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100">
-                <div className="flex items-center justify-between px-4 py-3.5">
-                  <div className="flex-1 min-w-0 pr-4">
-                    <p className="text-xs font-bold text-slate-700">Recordatorios de actividades</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Aviso 15 min antes de cada actividad programada</p>
-                  </div>
-                  <Toggle activo={notif.recordatoriosCronograma} onChange={() => toggleNotif('recordatoriosCronograma')} />
-                </div>
-              </div>
-            </div>
 
-            {/* Grupo: Bienestar */}
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Bienestar</p>
-              <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100">
+                {/* Modo crisis automático */}
                 <div className="flex items-center justify-between px-4 py-3.5">
-                  <div className="flex-1 min-w-0 pr-4">
-                    <p className="text-xs font-bold text-slate-700">Alertas de bienestar bajo</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Notificación cuando tus registros sean bajos varios días seguidos</p>
-                  </div>
-                  <Toggle activo={notif.alertasBienestar} onChange={() => toggleNotif('alertasBienestar')} />
-                </div>
-                <div className="flex items-center justify-between px-4 py-3.5">
-                  <div className="flex-1 min-w-0 pr-4">
-                    <p className="text-xs font-bold text-slate-700">Modo crisis automático</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Activa el modo crisis si tu bienestar es crítico esta semana</p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-base flex-shrink-0">🚨</div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">Modo crisis automático</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Se activa si tu bienestar es crítico esta semana</p>
+                    </div>
                   </div>
                   <Toggle activo={notif.modoCrisisAutomatico} onChange={() => toggleNotif('modoCrisisAutomatico')} />
                 </div>
+
+                {/* Recordatorio cronograma */}
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-base flex-shrink-0">📅</div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">Recordatorio de actividades</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">15 min antes de cada actividad del cronograma</p>
+                    </div>
+                  </div>
+                  <Toggle activo={notif.recordatoriosCronograma} onChange={() => toggleNotif('recordatoriosCronograma')} />
+                </div>
+
+                {/* Antiestrés del monitoreo */}
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-base flex-shrink-0">🧘</div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">Técnicas antiestrés</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Sugerencias de tu monitoreo emocional cuando lo necesites</p>
+                    </div>
+                  </div>
+                  <Toggle activo={notif.antiestresMonitoreo} onChange={() => toggleNotif('antiestresMonitoreo')} />
+                </div>
               </div>
             </div>
 
-            {/* Nota informativa */}
-            <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
-              <span className="text-sm flex-shrink-0 mt-0.5">ℹ️</span>
-              <p className="text-[10px] text-[#4A72A6] font-medium leading-relaxed">
-                Las notificaciones se guardan en este dispositivo. Para recibir avisos push, asegúrate de que los permisos del navegador estén habilitados.
-              </p>
-            </div>
+            {/* Nota: push desactivado */}
+            {!notif.pushActivo && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+                <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
+                <p className="text-[10px] text-amber-700 font-medium leading-relaxed">
+                  Las notificaciones push están desactivadas. Los avisos de crisis, cronograma y antiestrés solo funcionarán mientras tengas la app abierta.
+                </p>
+              </div>
+            )}
+
+            {/* Nota: push activado */}
+            {notif.pushActivo && (
+              <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
+                <span className="text-sm flex-shrink-0 mt-0.5">ℹ️</span>
+                <p className="text-[10px] text-[#4A72A6] font-medium leading-relaxed">
+                  Las notificaciones push están activas. Si dejas de recibirlas, verifica los permisos del navegador tocando el 🔒 en la barra de dirección.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
