@@ -117,6 +117,7 @@ function personalizarUmbralCrisis(frecuenciaEstres: string) {
 export default function HomePage() {
   const router = useRouter();
   const [usuarioNombre, setUsuarioNombre]   = useState('Usuario');
+  const [usuarioFoto, setUsuarioFoto]       = useState<string | null>(null); // ← NUEVO
   const [yaRegistroHoy, setYaRegistroHoy]   = useState(false);
   const [loadingLogout, setLoadingLogout]   = useState(false);
   const [herramientas, setHerramientas]     = useState<AccesoRapido[]>(accesoRapidoData);
@@ -136,6 +137,18 @@ export default function HomePage() {
       } else {
         setUsuarioNombre(obtenerNombreUsuarioLocal() || 'Estudiante');
       }
+
+      // ── NUEVO: leer foto desde la tabla perfiles ──────────────────────────
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('avatar_url')
+        .eq('id', session.user.id)
+        .single();
+
+      if (perfil?.avatar_url) {
+        setUsuarioFoto(perfil.avatar_url);
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const registroFecha = localStorage.getItem('fechaUltimoRegistro');
       const hoy = new Date().toLocaleDateString();
@@ -212,11 +225,20 @@ export default function HomePage() {
             <div className="flex items-center justify-between gap-4">
 
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-500 via-indigo-400 to-blue-400 p-0.5 shadow-md flex-shrink-0 flex items-center justify-center">
-                  <div className="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-indigo-400 translate-y-1">
-                      <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
-                    </svg>
+                {/* ── AVATAR: foto real o ícono genérico ── */}
+                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-500 via-indigo-400 to-blue-400 p-0.5 shadow-md flex-shrink-0">
+                  <div className="w-full h-full bg-white rounded-full overflow-hidden flex items-center justify-center">
+                    {usuarioFoto ? (
+                      <img
+                        src={usuarioFoto}
+                        alt="Foto de perfil"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-indigo-400 translate-y-1">
+                        <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
                 </div>
 
@@ -332,7 +354,7 @@ export default function HomePage() {
                 ))}
             </div>
 
-            {/* Modo Crisis — ancho completo y destacado */}
+            {/* Modo Crisis */}
             <button
               onClick={() => router.push('/modoCrisis.2')}
               className="w-full flex items-center gap-4 p-5 bg-rose-500 hover:bg-rose-600 rounded-2xl transition-all duration-150 active:scale-[0.99] shadow-md shadow-rose-200 text-left"
