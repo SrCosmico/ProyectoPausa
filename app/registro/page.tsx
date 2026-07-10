@@ -17,6 +17,7 @@ interface AlumnoRegistro {
 export default function RegisterView() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<AlumnoRegistro>({
     nombre: '',
@@ -27,56 +28,58 @@ export default function RegisterView() {
     terminos: false,
   });
 
+  // Redirigir si ya hay sesión activa
   useEffect(() => {
     const verificarSesion = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        router.push('/home');
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) router.push('/home');
     };
     verificarSesion();
   }, [router]);
 
   const handleRegistro = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
 
     if (formData.clave !== formData.confirmarClave) {
-      alert('Las contraseñas no coinciden.');
+      setError('Las contraseñas no coinciden.');
       return;
     }
     if (formData.clave.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres.');
+      setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
     if (!formData.terminos) {
-      alert('Debes aceptar los términos y condiciones.');
+      setError('Debes aceptar los términos y condiciones.');
       return;
     }
 
     setLoading(true);
 
-    const { data, error } = await registrarUsuario(
+    const { data, error: registroError } = await registrarUsuario(
       formData.correo.trim(),
-      formData.clave.trim(),
+      formData.clave,
       formData.nombre.trim(),
       formData.facultad
     );
 
     setLoading(false);
 
-    if (error) {
-      alert(`Error al registrarse: ${error.message}`);
+    if (registroError) {
+      const msg = registroError.message ?? '';
+      if (msg.includes('already registered') || msg.includes('User already registered')) {
+        setError('Este correo ya tiene una cuenta registrada. Inicia sesión.');
+      } else if (msg.includes('invalid email')) {
+        setError('El correo ingresado no es válido.');
+      } else if (msg.includes('Password should be')) {
+        setError('La contraseña debe tener al menos 6 caracteres.');
+      } else {
+        setError(`Error al registrarse: ${msg}`);
+      }
       return;
     }
 
     if (data?.user) {
-      // ↓ CAMBIO: guardar datos en localStorage para el cuestionario
-      localStorage.setItem('alumnoEmail', formData.correo.trim());
-      localStorage.setItem('alumnoNombre', formData.nombre.trim());
-      localStorage.setItem('alumnoFacultad', formData.facultad);
-      // ↑ FIN CAMBIO
       router.push('/bienvenida');
     }
   };
@@ -90,19 +93,8 @@ export default function RegisterView() {
           className="mb-6 text-gray-800"
           disabled={loading}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className="w-6 h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
         </button>
 
@@ -111,11 +103,17 @@ export default function RegisterView() {
           <p className="text-sm text-gray-500">Estás a un paso de tu refugio mental</p>
         </div>
 
+        {error && (
+          <div className="mb-4 px-4 py-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2">
+            <span className="text-rose-500 text-sm flex-shrink-0 mt-0.5">⚠️</span>
+            <p className="text-xs font-semibold text-rose-700 leading-relaxed">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleRegistro} className="space-y-4">
+
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
-              Nombre completo
-            </label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Nombre completo</label>
             <input
               type="text"
               required
@@ -123,14 +121,12 @@ export default function RegisterView() {
               placeholder="Ej: Valeria López"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.nombre}
-              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              onChange={(e) => { setError(null); setFormData({ ...formData, nombre: e.target.value }); }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
-              Correo institucional UCV
-            </label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Correo institucional UCV</label>
             <input
               type="email"
               required
@@ -138,21 +134,19 @@ export default function RegisterView() {
               placeholder="ejemplo@ucv.ve"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.correo}
-              onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+              onChange={(e) => { setError(null); setFormData({ ...formData, correo: e.target.value }); }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
-              Facultad / Escuela
-            </label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Facultad / Escuela</label>
             <div className="relative">
               <select
                 required
                 disabled={loading}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm appearance-none disabled:opacity-50"
                 value={formData.facultad}
-                onChange={(e) => setFormData({ ...formData, facultad: e.target.value })}
+                onChange={(e) => { setError(null); setFormData({ ...formData, facultad: e.target.value }); }}
               >
                 <option value="" disabled>Selecciona tu facultad</option>
                 <option value="Agronomía">Agronomía</option>
@@ -176,9 +170,7 @@ export default function RegisterView() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
-              Contraseña
-            </label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Contraseña</label>
             <input
               type="password"
               required
@@ -186,14 +178,12 @@ export default function RegisterView() {
               placeholder="Mínimo 6 caracteres"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.clave}
-              onChange={(e) => setFormData({ ...formData, clave: e.target.value })}
+              onChange={(e) => { setError(null); setFormData({ ...formData, clave: e.target.value }); }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">
-              Confirmar contraseña
-            </label>
+            <label className="block text-sm font-semibold mb-1.5 text-[#1E293B]">Confirmar contraseña</label>
             <input
               type="password"
               required
@@ -201,7 +191,7 @@ export default function RegisterView() {
               placeholder="********"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.confirmarClave}
-              onChange={(e) => setFormData({ ...formData, confirmarClave: e.target.value })}
+              onChange={(e) => { setError(null); setFormData({ ...formData, confirmarClave: e.target.value }); }}
             />
           </div>
 
@@ -211,7 +201,7 @@ export default function RegisterView() {
               disabled={loading}
               className="mt-1 w-4 h-4 rounded border-gray-300 accent-[#5B7A9A] disabled:opacity-50"
               checked={formData.terminos}
-              onChange={(e) => setFormData({ ...formData, terminos: e.target.checked })}
+              onChange={(e) => { setError(null); setFormData({ ...formData, terminos: e.target.checked }); }}
             />
             <label className="text-xs text-gray-600 leading-relaxed">
               Acepto los términos y condiciones y la política de privacidad
@@ -223,8 +213,14 @@ export default function RegisterView() {
             disabled={loading}
             className="w-full bg-[#5B7A9A] hover:bg-[#4A6480] text-white font-semibold py-3.5 rounded-full transition-all mt-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Creando cuenta...
+              </span>
+            ) : 'Crear cuenta'}
           </button>
+
         </form>
       </div>
     </div>
