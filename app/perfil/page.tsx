@@ -41,9 +41,19 @@ export default function PerfilPage() {
       setUserId(user.id);
       setCorreo(user.email || '');
 
-      // Leer perfil desde Supabase (nombre + avatar_url)
+      // Leer perfil desde Supabase
       const perfil = await leerPerfilUsuario(user.id);
-      setNombre(perfil.nombre || user.user_metadata?.nombre_usuario || user.email?.split('@')[0] || 'Estudiante');
+
+      // ✅ Prioridad: tabla perfiles → user_metadata → email prefix
+      // Ignoramos usuarioDefecto ('Valeria López') si la tabla no tiene nombre real
+      const nombreReal =
+        (perfil.nombre && perfil.nombre !== 'Valeria López' ? perfil.nombre : null) ||
+        user.user_metadata?.nombre_usuario ||
+        user.user_metadata?.full_name ||
+        user.email?.split('@')[0] ||
+        'Estudiante';
+
+      setNombre(nombreReal);
       
       // Prioridad: Supabase > localStorage
       if (perfil.avatar) {
