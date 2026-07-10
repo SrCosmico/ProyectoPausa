@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
 import { cerrarSesion } from '@/app/services/authService';
 import { leerPerfilUsuario, actualizarPerfil } from '@/lib/supabase/perfil';
-
 interface OpcionMenu {
   id: string;
   icono: string;
@@ -75,51 +74,32 @@ export default function PerfilPage() {
     const file = e.target.files?.[0];
     if (!file || !userId) return;
 
-    // Validaciones básicas
-    if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen no puede superar los 5 MB.');
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      alert('Solo se permiten archivos de imagen.');
-      return;
-    }
+    if (file.size > 5 * 1024 * 1024) { alert('La imagen no puede superar los 5 MB.'); return; }
+    if (!file.type.startsWith('image/')) { alert('Solo se permiten archivos de imagen.'); return; }
 
     setSubiendoFoto(true);
 
     try {
-      // Nombre único basado en userId — siempre sobreescribe el anterior
-      const extension = file.name.split('.').pop() ?? 'jpg';
-      const rutaArchivo = `avatars/${userId}/avatar.${extension}`;
+      // Convertir a base64 y guardar en localStorage + tabla perfiles
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-      // Subir a Supabase Storage (upsert: reemplaza si ya existe)
-      const { error: uploadError } = await supabase.storage
-        .from('avatares')
-        .upload(rutaArchivo, file, { upsert: true, contentType: file.type });
+      // Guardar en localStorage (para acceso rápido en home)
+      localStorage.setItem('userAvatar', base64);
+      setFoto(base64);
 
-      if (uploadError) throw uploadError;
+      // Guardar en tabla perfiles para persistencia entre dispositivos
+      await actualizarPerfil(userId, { avatar_url: base64 });
 
-      // Obtener URL pública
-      const { data: urlData } = supabase.storage
-        .from('avatares')
-        .getPublicUrl(rutaArchivo);
-
-      // Añadir timestamp para invalidar caché del navegador
-      const urlPublica = `${urlData.publicUrl}?t=${Date.now()}`;
-
-      // Guardar en tabla perfiles
-      await actualizarPerfil(userId, { avatar_url: urlPublica });
-
-      // Actualizar estado local y localStorage (para la home)
-      setFoto(urlPublica);
-      localStorage.setItem('userAvatar', urlPublica);
-
-    } catch (err: any) {
-      console.error('Error subiendo foto:', err);
-      alert('No se pudo subir la foto. Intenta de nuevo.');
+    } catch (err) {
+      console.error('Error procesando foto:', err);
+      alert('No se pudo procesar la foto. Intenta de nuevo.');
     } finally {
       setSubiendoFoto(false);
-      // Limpiar input para permitir subir el mismo archivo de nuevo
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
