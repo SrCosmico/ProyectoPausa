@@ -434,11 +434,7 @@ export default function HomePage() {
         "
       >
 
-        {/* ─────────────────────────────────────────────────────────────────
-            FONDO DECORATIVO
-            Se mantiene únicamente la onda central y la forma inferior.
-            Se eliminó la forma morada superior.
-        ────────────────────────────────────────────────────────────────── */}
+        {/* FONDO DECORATIVO */}
 
         <div
           className="
@@ -950,7 +946,7 @@ export default function HomePage() {
                         items-start
                         gap-3
                         p-4
-                        bg-[#F4F6F8]
+                        bg-white
                         rounded-2xl
                         border
                         border-slate-200/70
