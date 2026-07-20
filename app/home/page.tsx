@@ -181,6 +181,32 @@ export default function HomePage() {
 
         <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
 
+          {/* ── Imágenes decorativas — pointer-events-none para no bloquear clics ── */}
+
+          {/* Forma morada: esquina superior izquierda */}
+          <img
+            src="/images/forma_morada.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-0 left-0 w-64 opacity-60 pointer-events-none select-none z-0"
+          />
+
+          {/* Onda del medio: centrada verticalmente */}
+          <img
+            src="/images/onda_del_medio.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-1/2 -translate-y-1/2 left-0 w-full opacity-40 pointer-events-none select-none z-0"
+          />
+
+          {/* Forma grande: pegada al fondo */}
+          <img
+            src="/images/forma_grande.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute bottom-0 left-0 w-full pointer-events-none select-none z-0 opacity-70"
+          />
+
           {/* ENCABEZADO */}
           <div className="p-6 bg-white rounded-b-[32px] shadow-sm border-b border-slate-100">
             <div className="flex items-center justify-between gap-4">
