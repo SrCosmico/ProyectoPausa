@@ -9,11 +9,13 @@ import { cerrarSesion } from "@/app/services/authService";
 
 // ─── Importación segura de racha ──────────────────────────────────────────────
 
-let calcularEstadoRachaPareja: ((uid: string) => Promise<any>) | null = null;
+let calcularEstadoRachaPareja:
+  ((uid: string) => Promise<any>) | null = null;
 
 try {
   const mod = require("@/lib/supabase/racha");
-  calcularEstadoRachaPareja = mod.calcularEstadoRachaPareja ?? null;
+  calcularEstadoRachaPareja =
+    mod.calcularEstadoRachaPareja ?? null;
 } catch {
   calcularEstadoRachaPareja = null;
 }
@@ -116,7 +118,10 @@ export const accesoRapidoData: AccesoRapido[] = [
   },
 ];
 
-export const navegacionData: Omit<ItemNavegacion, "activo">[] = [
+export const navegacionData: Omit<
+  ItemNavegacion,
+  "activo"
+>[] = [
   {
     id: "inicio",
     label: "Inicio",
@@ -223,6 +228,9 @@ export default function HomePage() {
   const [usuarioAvatar, setUsuarioAvatar] =
     useState<string | null>(null);
 
+  const [avatarError, setAvatarError] =
+    useState(false);
+
   const [yaRegistroHoy, setYaRegistroHoy] =
     useState(false);
 
@@ -262,11 +270,26 @@ export default function HomePage() {
       const nombreMeta =
         user.user_metadata?.nombre_usuario;
 
-      setUsuarioNombre(
+      const nombreGuardado =
+        obtenerNombreUsuarioLocal();
+
+      const nombreFinal =
         nombreMeta ||
-          obtenerNombreUsuarioLocal() ||
-          "Estudiante"
-      );
+        nombreGuardado ||
+        "Estudiante";
+
+      setUsuarioNombre(nombreFinal);
+
+      // ─────────────────────────────────────────────────────────────────────
+      // CARGA DE FOTO DE PERFIL
+      // ─────────────────────────────────────────────────────────────────────
+
+      const avatarLocal =
+        localStorage.getItem("userAvatar");
+
+      if (avatarLocal) {
+        setUsuarioAvatar(avatarLocal);
+      }
 
       const { data: perfil } = await supabase
         .from("perfiles")
@@ -275,23 +298,20 @@ export default function HomePage() {
         .single();
 
       if (perfil?.avatar_url) {
-        setUsuarioAvatar(
-          `${perfil.avatar_url}?t=${Date.now()}`
-        );
+        const avatarUrl = perfil.avatar_url;
+
+        setUsuarioAvatar(avatarUrl);
 
         localStorage.setItem(
           "userAvatar",
-          perfil.avatar_url
-        );
-      } else {
-        setUsuarioAvatar(
-          localStorage.getItem("userAvatar")
+          avatarUrl
         );
       }
 
       if (
-        localStorage.getItem("fechaUltimoRegistro") ===
-        new Date().toLocaleDateString()
+        localStorage.getItem(
+          "fechaUltimoRegistro"
+        ) === new Date().toLocaleDateString()
       ) {
         setYaRegistroHoy(true);
       }
@@ -384,9 +404,17 @@ export default function HomePage() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
-
-      {/* CONTENEDOR PRINCIPAL */}
+    <div className="
+      min-h-screen
+      bg-[#F1F5F9]
+      flex
+      items-center
+      justify-center
+      p-0
+      sm:p-4
+      font-sans
+      selection:bg-blue-100
+    ">
 
       <div
         className="
@@ -410,11 +438,15 @@ export default function HomePage() {
             FONDO DECORATIVO
         ────────────────────────────────────────────────────────────────── */}
 
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="
+          absolute
+          inset-0
+          z-0
+          pointer-events-none
+          overflow-hidden
+        ">
 
-          {/* Forma morada:
-              empieza debajo del encabezado para que pueda visualizarse
-          */}
+          {/* FORMA MORADA */}
 
           <img
             src="/images/forma_morada.png"
@@ -427,12 +459,12 @@ export default function HomePage() {
               w-[58%]
               max-w-[280px]
               h-auto
-              opacity-75
+              opacity-90
               select-none
             "
           />
 
-          {/* Onda central */}
+          {/* ONDA CENTRAL */}
 
           <img
             src="/images/onda_del_medio.png"
@@ -446,12 +478,12 @@ export default function HomePage() {
               w-[125%]
               max-w-none
               h-auto
-              opacity-55
+              opacity-75
               select-none
             "
           />
 
-          {/* Forma inferior */}
+          {/* FORMA INFERIOR */}
 
           <img
             src="/images/forma_grande.png"
@@ -465,30 +497,60 @@ export default function HomePage() {
               w-[120%]
               max-w-none
               h-auto
-              opacity-70
+              opacity-85
               select-none
             "
           />
 
         </div>
 
-        {/* CONTENIDO PRINCIPAL */}
+        {/* CONTENIDO */}
 
-        <div className="relative z-10 flex flex-col h-full">
+        <div className="
+          relative
+          z-10
+          flex
+          flex-col
+          h-full
+        ">
 
           {/* ÁREA SCROLL */}
 
-          <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
+          <div className="
+            flex-1
+            overflow-y-auto
+            pb-6
+            custom-scrollbar
+          ">
 
             {/* ENCABEZADO */}
 
-            <div className="p-5 sm:p-6 bg-white/95 backdrop-blur-sm rounded-b-[32px] shadow-sm border-b border-slate-100">
+            <div className="
+              p-5
+              sm:p-6
+              bg-white/95
+              backdrop-blur-sm
+              rounded-b-[32px]
+              shadow-sm
+              border-b
+              border-slate-100
+            ">
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="
+                flex
+                items-center
+                justify-between
+                gap-3
+              ">
 
-                {/* Avatar y saludo */}
+                {/* FOTO Y SALUDO */}
 
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="
+                  flex
+                  items-center
+                  gap-3
+                  min-w-0
+                ">
 
                   <div
                     className="
@@ -515,11 +577,20 @@ export default function HomePage() {
                       router.push("/perfil")
                     }
                   >
-                    {usuarioAvatar ? (
+
+                    {usuarioAvatar &&
+                    !avatarError ? (
                       <img
                         src={usuarioAvatar}
                         alt="Foto de perfil"
-                        className="w-full h-full object-cover"
+                        className="
+                          w-full
+                          h-full
+                          object-cover
+                        "
+                        onError={() => {
+                          setAvatarError(true);
+                        }}
                       />
                     ) : (
                       <span>
@@ -528,15 +599,29 @@ export default function HomePage() {
                           .toUpperCase()}
                       </span>
                     )}
+
                   </div>
 
                   <div className="min-w-0">
 
-                    <h2 className="text-lg sm:text-xl font-bold text-[#2A3B50] truncate max-w-[170px]">
+                    <h2 className="
+                      text-lg
+                      sm:text-xl
+                      font-bold
+                      text-[#2A3B50]
+                      truncate
+                      max-w-[170px]
+                    ">
                       Hola, {usuarioNombre}
                     </h2>
 
-                    <p className="text-xs font-medium text-[#8C9BAE] truncate max-w-[190px]">
+                    <p className="
+                      text-xs
+                      font-medium
+                      text-[#8C9BAE]
+                      truncate
+                      max-w-[190px]
+                    ">
                       {saludo}
                     </p>
 
@@ -544,11 +629,14 @@ export default function HomePage() {
 
                 </div>
 
-                {/* Botones superiores */}
+                {/* BOTONES SUPERIORES */}
 
-                <div className="flex items-center gap-2 flex-shrink-0">
-
-                  {/* Racha */}
+                <div className="
+                  flex
+                  items-center
+                  gap-2
+                  flex-shrink-0
+                ">
 
                   {calcularEstadoRachaPareja !== null && (
                     <button
@@ -577,13 +665,16 @@ export default function HomePage() {
                         🔥
                       </span>
 
-                      <span className="text-xs font-extrabold tabular-nums">
+                      <span className="
+                        text-xs
+                        font-extrabold
+                        tabular-nums
+                      ">
                         {rachaDias}
                       </span>
+
                     </button>
                   )}
-
-                  {/* Logout */}
 
                   <button
                     onClick={handleLogout}
@@ -605,8 +696,17 @@ export default function HomePage() {
                       disabled:opacity-50
                     "
                   >
+
                     {loadingLogout ? (
-                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="
+                        w-5
+                        h-5
+                        border-2
+                        border-slate-400
+                        border-t-transparent
+                        rounded-full
+                        animate-spin
+                      " />
                     ) : (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -623,13 +723,14 @@ export default function HomePage() {
                         />
                       </svg>
                     )}
+
                   </button>
 
                 </div>
 
               </div>
 
-              {/* Banner de racha */}
+              {/* BANNER DE RACHA */}
 
               {estadoRacha &&
                 !estadoRacha.tieneParejaActiva &&
@@ -687,7 +788,7 @@ export default function HomePage() {
                 </button>
               )}
 
-              {/* CHECK-IN EMOCIONAL */}
+              {/* CHECK-IN */}
 
               {mostrarCheckin && (
                 <div className="
@@ -701,15 +802,30 @@ export default function HomePage() {
                   text-center
                 ">
 
-                  <h3 className="text-sm font-bold text-[#334155]">
+                  <h3 className="
+                    text-sm
+                    font-bold
+                    text-[#334155]
+                  ">
                     {preguntaCheckin}
                   </h3>
 
-                  <p className="text-[11px] text-[#8C9BAE] mt-0.5">
+                  <p className="
+                    text-[11px]
+                    text-[#8C9BAE]
+                    mt-0.5
+                  ">
                     Registra tu estado emocional
                   </p>
 
-                  <div className="flex justify-between items-center gap-1 mt-4 px-1">
+                  <div className="
+                    flex
+                    justify-between
+                    items-center
+                    gap-1
+                    mt-4
+                    px-1
+                  ">
 
                     {emojiEstadosData.map(
                       (item) => (
@@ -727,6 +843,7 @@ export default function HomePage() {
                           "
                           title={item.estado}
                         >
+
                           <span className="
                             text-3xl
                             sm:text-4xl
@@ -752,6 +869,7 @@ export default function HomePage() {
                           ">
                             {item.estado}
                           </span>
+
                         </button>
                       )
                     )}
@@ -765,7 +883,10 @@ export default function HomePage() {
 
             {/* HERRAMIENTAS */}
 
-            <div className="p-5 sm:p-6">
+            <div className="
+              p-5
+              sm:p-6
+            ">
 
               <h4 className="
                 text-xs
@@ -833,7 +954,8 @@ export default function HomePage() {
                         transition-all
                         group-hover:scale-110
                       ">
-                        {mapeoIconos[item.id] || "✨"}
+                        {mapeoIconos[item.id] ||
+                          "✨"}
                       </div>
 
                       <div>
@@ -901,7 +1023,10 @@ export default function HomePage() {
                   🚨
                 </div>
 
-                <div className="flex-1 min-w-0">
+                <div className="
+                  flex-1
+                  min-w-0
+                ">
 
                   <p className="
                     text-sm
