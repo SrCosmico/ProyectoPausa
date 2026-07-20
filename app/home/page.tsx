@@ -179,33 +179,34 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
 
-        <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
+        {/* ── Imágenes decorativas: absolute dentro del contenedor del celular,
+               fuera del scroll para que no se muevan ── */}
 
-          {/* ── Imágenes decorativas — pointer-events-none para no bloquear clics ── */}
+        {/* Forma morada: esquina superior izquierda, debajo del header */}
+        <img
+          src="/images/forma_morada.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute top-16 left-0 w-44 opacity-35 pointer-events-none select-none z-0"
+        />
 
-          {/* Forma morada: esquina superior izquierda */}
-          <img
-            src="/images/forma_morada.png"
-            alt=""
-            aria-hidden="true"
-            className="absolute top-0 left-0 w-64 opacity-60 pointer-events-none select-none z-0"
-          />
+        {/* Onda del medio: zona de herramientas recomendadas */}
+        <img
+          src="/images/onda_del_medio.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute top-[42%] left-0 w-full opacity-15 pointer-events-none select-none z-0"
+        />
 
-          {/* Onda del medio: centrada verticalmente */}
-          <img
-            src="/images/onda_del_medio.png"
-            alt=""
-            aria-hidden="true"
-            className="absolute top-1/2 -translate-y-1/2 left-0 w-full opacity-40 pointer-events-none select-none z-0"
-          />
+        {/* Forma grande: justo encima de la barra de navegación */}
+        <img
+          src="/images/forma_grande.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute bottom-16 left-0 w-full opacity-40 pointer-events-none select-none z-0"
+        />
 
-          {/* Forma grande: pegada al fondo */}
-          <img
-            src="/images/forma_grande.png"
-            alt=""
-            aria-hidden="true"
-            className="absolute bottom-0 left-0 w-full pointer-events-none select-none z-0 opacity-70"
-          />
+        <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar relative z-10">
 
           {/* ENCABEZADO */}
           <div className="p-6 bg-white rounded-b-[32px] shadow-sm border-b border-slate-100">
