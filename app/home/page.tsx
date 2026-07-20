@@ -404,17 +404,19 @@ export default function HomePage() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="
-      min-h-screen
-      bg-[#F1F5F9]
-      flex
-      items-center
-      justify-center
-      p-0
-      sm:p-4
-      font-sans
-      selection:bg-blue-100
-    ">
+    <div
+      className="
+        min-h-screen
+        bg-[#F1F5F9]
+        flex
+        items-center
+        justify-center
+        p-0
+        sm:p-4
+        font-sans
+        selection:bg-blue-100
+      "
+    >
 
       <div
         className="
@@ -438,13 +440,15 @@ export default function HomePage() {
             FONDO DECORATIVO
         ────────────────────────────────────────────────────────────────── */}
 
-        <div className="
-          absolute
-          inset-0
-          z-0
-          pointer-events-none
-          overflow-hidden
-        ">
+        <div
+          className="
+            absolute
+            inset-0
+            z-0
+            pointer-events-none
+            overflow-hidden
+          "
+        >
 
           {/* FORMA MORADA */}
 
@@ -506,51 +510,61 @@ export default function HomePage() {
 
         {/* CONTENIDO */}
 
-        <div className="
-          relative
-          z-10
-          flex
-          flex-col
-          h-full
-        ">
+        <div
+          className="
+            relative
+            z-10
+            flex
+            flex-col
+            h-full
+          "
+        >
 
           {/* ÁREA SCROLL */}
 
-          <div className="
-            flex-1
-            overflow-y-auto
-            pb-6
-            custom-scrollbar
-          ">
+          <div
+            className="
+              flex-1
+              overflow-y-auto
+              pb-6
+              custom-scrollbar
+            "
+          >
 
             {/* ENCABEZADO */}
 
-            <div className="
-              p-5
-              sm:p-6
-              bg-white/95
-              backdrop-blur-sm
-              rounded-b-[32px]
-              shadow-sm
-              border-b
-              border-slate-100
-            ">
+            <div
+              className="
+                p-5
+                sm:p-6
+                bg-white/95
+                backdrop-blur-sm
+                rounded-b-[32px]
+                shadow-sm
+                border-b
+                border-slate-100
+              "
+            >
 
-              <div className="
-                flex
-                items-center
-                justify-between
-                gap-3
-              ">
+              <div
+                className="
+                  flex
+                  items-center
+                  justify-between
+                  gap-3
+                "
+              >
 
                 {/* FOTO Y SALUDO */}
 
-                <div className="
-                  flex
-                  items-center
-                  gap-3
-                  min-w-0
-                ">
+                <div
+                  className="
+                    flex
+                    items-center
+                    gap-3
+                    min-w-0
+                  "
+                >
 
                   <div
                     className="
@@ -604,24 +618,28 @@ export default function HomePage() {
 
                   <div className="min-w-0">
 
-                    <h2 className="
-                      text-lg
-                      sm:text-xl
-                      font-bold
-                      text-[#2A3B50]
-                      truncate
-                      max-w-[170px]
-                    ">
+                    <h2
+                      className="
+                        text-lg
+                        sm:text-xl
+                        font-bold
+                        text-[#2A3B50]
+                        truncate
+                        max-w-[170px]
+                      "
+                    >
                       Hola, {usuarioNombre}
                     </h2>
 
-                    <p className="
-                      text-xs
-                      font-medium
-                      text-[#8C9BAE]
-                      truncate
-                      max-w-[190px]
-                    ">
+                    <p
+                      className="
+                        text-xs
+                        font-medium
+                        text-[#8C9BAE]
+                        truncate
+                        max-w-[190px]
+                      "
+                    >
                       {saludo}
                     </p>
 
@@ -631,12 +649,14 @@ export default function HomePage() {
 
                 {/* BOTONES SUPERIORES */}
 
-                <div className="
-                  flex
-                  items-center
-                  gap-2
-                  flex-shrink-0
-                ">
+                <div
+                  className="
+                    flex
+                    items-center
+                    gap-2
+                    flex-shrink-0
+                  "
+                >
 
                   {calcularEstadoRachaPareja !== null && (
                     <button
@@ -661,15 +681,18 @@ export default function HomePage() {
                         }
                       `}
                     >
+
                       <span className="text-base">
                         🔥
                       </span>
 
-                      <span className="
-                        text-xs
-                        font-extrabold
-                        tabular-nums
-                      ">
+                      <span
+                        className="
+                          text-xs
+                          font-extrabold
+                          tabular-nums
+                        "
+                      >
                         {rachaDias}
                       </span>
 
@@ -698,15 +721,17 @@ export default function HomePage() {
                   >
 
                     {loadingLogout ? (
-                      <div className="
-                        w-5
-                        h-5
-                        border-2
-                        border-slate-400
-                        border-t-transparent
-                        rounded-full
-                        animate-spin
-                      " />
+                      <div
+                        className="
+                          w-5
+                          h-5
+                          border-2
+                          border-slate-400
+                          border-t-transparent
+                          rounded-full
+                          animate-spin
+                        "
+                      />
                     ) : (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -791,41 +816,49 @@ export default function HomePage() {
               {/* CHECK-IN */}
 
               {mostrarCheckin && (
-                <div className="
-                  mt-6
-                  bg-slate-50/80
-                  backdrop-blur-sm
-                  border
-                  border-slate-100/80
-                  rounded-2xl
-                  p-4
-                  text-center
-                ">
+                <div
+                  className="
+                    mt-6
+                    bg-slate-50/80
+                    backdrop-blur-sm
+                    border
+                    border-slate-100/80
+                    rounded-2xl
+                    p-4
+                    text-center
+                  "
+                >
 
-                  <h3 className="
-                    text-sm
-                    font-bold
-                    text-[#334155]
-                  ">
+                  <h3
+                    className="
+                      text-sm
+                      font-bold
+                      text-[#334155]
+                    "
+                  >
                     {preguntaCheckin}
                   </h3>
 
-                  <p className="
-                    text-[11px]
-                    text-[#8C9BAE]
-                    mt-0.5
-                  ">
+                  <p
+                    className="
+                      text-[11px]
+                      text-[#8C9BAE]
+                      mt-0.5
+                    "
+                  >
                     Registra tu estado emocional
                   </p>
 
-                  <div className="
-                    flex
-                    justify-between
-                    items-center
-                    gap-1
-                    mt-4
-                    px-1
-                  ">
+                  <div
+                    className="
+                      flex
+                      justify-between
+                      items-center
+                      gap-1
+                      mt-4
+                      px-1
+                    "
+                  >
 
                     {emojiEstadosData.map(
                       (item) => (
@@ -844,29 +877,33 @@ export default function HomePage() {
                           title={item.estado}
                         >
 
-                          <span className="
-                            text-3xl
-                            sm:text-4xl
-                            transition-all
-                            duration-300
-                            group-hover:scale-125
-                            cursor-pointer
-                            select-none
-                            active:scale-90
-                            block
-                          ">
+                          <span
+                            className="
+                              text-3xl
+                              sm:text-4xl
+                              transition-all
+                              duration-300
+                              group-hover:scale-125
+                              cursor-pointer
+                              select-none
+                              active:scale-90
+                              block
+                            "
+                          >
                             {item.emoji}
                           </span>
 
-                          <span className="
-                            text-[9px]
-                            font-bold
-                            text-[#A0AEC0]
-                            mt-1.5
-                            opacity-0
-                            group-hover:opacity-100
-                            transition-opacity
-                          ">
+                          <span
+                            className="
+                              text-[9px]
+                              font-bold
+                              text-[#A0AEC0]
+                              mt-1.5
+                              opacity-0
+                              group-hover:opacity-100
+                              transition-opacity
+                            "
+                          >
                             {item.estado}
                           </span>
 
@@ -883,28 +920,34 @@ export default function HomePage() {
 
             {/* HERRAMIENTAS */}
 
-            <div className="
-              p-5
-              sm:p-6
-            ">
+            <div
+              className="
+                p-5
+                sm:p-6
+              "
+            >
 
-              <h4 className="
-                text-xs
-                font-bold
-                text-[#8C9BAE]
-                tracking-widest
-                uppercase
-                mb-4
-              ">
+              <h4
+                className="
+                  text-xs
+                  font-bold
+                  text-[#8C9BAE]
+                  tracking-widest
+                  uppercase
+                  mb-4
+                "
+              >
                 Herramientas recomendadas
               </h4>
 
-              <div className="
-                grid
-                grid-cols-2
-                gap-3
-                mb-3
-              ">
+              <div
+                className="
+                  grid
+                  grid-cols-2
+                  gap-3
+                  mb-3
+                "
+              >
 
                 {herramientas
                   .filter(
@@ -925,13 +968,17 @@ export default function HomePage() {
                         items-start
                         gap-3
                         p-4
-                        bg-white/95
-                        backdrop-blur-sm
+
+                        /* CAMBIO PRINCIPAL:
+                           TARJETAS EN GRIS MUY CLARO */
+
+                        bg-[#F4F6F8]
+
                         rounded-2xl
                         border
-                        border-slate-100
+                        border-slate-200/70
                         hover:border-indigo-200
-                        hover:bg-indigo-50/30
+                        hover:bg-indigo-50/50
                         transition-all
                         active:scale-[0.98]
                         group
@@ -940,41 +987,47 @@ export default function HomePage() {
                       "
                     >
 
-                      <div className="
-                        w-12
-                        h-12
-                        rounded-2xl
-                        bg-slate-50
-                        group-hover:bg-white
-                        flex
-                        items-center
-                        justify-center
-                        text-2xl
-                        shadow-sm
-                        transition-all
-                        group-hover:scale-110
-                      ">
+                      <div
+                        className="
+                          w-12
+                          h-12
+                          rounded-2xl
+                          bg-white
+                          group-hover:bg-white
+                          flex
+                          items-center
+                          justify-center
+                          text-2xl
+                          shadow-sm
+                          transition-all
+                          group-hover:scale-110
+                        "
+                      >
                         {mapeoIconos[item.id] ||
                           "✨"}
                       </div>
 
                       <div>
 
-                        <p className="
-                          text-xs
-                          font-bold
-                          text-[#334155]
-                          leading-snug
-                        ">
+                        <p
+                          className="
+                            text-xs
+                            font-bold
+                            text-[#334155]
+                            leading-snug
+                          "
+                        >
                           {item.titulo}
                         </p>
 
-                        <p className="
-                          text-[10px]
-                          text-[#8C9BAE]
-                          mt-0.5
-                          leading-snug
-                        ">
+                        <p
+                          className="
+                            text-[10px]
+                            text-[#8C9BAE]
+                            mt-0.5
+                            leading-snug
+                          "
+                        >
                           {item.descripcion}
                         </p>
 
@@ -1009,38 +1062,46 @@ export default function HomePage() {
                 "
               >
 
-                <div className="
-                  w-14
-                  h-14
-                  rounded-2xl
-                  bg-rose-400/50
-                  flex
-                  items-center
-                  justify-center
-                  text-3xl
-                  flex-shrink-0
-                ">
+                <div
+                  className="
+                    w-14
+                    h-14
+                    rounded-2xl
+                    bg-rose-400/50
+                    flex
+                    items-center
+                    justify-center
+                    text-3xl
+                    flex-shrink-0
+                  "
+                >
                   🚨
                 </div>
 
-                <div className="
-                  flex-1
-                  min-w-0
-                ">
+                <div
+                  className="
+                    flex-1
+                    min-w-0
+                  "
+                >
 
-                  <p className="
-                    text-sm
-                    font-extrabold
-                    text-white
-                  ">
+                  <p
+                    className="
+                      text-sm
+                      font-extrabold
+                      text-white
+                    "
+                  >
                     Modo crisis
                   </p>
 
-                  <p className="
-                    text-xs
-                    text-rose-100
-                    mt-0.5
-                  ">
+                  <p
+                    className="
+                      text-xs
+                      text-rose-100
+                      mt-0.5
+                    "
+                  >
                     Ayuda inmediata y contención
                   </p>
 
@@ -1074,23 +1135,25 @@ export default function HomePage() {
 
           {/* NAVEGACIÓN INFERIOR */}
 
-          <div className="
-            relative
-            z-30
-            bg-white/95
-            backdrop-blur-md
-            border-t
-            border-slate-100
-            px-5
-            sm:px-6
-            py-3.5
-            flex
-            justify-around
-            items-center
-            sm:rounded-b-[40px]
-            shadow-[0_-6px_20px_rgba(0,0,0,0.03)]
-            flex-shrink-0
-          ">
+          <div
+            className="
+              relative
+              z-30
+              bg-white/95
+              backdrop-blur-md
+              border-t
+              border-slate-100
+              px-5
+              sm:px-6
+              py-3.5
+              flex
+              justify-around
+              items-center
+              sm:rounded-b-[40px]
+              shadow-[0_-6px_20px_rgba(0,0,0,0.03)]
+              flex-shrink-0
+            "
+          >
 
             {navegacionData.map((tab) => {
 
@@ -1171,11 +1234,13 @@ export default function HomePage() {
                     </svg>
                   )}
 
-                  <span className="
-                    text-[10px]
-                    font-bold
-                    tracking-wide
-                  ">
+                  <span
+                    className="
+                      text-[10px]
+                      font-bold
+                      tracking-wide
+                    "
+                  >
                     {tab.label}
                   </span>
 
