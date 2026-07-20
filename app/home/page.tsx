@@ -280,9 +280,7 @@ export default function HomePage() {
 
       setUsuarioNombre(nombreFinal);
 
-      // ─────────────────────────────────────────────────────────────────────
-      // CARGA DE FOTO DE PERFIL
-      // ─────────────────────────────────────────────────────────────────────
+      // ─── Carga de foto de perfil ───────────────────────────────────────────
 
       const avatarLocal =
         localStorage.getItem("userAvatar");
@@ -438,6 +436,8 @@ export default function HomePage() {
 
         {/* ─────────────────────────────────────────────────────────────────
             FONDO DECORATIVO
+            Se mantiene únicamente la onda central y la forma inferior.
+            Se eliminó la forma morada superior.
         ────────────────────────────────────────────────────────────────── */}
 
         <div
@@ -449,24 +449,6 @@ export default function HomePage() {
             overflow-hidden
           "
         >
-
-          {/* FORMA MORADA */}
-
-          <img
-            src="/images/forma_morada.png"
-            alt=""
-            aria-hidden="true"
-            className="
-              absolute
-              top-[135px]
-              left-0
-              w-[58%]
-              max-w-[280px]
-              h-auto
-              opacity-90
-              select-none
-            "
-          />
 
           {/* ONDA CENTRAL */}
 
@@ -968,12 +950,7 @@ export default function HomePage() {
                         items-start
                         gap-3
                         p-4
-
-                        /* CAMBIO PRINCIPAL:
-                           TARJETAS EN GRIS MUY CLARO */
-
                         bg-[#F4F6F8]
-
                         rounded-2xl
                         border
                         border-slate-200/70
@@ -993,7 +970,6 @@ export default function HomePage() {
                           h-12
                           rounded-2xl
                           bg-white
-                          group-hover:bg-white
                           flex
                           items-center
                           justify-center
