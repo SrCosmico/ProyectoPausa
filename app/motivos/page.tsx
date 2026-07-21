@@ -52,8 +52,9 @@ const mapeoIconos: Record<MotivoId, string> = {
 export default function MotivosPage() {
   const router = useRouter();
 
+  // ── Ninguna opción marcada por defecto ───────────────────────────────────
   const [seleccionados, setSeleccionados] = useState<Record<MotivoId, boolean>>({
-    estres: true,
+    estres: false,
     bienestar: false,
     dormir: false,
     academico: false,
@@ -63,6 +64,11 @@ export default function MotivosPage() {
 
   const [otroTexto, setOtroTexto] = useState<string>('');
   const [simulacionEnvioOtro, setSimulacionEnvioOtro] = useState<boolean>(false);
+
+  // ── Al menos una opción seleccionada para habilitar el botón ─────────────
+  const hayAlgunaSeleccionada = (Object.keys(seleccionados) as MotivoId[]).some(
+    (id) => seleccionados[id]
+  );
 
   const datosMotivos: PantallaMotivos = {
     paso: 1,
@@ -98,8 +104,8 @@ export default function MotivosPage() {
     }
   };
 
-  // Persiste las opciones elegidas y avanza al siguiente paso del cuestionario
   const manejarContinuar = () => {
+    if (!hayAlgunaSeleccionada) return;
     const motivosSeleccionados = (Object.keys(seleccionados) as MotivoId[]).filter(
       (id) => seleccionados[id]
     );
@@ -218,13 +224,24 @@ export default function MotivosPage() {
           </div>
         </div>
 
+        {/* ── Botón continuar: deshabilitado si no hay nada seleccionado ── */}
         <div className="mt-8 pb-4">
           <button 
             onClick={manejarContinuar}
-            className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
+            disabled={!hayAlgunaSeleccionada}
+            className={`w-full font-semibold py-4 px-6 rounded-2xl shadow-lg transition-all active:scale-[0.99] text-base text-center ${
+              hayAlgunaSeleccionada
+                ? 'bg-[#4A72A6] hover:bg-[#3B5E8C] text-white shadow-blue-900/10 cursor-pointer'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+            }`}
           >
             {datosMotivos.botonContinuar}
           </button>
+          {!hayAlgunaSeleccionada && (
+            <p className="text-[11px] text-slate-400 text-center mt-2">
+              Selecciona al menos una opción para continuar
+            </p>
+          )}
         </div>
 
       </div>
