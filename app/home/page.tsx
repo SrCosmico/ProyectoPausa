@@ -10,7 +10,7 @@ import { cerrarSesion } from "@/app/services/authService";
 // ─── Importación segura de racha ──────────────────────────────────────────────
 
 let calcularEstadoRachaPareja:
-  ((uid: string) => Promise<any>) | null = null;
+  | ((uid: string) => Promise<any>) | null = null;
 
 try {
   const mod = require("@/lib/supabase/racha");
@@ -411,7 +411,7 @@ export default function HomePage() {
         justify-center
         p-0
         sm:p-4
-        font-sans
+        font-['Plus_Jakarta_Sans',sans-serif]
         selection:bg-blue-100
       "
     >
