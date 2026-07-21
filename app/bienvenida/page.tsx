@@ -3,7 +3,6 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 
-// Interfaces originales
 export interface LogoApp {
   nombre: string; 
   tagline: string;
@@ -37,36 +36,77 @@ export default function PausaApp() {
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100 relative overflow-hidden">
       
-      {/* TARJETA PRINCIPAL (Estructura original mantenida) */}
-      <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-hidden flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 z-10 animate-fade-in-up">
+      {/* TARJETA PRINCIPAL (con overflow-hidden para cortar las imágenes en el borde) */}
+      <div className="w-full max-w-md h-screen sm:h-auto sm:min-h-[820px] sm:max-h-[900px] bg-[#FAF8F5] shadow-2xl overflow-hidden flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 z-10 animate-fade-in-up">
         
-        {/* ELEMENTOS PLASMÁTICOS DENTRO DEL CONTENEDOR */}
-        <div className="absolute -top-[10%] -left-[20%] w-80 h-80 rounded-full bg-purple-100/60 blur-[80px] -z-10 animate-pulse-slow" />
-        <div className="absolute top-[30%] -right-[20%] w-80 h-80 rounded-full bg-blue-100/60 blur-[80px] -z-10 animate-pulse-slower" />
-        <div className="absolute -bottom-[5%] left-[10%] w-96 h-96 rounded-full bg-green-100/50 blur-[80px] -z-10 animate-float" />
+        {/* ESQUINA SUPERIOR IZQUIERDA (Ajustada con márgenes negativos para eliminar el borde transparente) */}
+        <img 
+          src="/images/forma_morada.png" 
+          alt="" 
+          className="absolute -top-4 -left-4 w-[65%] max-w-[280px] object-contain pointer-events-none z-0 scale-110 origin-top-left" 
+        />
+        
+        {/* ESQUINA INFERIOR DERECHA (Ajustada con márgenes negativos) */}
+        <img 
+          src="/images/forma_verde.png" 
+          alt="" 
+          className="absolute -bottom-6 -right-6 w-[70%] max-w-[300px] object-contain pointer-events-none z-0 scale-110 origin-bottom-right" 
+        />
 
-        {/* CONTENIDO ORIGINAL */}
-        <div className="flex-1 flex flex-col items-center justify-center px-8 pt-12 text-center">
-          <div className="relative w-28 h-28 mb-6 flex items-center justify-center">
-            <div className="absolute inset-0 bg-gradient-to-tr from-purple-200 via-emerald-100 to-blue-200 rounded-full opacity-70" />
-            <div className="absolute w-20 h-20 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm">
-              <svg viewBox="0 0 100 100" className="w-12 h-12 text-slate-400" fill="currentColor">
-                <path d="M50 0C50 27.6 27.6 50 0 50C27.6 50 50 72.4 50 100C50 72.4 72.4 50 100 50C72.4 50 50 27.6 50 0Z" />
-              </svg>
-            </div>
+        {/* ONDA DEL MEDIO */}
+        <img 
+          src="/images/onda_del_medio.png" 
+          alt="" 
+          className="absolute top-[42%] -left-2 w-[105%] object-cover pointer-events-none z-0 opacity-50" 
+        />
+
+        {/* RAMITAS LATERALES PEGADAS A LOS BORDES */}
+        <img 
+          src="/images/ramita_izquierda.png" 
+          alt="" 
+          className="absolute top-[50%] -left-2 w-14 sm:w-16 object-contain pointer-events-none z-0 opacity-80" 
+        />
+        <img 
+          src="/images/ramita_derecha.png" 
+          alt="" 
+          className="absolute top-[44%] -right-2 w-16 sm:w-20 object-contain pointer-events-none z-0 opacity-80" 
+        />
+
+        {/* CONTENIDO PRINCIPAL */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 sm:px-8 pt-12 text-center z-10">
+          
+          {/* LOGO */}
+          <div className="relative w-32 h-32 sm:w-36 sm:h-36 mb-3 flex items-center justify-center">
+            <img 
+              src="/images/logo sin letras.jpeg" 
+              alt="Logo Pausa" 
+              className="w-full h-full object-contain scale-125 mix-blend-multiply" 
+            />
           </div>
-          <h1 className="text-4xl font-bold text-[#2A3B50] tracking-tight mb-1">{datosBienvenida.logo.nombre}</h1>
-          <p className="text-xs font-semibold text-[#8C9BAE] tracking-[0.2em] mb-12">{datosBienvenida.logo.tagline}</p>
 
-          <div className="space-y-4 max-w-sm">
-            <h2 className="text-xl font-bold text-[#334155] leading-snug px-2">{datosBienvenida.encabezado}</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed px-4">{datosBienvenida.descripcion}</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#2A3B50] tracking-tight mb-1">{datosBienvenida.logo.nombre}</h1>
+          <p className="text-[10px] sm:text-xs font-semibold text-[#8C9BAE] tracking-[0.2em] mb-8 sm:mb-10">{datosBienvenida.logo.tagline}</p>
+
+          <div className="space-y-3 sm:space-y-4 max-w-sm">
+            <h2 className="text-lg sm:text-xl font-bold text-[#334155] leading-snug px-2">{datosBienvenida.encabezado}</h2>
+            <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed px-2 sm:px-4">{datosBienvenida.descripcion}</p>
           </div>
         </div>
 
-        <div className="px-8 pb-10 flex flex-col items-center gap-4 w-full">
-          <button onClick={() => router.push('/motivos')} className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl transition-all active:scale-[0.99]">{datosBienvenida.botones.primario}</button>
-          <button onClick={() => router.push('/home')} className="text-[#7E8CA0] hover:text-[#4A72A6] font-semibold text-sm">{datosBienvenida.botones.secundario}</button>
+        {/* BOTONES */}
+        <div className="px-6 sm:px-8 pb-8 sm:pb-10 flex flex-col items-center gap-3 w-full z-10">
+          <button 
+            onClick={() => router.push('/motivos')} 
+            className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-3.5 sm:py-4 px-6 rounded-2xl transition-all active:scale-[0.99] shadow-md"
+          >
+            {datosBienvenida.botones.primario}
+          </button>
+          <button 
+            onClick={() => router.push('/home')} 
+            className="text-[#7E8CA0] hover:text-[#4A72A6] font-semibold text-xs sm:text-sm py-1 transition-colors"
+          >
+            {datosBienvenida.botones.secundario}
+          </button>
         </div>
       </div>
 
@@ -75,22 +115,7 @@ export default function PausaApp() {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes pulseSlow {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-        @keyframes pulseSlower {
-          0%, 100% { transform: scale(1.1); }
-          50% { transform: scale(1); }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-20px); }
-        }
         .animate-fade-in-up { animation: fadeInUp 0.8s ease-out; }
-        .animate-pulse-slow { animation: pulseSlow 10s ease-in-out infinite; }
-        .animate-pulse-slower { animation: pulseSlower 12s ease-in-out infinite; }
-        .animate-float { animation: float 8s ease-in-out infinite; }
       `}</style>
     </div>
   );
