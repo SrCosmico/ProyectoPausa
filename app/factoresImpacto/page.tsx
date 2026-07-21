@@ -44,28 +44,28 @@ export const opcionesFactoresData: Omit<OpcionFactor, "seleccionado">[] = [
 ];
 
 const mapeoIconos: Record<FactorId, string> = {
-  estres_academico: "🎓",
-  sobrecarga_tareas: "📝",
-  falta_tiempo: "⏳",
+  estres_academico:     "🎓",
+  sobrecarga_tareas:    "📝",
+  falta_tiempo:         "⏳",
   problemas_personales: "👥",
-  ansiedad: "🧠",
-  motivacion_baja: "📉",
-  otro: "✏️"
+  ansiedad:             "🧠",
+  motivacion_baja:      "📉",
+  otro:                 "✏️",
 };
 
 export default function FactoresImpactoPage() {
   const router = useRouter();
 
   const [seleccionados, setSeleccionados] = useState<Record<FactorId, boolean>>({
-    estres_academico: false,
-    sobrecarga_tareas: false,
-    falta_tiempo: false,
+    estres_academico:     false,
+    sobrecarga_tareas:    false,
+    falta_tiempo:         false,
     problemas_personales: false,
-    ansiedad: false,
-    motivacion_baja: false,
-    otro: false,
+    ansiedad:             false,
+    motivacion_baja:      false,
+    otro:                 false,
   });
-  const [otroTexto, setOtroTexto] = useState<string>('');
+  const [otroTexto, setOtroTexto]         = useState<string>('');
   const [envioSimulado, setEnvioSimulado] = useState<boolean>(false);
 
   const datosFactores: PantallaFactoresImpacto = {
@@ -77,12 +77,15 @@ export default function FactoresImpactoPage() {
       id: item.id,
       label: item.label,
       icono: mapeoIconos[item.id],
-      seleccionado: seleccionados[item.id]
+      seleccionado: seleccionados[item.id],
     })),
-    otroTexto: otroTexto,
+    otroTexto,
     botonContinuar: "Continuar",
-    botonVolver: "Volver"
+    botonVolver: "Volver",
   };
+
+  // Al menos una opción seleccionada para habilitar el botón
+  const haySeleccion = (Object.values(seleccionados) as boolean[]).some(Boolean);
 
   const toggleOpcionId = (id: FactorId) => {
     setSeleccionados(prev => ({ ...prev, [id]: !prev[id] }));
@@ -92,14 +95,13 @@ export default function FactoresImpactoPage() {
   };
 
   const manejarEnvioSimulado = () => {
-    if (otroTexto.trim() !== '') {
-      setEnvioSimulado(true);
-    }
+    if (otroTexto.trim() !== '') setEnvioSimulado(true);
   };
 
   const manejarContinuar = () => {
+    if (!haySeleccion) return;
     const factoresSeleccionados = (Object.keys(seleccionados) as FactorId[]).filter(
-      (id) => seleccionados[id]
+      id => seleccionados[id]
     );
     guardarFactoresOnboarding(factoresSeleccionados, otroTexto);
     router.push('/preferenciasApoyo');
@@ -108,11 +110,11 @@ export default function FactoresImpactoPage() {
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
-        
+
         <div className="pt-4">
-          
-          <button 
-            onClick={() => router.push('/estadoActual')} 
+
+          <button
+            onClick={() => router.push('/estadoActual')}
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none rounded-full hover:bg-slate-50 active:scale-95"
             aria-label="Regresar"
           >
@@ -134,15 +136,15 @@ export default function FactoresImpactoPage() {
           <p className="text-xs text-[#8C9BAE] mt-1">
             {datosFactores.instruccion}
           </p>
-          
+
           <div className="space-y-3 mt-6">
             {datosFactores.opciones.map((opcion) => (
               <div key={opcion.id} className="w-full">
                 <button
                   onClick={() => toggleOpcionId(opcion.id)}
                   className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-150 active:scale-[0.99] ${
-                    opcion.seleccionado 
-                      ? 'border-[#4A72A6] bg-[#4A72A6]/5 shadow-sm' 
+                    opcion.seleccionado
+                      ? 'border-[#4A72A6] bg-[#4A72A6]/5 shadow-sm'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
@@ -172,13 +174,10 @@ export default function FactoresImpactoPage() {
                           setOtroTexto(e.target.value);
                           if (envioSimulado) setEnvioSimulado(false);
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') manejarEnvioSimulado();
-                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') manejarEnvioSimulado(); }}
                         placeholder="Escribe aquí tu situación..."
                         className="w-full pl-4 pr-12 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A72A6] focus:bg-white text-slate-700 transition-colors placeholder:text-slate-400"
                       />
-                      
                       <button
                         onClick={manejarEnvioSimulado}
                         className="absolute right-2 p-2 text-[#4A72A6] hover:text-[#3B5E8C] transition-colors rounded-lg hover:bg-slate-200/50"
@@ -203,9 +202,14 @@ export default function FactoresImpactoPage() {
         </div>
 
         <div className="mt-8 pb-4 w-full">
-          <button 
+          <button
             onClick={manejarContinuar}
-            className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
+            disabled={!haySeleccion}
+            className={`w-full font-semibold py-4 px-6 rounded-2xl shadow-lg transition-all active:scale-[0.99] text-base text-center
+              ${haySeleccion
+                ? 'bg-[#4A72A6] hover:bg-[#3B5E8C] text-white shadow-blue-900/10 cursor-pointer'
+                : 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed'
+              }`}
           >
             {datosFactores.botonContinuar}
           </button>
