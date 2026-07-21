@@ -11,8 +11,7 @@ export type PreferenciaId =
   | "tips_antistres"
   | "organizacion"
   | "motivacion_habitos"
-  | "acompanamiento"
-  | "chat_ia";
+  | "acompanamiento";
 
 export interface OpcionPreferencia {
   id: PreferenciaId;
@@ -37,29 +36,26 @@ export const opcionesPreferenciasData: Omit<OpcionPreferencia, "seleccionado">[]
   { id: "organizacion",       label: "Organización académica" },
   { id: "motivacion_habitos", label: "Motivación y hábitos" },
   { id: "acompanamiento",     label: "Acompañamiento emocional" },
-  { id: "chat_ia",            label: "Hablar con alguien (IA)" },
 ];
 
 const mapeoIconos: Record<PreferenciaId, string> = {
-  ejercicios_calma:   "🧘",
-  tips_antistres:     "💡",
-  organizacion:       "📅",
+  ejercicios_calma: "🧘",
+  tips_antistres: "💡",
+  organizacion: "📅",
   motivacion_habitos: "🌱",
-  acompanamiento:     "🤝",
-  chat_ia:            "🤖",
+  acompanamiento: "🤝",
 };
 
 export default function PreferenciasApoyoPage() {
   const router = useRouter();
 
   const [seleccionados, setSeleccionados] = useState<Record<PreferenciaId, boolean>>({
-    ejercicios_calma:   false,
-    tips_antistres:     false,
-    organizacion:       false,
-    motivacion_habitos: false,
-    acompanamiento:     false,
-    chat_ia:            false,
-  });
+  ejercicios_calma: false,
+  tips_antistres: false,
+  organizacion: false,
+  motivacion_habitos: false,
+  acompanamiento: false,
+});
 
   const datosPreferencias: PantallaPreferenciasApoyo = {
     paso: 4,
