@@ -32,33 +32,33 @@ export interface PantallaPreferenciasApoyo {
 }
 
 export const opcionesPreferenciasData: Omit<OpcionPreferencia, "seleccionado">[] = [
-  { id: "ejercicios_calma",    label: "Ejercicios para calmarme" },
-  { id: "tips_antistres",      label: "Consejos y tips anti-estrés" },
-  { id: "organizacion",        label: "Organización académica" },
-  { id: "motivacion_habitos",  label: "Motivación y hábitos" },
-  { id: "acompanamiento",      label: "Acompañamiento emocional" },
-  { id: "chat_ia",             label: "Hablar con alguien (IA)" },
+  { id: "ejercicios_calma",   label: "Ejercicios para calmarme" },
+  { id: "tips_antistres",     label: "Consejos y tips anti-estrés" },
+  { id: "organizacion",       label: "Organización académica" },
+  { id: "motivacion_habitos", label: "Motivación y hábitos" },
+  { id: "acompanamiento",     label: "Acompañamiento emocional" },
+  { id: "chat_ia",            label: "Hablar con alguien (IA)" },
 ];
 
 const mapeoIconos: Record<PreferenciaId, string> = {
-  ejercicios_calma: "🧘",
-  tips_antistres: "💡",
-  organizacion: "📅",
+  ejercicios_calma:   "🧘",
+  tips_antistres:     "💡",
+  organizacion:       "📅",
   motivacion_habitos: "🌱",
-  acompanamiento: "🤝",
-  chat_ia: "🤖"
+  acompanamiento:     "🤝",
+  chat_ia:            "🤖",
 };
 
 export default function PreferenciasApoyoPage() {
   const router = useRouter();
 
   const [seleccionados, setSeleccionados] = useState<Record<PreferenciaId, boolean>>({
-    ejercicios_calma: false,
-    tips_antistres: false,
-    organizacion: false,
+    ejercicios_calma:   false,
+    tips_antistres:     false,
+    organizacion:       false,
     motivacion_habitos: false,
-    acompanamiento: false,
-    chat_ia: false,
+    acompanamiento:     false,
+    chat_ia:            false,
   });
 
   const datosPreferencias: PantallaPreferenciasApoyo = {
@@ -70,19 +70,23 @@ export default function PreferenciasApoyoPage() {
       id: item.id,
       label: item.label,
       icono: mapeoIconos[item.id],
-      seleccionado: seleccionados[item.id]
+      seleccionado: seleccionados[item.id],
     })),
     botonContinuar: "Continuar",
-    botonVolver: "Volver"
+    botonVolver: "Volver",
   };
+
+  // Al menos una opción seleccionada para habilitar el botón
+  const haySeleccion = (Object.values(seleccionados) as boolean[]).some(Boolean);
 
   const toggleOpcionId = (id: PreferenciaId) => {
     setSeleccionados(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const manejarContinuar = () => {
+    if (!haySeleccion) return;
     const preferenciasSeleccionadas = (Object.keys(seleccionados) as PreferenciaId[]).filter(
-      (id) => seleccionados[id]
+      id => seleccionados[id]
     );
     guardarPreferenciasOnboarding(preferenciasSeleccionadas);
     router.push('/frecuencia');
@@ -91,11 +95,11 @@ export default function PreferenciasApoyoPage() {
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-blue-100">
       <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
-        
+
         <div className="pt-4">
-          
-          <button 
-            onClick={() => router.push('/factoresImpacto')} 
+
+          <button
+            onClick={() => router.push('/factoresImpacto')}
             className="p-2 -ml-2 text-[#7E8CA0] hover:text-[#4A72A6] transition-colors focus:outline-none rounded-full hover:bg-slate-50 active:scale-95"
             aria-label="Regresar"
           >
@@ -117,15 +121,15 @@ export default function PreferenciasApoyoPage() {
           <p className="text-xs text-[#8C9BAE] mt-1">
             {datosPreferencias.instruccion}
           </p>
-          
+
           <div className="space-y-3 mt-6">
             {datosPreferencias.opciones.map((opcion) => (
               <button
                 key={opcion.id}
                 onClick={() => toggleOpcionId(opcion.id)}
                 className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-150 active:scale-[0.99] ${
-                  opcion.seleccionado 
-                    ? 'border-[#4A72A6] bg-[#4A72A6]/5 shadow-sm' 
+                  opcion.seleccionado
+                    ? 'border-[#4A72A6] bg-[#4A72A6]/5 shadow-sm'
                     : 'border-slate-200 bg-white hover:bg-slate-50'
                 }`}
               >
@@ -149,9 +153,14 @@ export default function PreferenciasApoyoPage() {
         </div>
 
         <div className="mt-8 pb-4 w-full">
-          <button 
+          <button
             onClick={manejarContinuar}
-            className="w-full bg-[#4A72A6] hover:bg-[#3B5E8C] text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99] text-base text-center"
+            disabled={!haySeleccion}
+            className={`w-full font-semibold py-4 px-6 rounded-2xl shadow-lg transition-all active:scale-[0.99] text-base text-center
+              ${haySeleccion
+                ? 'bg-[#4A72A6] hover:bg-[#3B5E8C] text-white shadow-blue-900/10 cursor-pointer'
+                : 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed'
+              }`}
           >
             {datosPreferencias.botonContinuar}
           </button>
