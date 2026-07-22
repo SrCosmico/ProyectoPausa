@@ -9,6 +9,15 @@ import { obtenerTituloRegistro } from '@/lib/supabase/registroemocional';
 import { obtenerEmocionTemporal, limpiarEmocionTemporal } from '@/lib/supabase/quizState';
 import { obtenerUsuarioIdLocal } from '@/lib/supabase/home';
 import { emojiEstadosData } from '@/models/home';
+import {
+  debeActivarIntervencion,
+  obtenerParcialMasUrgente,
+  construirIntervencionEmocional,
+  DIAS_VENTANA_ALERTA,
+  type IntervencionEmocional,
+} from '@/lib/cronograma/vinculacionEmocional';
+import { leerParcialesProximos } from '@/lib/supabase/materiasParciales';
+import ModalIntervencionEmocional from '@/components/ModalIntervencionEmocional';
 
 export default function RegistroEmocionalPage() {
   const router = useRouter();
@@ -17,6 +26,7 @@ export default function RegistroEmocionalPage() {
   const [tituloCabecera, setTituloCabecera] = useState<string>("¿Cómo te sientes hoy?");
   const [estaGuardando, setEstaGuardando] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [intervencion, setIntervencion] = useState<IntervencionEmocional | null>(null);
 
   useEffect(() => {
     const cargarEstado = async () => {
@@ -33,6 +43,11 @@ export default function RegistroEmocionalPage() {
 
     cargarEstado();
   }, []);
+
+  const manejarCierreIntervencion = () => {
+    setIntervencion(null);
+    router.push('/monitoreo');
+  };
 
   const manejarGuardado = async () => {
     if (!emocionSeleccionada) return;
@@ -63,16 +78,20 @@ export default function RegistroEmocionalPage() {
 
     setEstaGuardando(false);
 
-    if (errorSupabase) {
-      setError('No se pudo guardar tu registro. Intenta de nuevo.');
-      return;
-    }
-
     if (typeof window !== 'undefined') {
       localStorage.setItem('fechaUltimoRegistro', new Date().toLocaleDateString());
     }
 
-    // 4. Redirigimos directo a monitoreo para que vea su registro reflejado
+    // NUEVO: si la emoción registrada activa alerta, revisamos parciales próximos
+    if (debeActivarIntervencion(emocionSeleccionada)) {
+      const proximos = await leerParcialesProximos(user.id, DIAS_VENTANA_ALERTA);
+      const urgente = obtenerParcialMasUrgente(proximos);
+      if (urgente) {
+        setIntervencion(construirIntervencionEmocional(urgente));
+        return; // no navegamos todavía; el modal decide el siguiente paso
+      }
+    }
+
     router.push('/monitoreo');
   };
 
@@ -143,6 +162,13 @@ export default function RegistroEmocionalPage() {
             )}
           </button>
         </div>
+
+        {intervencion && (
+          <ModalIntervencionEmocional
+            intervencion={intervencion}
+            onCerrar={manejarCierreIntervencion}
+          />
+        )}
 
       </div>
     </div>

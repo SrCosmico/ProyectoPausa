@@ -12,17 +12,23 @@ import {
   obtenerConfiguracionCronograma,
   type ActividadCronogramaGuardada,
 } from '@/lib/supabase/cronograma';
+import SemaforoEstres from '@/components/SemaforoEstres';
+import GestionMateriasParciales from '@/components/GestionMateriasParciales';
+import { leerParcialesConMateria } from '@/lib/supabase/materiasParciales';
+import type { ParcialConMateria } from '@/models/cronogramaAcademico';
+import {
+  guardarCacheOffline,
+  leerCacheOffline,
+  tiempoDesdeSincronizacion,
+  generarResumenTextoSemana,
+  descargarResumenSemanal,
+} from '@/lib/cronograma/modoOffline';
 
 type VistaId = 
-  | 'paso1' 
-  | 'paso2' 
-  | 'paso3' 
-  | 'paso4' 
-  | 'paso5' 
-  | 'vistaSemanal' 
-  | 'agregarActividad' 
-  | 'detallesActividad'
-  | 'configuracionRapida';
+  | 'paso1' | 'paso2' | 'paso3' | 'paso4' | 'paso5' 
+  | 'vistaSemanal' | 'agregarActividad' | 'detallesActividad'
+  | 'configuracionRapida'
+  | 'materiasParciales'; // NUEVO
 
 type SubVistaCalendario = 'dia' | 'mes' | 'lista';
 
@@ -126,6 +132,8 @@ export default function CronogramaPage() {
   const [horaFinActividad, setHoraFinActividad] = useState("08:00 a. m.");
   const [guardandoActividad, setGuardandoActividad] = useState(false);
   const [errorActividad, setErrorActividad] = useState<string | null>(null);
+  const [parciales, setParciales] = useState<ParcialConMateria[]>([]);
+  const [ultimaSincronizacion, setUltimaSincronizacion] = useState<string | null>(null);
 
   const mapaEstilos = {
     blue: { bg: "bg-blue-400", hoverBg: "hover:bg-blue-500", text: "text-blue-500", bgLight: "bg-blue-50/70", border: "border-blue-200" },
@@ -167,6 +175,21 @@ export default function CronogramaPage() {
       }
 
       await refrescarActividades(session.user.id);
+            const parcialesUsuario = await leerParcialesConMateria(session.user.id);
+      setParciales(parcialesUsuario);
+
+      // Guardamos copia offline para consulta sin conexión
+      guardarCacheOffline(session.user.id, {
+        actividades: await (async () => {
+          // reutilizamos lo ya cargado por refrescarActividades vía estado actual
+          return actividadesGuardadas;
+        })(),
+        parciales: parcialesUsuario,
+      });
+
+      const cache = leerCacheOffline(session.user.id);
+      if (cache) setUltimaSincronizacion(cache.sincronizadoEn);
+
       setCargandoSesion(false);
       
       if (vista === 'paso1') setVista('vistaSemanal');
@@ -188,8 +211,14 @@ export default function CronogramaPage() {
         break;
       case 'detallesActividad': setVista('vistaSemanal'); break;
       case 'configuracionRapida': setVista('vistaSemanal'); break;
+      case 'materiasParciales': setVista('vistaSemanal'); break;
       default: router.push('/home');
     }
+  };
+
+  const manejarDescargaResumen = () => {
+    const contenido = generarResumenTextoSemana(nombreCronograma, actividadesGuardadas, parciales);
+    descargarResumenSemanal(`pausa_resumen_${obtenerFechaISO(new Date())}`, contenido);
   };
 
   const toggleSelection = (item: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
@@ -333,18 +362,30 @@ export default function CronogramaPage() {
             {vista === 'configuracionRapida' && "Ajustes del calendario"}
           </h3>
 
-          {/* Botón de Ajustes Rápidos en la esquina superior derecha */}
+          {/* Botones de acceso rápido en la esquina superior derecha */}
           {vista === 'vistaSemanal' ? (
-            <button 
-              onClick={() => setVista('configuracionRapida')} 
-              className="p-2 -mr-2 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
-              title="Ajustes de Cronograma"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.767c-.293.224-.438.613-.431.983.001.066.002.132.002.198 0 .066-.001.132-.002.198-.007.37.138.76.431.983l1.003.767a1.125 1.125 0 0 1 .26 1.43l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.216-.456a1.125 1.125 0 0 0-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.644-.87a6.52 6.52 0 0 1-.22-.127a1.125 1.125 0 0 0-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.43l1.003-.767c.293-.224.438-.613.431-.983a6.53 6.53 0 0 1-.002-.198c0-.066.001-.132.002-.198.007-.37-.138-.76-.431-.983l-1.003-.767a1.125 1.125 0 0 1-.26-1.43l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128c.332-.183.582-.495.644-.869l.214-1.28Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={manejarDescargaResumen}
+                className="p-2 -mr-1 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
+                title="Descargar resumen semanal"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v11m0 0 4-4m-4 4-4-4M4 18h16" />
+                </svg>
+              </button>
+
+              <button 
+                onClick={() => setVista('configuracionRapida')} 
+                className="p-2 -mr-2 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
+                title="Ajustes de Cronograma"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.767c-.293.224-.438.613-.431.983.001.066.002.132.002.198 0 .066-.001.132-.002.198-.007.37.138.76.431.983l1.003.767a1.125 1.125 0 0 1 .26 1.43l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.216-.456a1.125 1.125 0 0 0-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.644-.87a6.52 6.52 0 0 1-.22-.127a1.125 1.125 0 0 0-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.43l1.003-.767c.293-.224.438-.613.431-.983a6.53 6.53 0 0 1-.002-.198c0-.066.001-.132.002-.198.007-.37-.138-.76-.431-.983l-1.003-.767a1.125 1.125 0 0 1-.26-1.43l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128c.332-.183.582-.495.644-.869l.214-1.28Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              </button>
+            </div>
           ) : (
             <div className="w-5 h-5" />
           )}
@@ -469,9 +510,36 @@ export default function CronogramaPage() {
             </div>
           )}
 
+          {/* VISTA MATERIAS Y PARCIALES */}
+          {vista === 'materiasParciales' && (
+            <div className="p-6 animate-fadeIn">
+              <GestionMateriasParciales
+                userId={userId!}
+                onDatosActualizados={(nuevosParciales) => setParciales(nuevosParciales)}
+              />
+            </div>
+          )}
+
           {/* VISTA DASHBOARD PRINCIPAL */}
           {vista === 'vistaSemanal' && (
             <div className="animate-fadeIn relative pb-16">
+              <div className="px-6 pt-4 pb-2 bg-white space-y-3">
+                <SemaforoEstres parciales={parciales} />
+
+                <button
+                  onClick={() => setVista('materiasParciales')}
+                  className="w-full py-2.5 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                  📚 Materias y parciales
+                </button>
+
+                {ultimaSincronizacion && (
+                  <p className="text-[10px] text-slate-400 text-center">
+                    Última sincronización: {tiempoDesdeSincronizacion(ultimaSincronizacion)}
+                  </p>
+                )}
+              </div>
+
               <div className="px-6 pt-3 flex justify-between items-center bg-slate-50/60 pb-3 border-b border-slate-100">
                 <div className="flex bg-slate-200/70 p-1 rounded-xl w-full max-w-[300px]">
                   <button onClick={() => setSubVista('dia')} className={`flex-1 text-center text-[11px] font-bold py-1.5 rounded-lg transition-all ${subVista === 'dia' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Día</button>
