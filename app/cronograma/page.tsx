@@ -1,36 +1,45 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase';
-import {
-  crearActividadCronograma,
-  actualizarActividadCronograma,
-  leerActividadesCronogramaUsuario,
-  eliminarActividadCronograma,
-  guardarConfiguracionCronograma,
-  obtenerConfiguracionCronograma,
-  type ActividadCronogramaGuardada,
-} from '@/lib/supabase/cronograma';
-import SemaforoEstres from '@/components/SemaforoEstres';
-import GestionMateriasParciales from '@/components/GestionMateriasParciales';
-import { leerParcialesConMateria } from '@/lib/supabase/materiasParciales';
-import type { ParcialConMateria } from '@/models/cronogramaAcademico';
-import {
-  guardarCacheOffline,
-  leerCacheOffline,
-  tiempoDesdeSincronizacion,
-  generarResumenTextoSemana,
-  descargarResumenSemanal,
-} from '@/lib/cronograma/modoOffline';
+// DELATE
+import { deleteSelectedDay } from '@/lib/supabase/cronograma';
+import { deleteSelectedActivity } from '@/lib/supabase/cronograma';
+import { deleteCronogramaActivity } from '@/lib/supabase/cronograma';
 
-type VistaId = 
-  | 'paso1' | 'paso2' | 'paso3' | 'paso4' | 'paso5' 
-  | 'vistaSemanal' | 'agregarActividad' | 'detallesActividad'
-  | 'configuracionRapida'
-  | 'materiasParciales'; // NUEVO
-
+// ==========================================
+// INTERFACES Y CONFIGURACIÓN DE DATOS
+// ==========================================
+type VistaId = 'paso1' | 'paso2' | 'paso3' | 'paso4' | 'paso5' | 'vistaSemanal' | 'agregarActividad' | 'detallesActividad';
 type SubVistaCalendario = 'dia' | 'mes' | 'lista';
+
+interface BloqueHorario {
+  id: string;
+  hora: string;
+  titulo: string;
+  subtitulo: string;
+  color: string;
+}
+
+// ==========================================
+// NUEVO: MATERIAS Y PARCIALES/EVALUACIONES
+// ==========================================
+interface Materia {
+  id: string;
+  nombre: string;
+  dificultad: number; // 1-5
+}
+
+interface ParcialItem {
+  id: string;
+  materiaId: string;
+  titulo: string;
+  fecha: string;
+  tipo: string;
+  peso: number; // 1-5
+}
+
+const TIPOS_EVALUACION = ["Parcial", "Quiz", "Proyecto", "Tarea evaluada"];
 
 const opcionesHoras = [
   "05:00 a. m.", "06:00 a. m.", "07:00 a. m.", "08:00 a. m.", "09:00 a. m.", "10:00 a. m.", "11:00 a. m.",
@@ -38,187 +47,114 @@ const opcionesHoras = [
   "07:00 p. m.", "08:00 p. m.", "09:00 p. m.", "10:00 p. m.", "11:00 p. m."
 ];
 
-const tiposActividad = [
-  { id: "clase", label: "Clase" },
-  { id: "estudio", label: "Estudio" },
-  { id: "tarea", label: "Tarea" },
-  { id: "examen", label: "Examen" },
-];
-
-// Helper para mapear colores pasteles limpios y legibles por tipo de actividad
-function obtenerEstiloPorTipo(tipo: string) {
-  switch (tipo?.toLowerCase()) {
-    case 'tarea':
-      return { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200/80", badge: "bg-orange-100 text-orange-800" };
-    case 'estudio':
-      return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200/80", badge: "bg-emerald-100 text-emerald-800" };
-    case 'examen':
-      return { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200/80", badge: "bg-rose-100 text-rose-800" };
-    case 'clase':
-    default:
-      return { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200/80", badge: "bg-purple-100 text-purple-800" };
-  }
-}
-
-function convertir24a12h(hora24: string): string {
-  if (!hora24) return "07:00 a. m.";
-  const partes = hora24.split(':');
-  let horas = parseInt(partes[0], 10);
-  const minutos = partes[1] || '00';
-  const ampm = horas >= 12 ? 'p. m.' : 'a. m.';
-  if (horas > 12) horas -= 12;
-  if (horas === 0) horas = 12;
-  return `${String(horas).padStart(2, '0')}:${minutos} ${ampm}`;
-}
-
-function obtenerFechaISO(d: Date): string {
-  const offset = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - offset).toISOString().split('T')[0];
-}
-
-function generarDiasVisibles() {
-  const abreviaturas = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const hoy = new Date();
-  const dias = [];
-  for (let i = -2; i <= 2; i++) {
-    const d = new Date(hoy);
-    d.setDate(hoy.getDate() + i);
-    dias.push({
-      iso: obtenerFechaISO(d),
-      abbr: abreviaturas[d.getDay()],
-      num: String(d.getDate()).padStart(2, '0'),
-    });
-  }
-  return dias;
-}
-
-function formatearFechaLegible(iso: string): string {
-  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const [anio, mes, dia] = iso.split('-').map(Number);
-  return `${dia} de ${meses[mes - 1]} de ${anio}`;
-}
-
 export default function CronogramaPage() {
   const router = useRouter();
-
+  
+  // Estado principal de navegación interna
   const [vista, setVista] = useState<VistaId>('paso1');
+  
+  // ESTADOS DE INTERACTIVIDAD INTERNA DEL CRONOGRAMA
   const [subVista, setSubVista] = useState<SubVistaCalendario>('dia');
+  const [diaActivoNumero, setDiaActivoNumero] = useState<string>("27");
 
+  // Estados del Formulario de Creación
   const [diasSeleccionados, setDiasSeleccionados] = useState<string[]>(["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]);
   const [horaInicio, setHoraInicio] = useState("07:00 a. m.");
   const [horaFin, setHoraFin] = useState("10:00 p. m.");
-  const [actividadesPreferidas, setActividadesPreferidas] = useState<string[]>(["Clases", "Estudio personal", "Tareas"]);
+  const [actividades, setActividades] = useState<string[]>(["Clases", "Estudio personal", "Tareas"]);
   const [nombreCronograma, setNombreCronograma] = useState("Semestre Mayo - Julio 2026");
-
+  
+  // Color Dinámico elegido por el usuario
   const [colorCronograma, setColorCronograma] = useState<"blue" | "purple" | "emerald" | "orange" | "rose">("blue");
   const [recordatorios, setRecordatorios] = useState(true);
 
-  const [userId, setUserId] = useState<string | null>(null);
-  const [cargandoSesion, setCargandoSesion] = useState(true);
-  const [actividadesGuardadas, setActividadesGuardadas] = useState<ActividadCronogramaGuardada[]>([]);
-  const [cargandoActividades, setCargandoActividades] = useState(false);
-  const [guardandoAjustes, setGuardandoAjustes] = useState(false);
+  // Estados para añadir/ver detalles
+  const [bloqueSeleccionado, setBloqueSeleccionado] = useState<BloqueHorario | null>(null);
 
-  const [fechaSeleccionadaVista, setFechaSeleccionadaVista] = useState<string>(obtenerFechaISO(new Date()));
-  const [fechaCalendario, setFechaCalendario] = useState(new Date());
-  const [bloqueSeleccionado, setBloqueSeleccionado] = useState<ActividadCronogramaGuardada | null>(null);
+  // ==========================================
+  // NUEVO: ESTADOS DE MATERIAS Y PARCIALES
+  // ==========================================
+  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [nombreMateriaInput, setNombreMateriaInput] = useState("");
+  const [dificultadMateriaInput, setDificultadMateriaInput] = useState(3);
 
-  const [idActividadEditando, setIdActividadEditando] = useState<string | null>(null);
-  const [tituloNuevaActividad, setTituloNuevaActividad] = useState("");
-  const [ubicacionNuevaActividad, setUbicacionNuevaActividad] = useState("");
-  const [tipoNuevaActividad, setTipoNuevaActividad] = useState<string>("clase");
-  const [fechaNuevaActividad, setFechaNuevaActividad] = useState<string>(obtenerFechaISO(new Date()));
-  const [horaInicioActividad, setHoraInicioActividad] = useState("07:00 a. m.");
-  const [horaFinActividad, setHoraFinActividad] = useState("08:00 a. m.");
-  const [guardandoActividad, setGuardandoActividad] = useState(false);
-  const [errorActividad, setErrorActividad] = useState<string | null>(null);
-  const [parciales, setParciales] = useState<ParcialConMateria[]>([]);
-  const [ultimaSincronizacion, setUltimaSincronizacion] = useState<string | null>(null);
+  const [parciales, setParciales] = useState<ParcialItem[]>([]);
+  const [materiaSeleccionadaId, setMateriaSeleccionadaId] = useState("");
+  const [tituloParcial, setTituloParcial] = useState("");
+  const [fechaParcial, setFechaParcial] = useState("");
+  const [tipoParcial, setTipoParcial] = useState(TIPOS_EVALUACION[0]);
+  const [pesoParcial, setPesoParcial] = useState(3);
 
-  const mapaEstilos = {
-    blue: { bg: "bg-blue-400", hoverBg: "hover:bg-blue-500", text: "text-blue-500", bgLight: "bg-blue-50/70", border: "border-blue-200" },
-    purple: { bg: "bg-purple-400", hoverBg: "hover:bg-purple-500", text: "text-purple-500", bgLight: "bg-purple-50/70", border: "border-purple-200" },
-    emerald: { bg: "bg-emerald-400", hoverBg: "hover:bg-emerald-500", text: "text-emerald-500", bgLight: "bg-emerald-50/70", border: "border-emerald-200" },
-    orange: { bg: "bg-orange-400", hoverBg: "hover:bg-orange-500", text: "text-orange-500", bgLight: "bg-orange-50/70", border: "border-orange-200" },
-    rose: { bg: "bg-rose-400", hoverBg: "hover:bg-rose-500", text: "text-rose-500", bgLight: "bg-rose-50/70", border: "border-rose-200" }
+  const agregarMateria = () => {
+    if (!nombreMateriaInput.trim()) return;
+    const nuevaMateria: Materia = {
+      id: `mat_${Date.now()}`,
+      nombre: nombreMateriaInput.trim(),
+      dificultad: dificultadMateriaInput,
+    };
+    setMaterias((prev) => [...prev, nuevaMateria]);
+    setNombreMateriaInput("");
+    setDificultadMateriaInput(3);
   };
 
-  const estilosActuales = mapaEstilos[colorCronograma] || mapaEstilos.blue;
-  const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const eliminarMateria = (id: string) => {
+    setMaterias((prev) => prev.filter((m) => m.id !== id));
+    setParciales((prev) => prev.filter((p) => p.materiaId !== id));
+    if (materiaSeleccionadaId === id) setMateriaSeleccionadaId("");
+  };
 
-  const refrescarActividades = useCallback(async (idUsuario: string) => {
-    setCargandoActividades(true);
-    const datos = await leerActividadesCronogramaUsuario(idUsuario);
-    setActividadesGuardadas(datos);
-    setCargandoActividades(false);
-  }, []);
-
-  useEffect(() => {
-    const inicializar = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-      setUserId(session.user.id);
-
-      // Cargar la configuración general desde Supabase
-      const { data: config } = await obtenerConfiguracionCronograma(session.user.id);
-      if (config) {
-        if (config.nombre) setNombreCronograma(config.nombre);
-        if (config.color) setColorCronograma(config.color as any);
-        if (config.dias_activos) setDiasSeleccionados(config.dias_activos);
-        if (config.hora_inicio) setHoraInicio(config.hora_inicio);
-        if (config.hora_fin) setHoraFin(config.hora_fin);
-        if (config.actividades_preferidas) setActividadesPreferidas(config.actividades_preferidas);
-        if (config.recordatorios !== null) setRecordatorios(config.recordatorios);
-      }
-
-      await refrescarActividades(session.user.id);
-            const parcialesUsuario = await leerParcialesConMateria(session.user.id);
-      setParciales(parcialesUsuario);
-
-      // Guardamos copia offline para consulta sin conexión
-      guardarCacheOffline(session.user.id, {
-        actividades: await (async () => {
-          // reutilizamos lo ya cargado por refrescarActividades vía estado actual
-          return actividadesGuardadas;
-        })(),
-        parciales: parcialesUsuario,
-      });
-
-      const cache = leerCacheOffline(session.user.id);
-      if (cache) setUltimaSincronizacion(cache.sincronizadoEn);
-
-      setCargandoSesion(false);
-      
-      if (vista === 'paso1') setVista('vistaSemanal');
+  const agregarParcial = () => {
+    if (!materiaSeleccionadaId || !tituloParcial.trim()) return;
+    const nuevoParcial: ParcialItem = {
+      id: `par_${Date.now()}`,
+      materiaId: materiaSeleccionadaId,
+      titulo: tituloParcial.trim(),
+      fecha: fechaParcial,
+      tipo: tipoParcial,
+      peso: pesoParcial,
     };
-    inicializar();
-  }, [router, refrescarActividades, vista]);
+    setParciales((prev) => [...prev, nuevoParcial]);
+    setTituloParcial("");
+    setFechaParcial("");
+    setPesoParcial(3);
+  };
+
+  const eliminarParcial = (id: string) => {
+    setParciales((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // Bloques de ejemplo para simular la agenda
+  const bloquesSemana: BloqueHorario[] = [
+    { id: "1", hora: "07:00", titulo: "Cálculo diferencial", subtitulo: "Aula 201 (07:00 - 08:30)", color: "bg-purple-50 text-purple-700 border-purple-200" },
+    { id: "2", hora: "09:00", titulo: "Física I", subtitulo: "Aula 102 (08:40 - 10:10)", color: "bg-blue-50 text-blue-700 border-blue-200" },
+    { id: "3", hora: "10:30", titulo: "Estudio personal", subtitulo: "Repaso de ejercicios", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    { id: "4", hora: "12:00", titulo: "Almuerzo", subtitulo: "Descanso y comida", color: "bg-orange-50 text-orange-700 border-orange-200" },
+    { id: "5", hora: "01:00", titulo: "Química general", subtitulo: "Laboratorio 3 (01:10 - 02:40)", color: "bg-purple-50 text-purple-700 border-purple-200" }
+  ];
+
+  // Diccionario de estilos dinámicos basados en la selección de color
+  const mapaEstilos = {
+    blue: { bg: "bg-blue-500", hoverBg: "hover:bg-blue-600", text: "text-blue-500", bgLight: "bg-blue-50", border: "border-blue-500" },
+    purple: { bg: "bg-purple-500", hoverBg: "hover:bg-purple-600", text: "text-purple-500", bgLight: "bg-purple-50", border: "border-purple-500" },
+    emerald: { bg: "bg-emerald-500", hoverBg: "hover:bg-emerald-600", text: "text-emerald-500", bgLight: "bg-emerald-50", border: "border-emerald-500" },
+    orange: { bg: "bg-orange-500", hoverBg: "hover:bg-orange-600", text: "text-orange-500", bgLight: "bg-orange-50", border: "border-orange-500" },
+    rose: { bg: "bg-rose-500", hoverBg: "hover:bg-rose-600", text: "text-rose-500", bgLight: "bg-rose-50", border: "border-rose-500" }
+  };
+
+  const estilosActuales = mapaEstilos[colorCronograma];
 
   const manejarFlechaAtras = () => {
     switch (vista) {
-      case 'paso1': router.push('/home'); break;
+      case 'paso1': router.push('/home.2'); break;
       case 'paso2': setVista('paso1'); break;
       case 'paso3': setVista('paso2'); break;
       case 'paso4': setVista('paso3'); break;
       case 'paso5': setVista('paso4'); break;
-      case 'vistaSemanal': router.push('/home'); break;
-      case 'agregarActividad': 
-        limpiarFormularioActividad();
-        setVista('vistaSemanal'); 
-        break;
+      case 'vistaSemanal': setVista('paso5'); break;
+      case 'agregarActividad': setVista('vistaSemanal'); break;
       case 'detallesActividad': setVista('vistaSemanal'); break;
-      case 'configuracionRapida': setVista('vistaSemanal'); break;
-      case 'materiasParciales': setVista('vistaSemanal'); break;
-      default: router.push('/home');
+      default: router.push('/home.2');
     }
-  };
-
-  const manejarDescargaResumen = () => {
-    const contenido = generarResumenTextoSemana(nombreCronograma, actividadesGuardadas, parciales);
-    descargarResumenSemanal(`pausa_resumen_${obtenerFechaISO(new Date())}`, contenido);
   };
 
   const toggleSelection = (item: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
@@ -229,168 +165,34 @@ export default function CronogramaPage() {
     }
   };
 
-  const limpiarFormularioActividad = () => {
-    setIdActividadEditando(null);
-    setTituloNuevaActividad("");
-    setUbicacionNuevaActividad("");
-    setTipoNuevaActividad("clase");
-    setHoraInicioActividad("07:00 a. m.");
-    setHoraFinActividad("08:00 a. m.");
-    setFechaNuevaActividad(obtenerFechaISO(new Date()));
-  };
-
-  const iniciarEdicionActividad = (actividad: ActividadCronogramaGuardada, e: React.MouseEvent) => {
-    e.stopPropagation(); 
-    setIdActividadEditando(actividad.id);
-    setTituloNuevaActividad(actividad.titulo);
-    setUbicacionNuevaActividad(actividad.ubicacion || "");
-    setTipoNuevaActividad(actividad.tipo_actividad);
-    setFechaNuevaActividad(actividad.fecha);
-    setHoraInicioActividad(convertir24a12h(actividad.hora_inicio));
-    setHoraFinActividad(convertir24a12h(actividad.hora_fin));
-    setVista('agregarActividad');
-  };
-
-  const handleGuardarActividad = async () => {
-    setErrorActividad(null);
-
-    if (!tituloNuevaActividad.trim()) {
-      setErrorActividad("Ponle un título a tu actividad antes de guardar.");
-      return;
-    }
-    if (!fechaNuevaActividad) {
-      setErrorActividad("Selecciona una fecha para la actividad.");
-      return;
-    }
-    if (!userId) {
-      setErrorActividad("Debes iniciar sesión para guardar actividades.");
-      return;
-    }
-
-    setGuardandoActividad(true);
-
-    const payloadActividad = {
-      user_id: userId,
-      titulo: tituloNuevaActividad,
-      ubicacion: ubicacionNuevaActividad,
-      tipo_actividad: tipoNuevaActividad,
-      fecha: fechaNuevaActividad,
-      hora_inicio: horaInicioActividad,
-      hora_fin: horaFinActividad,
-      dias_semana: diasSeleccionados,
-    };
-
-    let resultado;
-    if (idActividadEditando) {
-      resultado = await actualizarActividadCronograma(idActividadEditando, payloadActividad);
-    } else {
-      resultado = await crearActividadCronograma(payloadActividad);
-    }
-
-    if (resultado.error) {
-      setErrorActividad("No se pudo procesar la actividad. Intenta de nuevo.");
-      setGuardandoActividad(false);
-      return;
-    }
-
-    const fechaDestino = fechaNuevaActividad;
-    limpiarFormularioActividad();
-    setGuardandoActividad(false);
-    setFechaSeleccionadaVista(fechaDestino);
-
-    await refrescarActividades(userId);
-    setVista('vistaSemanal');
-  };
-
-  const handleEliminarActividad = async () => {
-    if (!bloqueSeleccionado || !userId) return;
-    const exito = await eliminarActividadCronograma(bloqueSeleccionado.id);
-    if (exito) {
-      await refrescarActividades(userId);
-      setBloqueSeleccionado(null);
-      setVista('vistaSemanal');
-    }
-  };
-
-  const procesarGuardadoConfiguracion = async () => {
-    if (!userId) return;
-    setGuardandoAjustes(true);
-    await guardarConfiguracionCronograma(userId, {
-      nombre: nombreCronograma,
-      color: colorCronograma,
-      dias: diasSeleccionados,
-      horaInicio: horaInicio,
-      horaFin: horaFin,
-      actividades: actividadesPreferidas,
-      recordatorios: recordatorios
-    });
-    setGuardandoAjustes(false);
-    setVista('vistaSemanal');
-  };
-
-  const actividadesDelDia = actividadesGuardadas.filter(a => a.fecha === fechaSeleccionadaVista);
-  const actividadesOrdenadasLista = [...actividadesGuardadas].sort((a, b) =>
-    a.fecha === b.fecha ? a.hora_inicio.localeCompare(b.hora_inicio) : a.fecha.localeCompare(b.fecha)
-  );
-
-  if (cargandoSesion) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <p className="text-xs font-bold text-slate-400">Cargando tu cronograma...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-slate-200">
+      
+      {/* Contenedor Base Estilo Dispositivo */}
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 overflow-hidden pb-4">
-
-        {/* Encabezado Dinámico */}
+        
+        {/* HEADER DE LA PANTALLA */}
         <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-100 bg-white z-20">
           <button onClick={manejarFlechaAtras} className="p-2 -ml-2 text-slate-700 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-50">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
           </button>
-
+          
           <h3 className="text-sm font-bold text-[#2A3B50]">
             {vista === 'paso1' && "Cronograma académico"}
             {(vista === 'paso2' || vista === 'paso3' || vista === 'paso4' || vista === 'paso5') && "Crear cronograma"}
             {vista === 'vistaSemanal' && "Mi cronograma"}
-            {vista === 'agregarActividad' && (idActividadEditando ? "Editar actividad" : "Agregar actividad")}
+            {vista === 'agregarActividad' && "Materias y parciales"}
             {vista === 'detallesActividad' && "Detalles de actividad"}
-            {vista === 'configuracionRapida' && "Ajustes del calendario"}
           </h3>
-
-          {/* Botones de acceso rápido en la esquina superior derecha */}
-          {vista === 'vistaSemanal' ? (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={manejarDescargaResumen}
-                className="p-2 -mr-1 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
-                title="Descargar resumen semanal"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v11m0 0 4-4m-4 4-4-4M4 18h16" />
-                </svg>
-              </button>
-
-              <button 
-                onClick={() => setVista('configuracionRapida')} 
-                className="p-2 -mr-2 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
-                title="Ajustes de Cronograma"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.767c-.293.224-.438.613-.431.983.001.066.002.132.002.198 0 .066-.001.132-.002.198-.007.37.138.76.431.983l1.003.767a1.125 1.125 0 0 1 .26 1.43l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.216-.456a1.125 1.125 0 0 0-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.644-.87a6.52 6.52 0 0 1-.22-.127a1.125 1.125 0 0 0-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.43l1.003-.767c.293-.224.438-.613.431-.983a6.53 6.53 0 0 1-.002-.198c0-.066.001-.132.002-.198.007-.37-.138-.76-.431-.983l-1.003-.767a1.125 1.125 0 0 1-.26-1.43l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128c.332-.183.582-.495.644-.869l.214-1.28Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <div className="w-5 h-5" />
-          )}
+          
+          <div className="w-5 h-5 text-slate-400 text-[10px] flex items-center justify-center border border-slate-300 rounded-full font-bold select-none">
+            i
+          </div>
         </div>
 
+        {/* LÍNEA DE PROGRESO */}
         {['paso2', 'paso3', 'paso4', 'paso5'].includes(vista) && (
           <div className="px-6 py-2 bg-slate-50 flex flex-col gap-1 border-b border-slate-100">
             <div className={`text-[10px] font-bold ${estilosActuales.text}`}>
@@ -405,9 +207,35 @@ export default function CronogramaPage() {
           </div>
         )}
 
+        {/* ÁREA DE CONTENIDO VARIABLE */}
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
 
-          {/* PASO 2 */}
+          {/* PANTALLA 1: INICIO */}
+          {vista === 'paso1' && (
+            <div className="p-6 space-y-6 animate-fadeIn">
+              <div className="text-center space-y-2 py-4">
+                <div className="w-44 h-44 bg-[#F0F4F8] rounded-3xl mx-auto flex items-center justify-center text-7xl shadow-inner">📅</div>
+                <p className="text-xs font-semibold text-[#8C9BAE] max-w-xs mx-auto leading-relaxed pt-2">
+                  Organiza tu semana y cumple tus metas con equilibrio.
+                </p>
+              </div>
+              <div className="space-y-2.5">
+                {[
+                  { icon: "📉", text: "Planifica tus clases y tareas" },
+                  { icon: "⏰", text: "Establece recordatorios" },
+                  { icon: "📊", text: "Visualiza tu progreso" },
+                  { icon: "🧘", text: "Reduce el estrés académico" }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-4 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span className="text-lg">{item.icon}</span>
+                    <span className="text-xs font-bold text-slate-700">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* PANTALLA 2: SELECCIÓN DE DÍAS */}
           {vista === 'paso2' && (
             <div className="p-6 space-y-4 animate-fadeIn">
               <div>
@@ -430,31 +258,61 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* PASO 3 */}
+          {/* PANTALLA 3: RANGO DE HORARIOS */}
           {vista === 'paso3' && (
             <div className="p-6 space-y-5 animate-fadeIn">
               <div>
                 <h4 className="text-base font-bold text-[#2A3B50]">¿A qué hora inician y terminan tus actividades?</h4>
                 <p className="text-xs text-slate-400 mt-0.5">Define el rango de horas para tu día.</p>
               </div>
+              
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500">Hora de inicio</label>
-                  <select value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none">
-                    {opcionesHoras.map((hora) => (<option key={hora} value={hora}>{hora}</option>))}
-                  </select>
+                  <div className={`flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 shadow-sm focus-within:ring-1 focus-within:${estilosActuales.border}`}>
+                    <span className="text-base select-none mr-2">🕒</span>
+                    <select 
+                      value={horaInicio}
+                      onChange={(e) => setHoraInicio(e.target.value)}
+                      className="w-full py-2.5 bg-transparent text-xs text-slate-700 font-bold focus:outline-none cursor-pointer appearance-none"
+                    >
+                      {opcionesHoras.map((hora) => (
+                        <option key={hora} value={hora}>{hora}</option>
+                      ))}
+                    </select>
+                    <span className="text-[9px] text-slate-400 ml-2 select-none">▼</span>
+                  </div>
                 </div>
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500">Hora de finalización</label>
-                  <select value={horaFin} onChange={(e) => setHoraFin(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none">
-                    {opcionesHoras.map((hora) => (<option key={hora} value={hora}>{hora}</option>))}
-                  </select>
+                  <div className={`flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 shadow-sm focus-within:ring-1 focus-within:${estilosActuales.border}`}>
+                    <span className="text-base select-none mr-2">🌙</span>
+                    <select 
+                      value={horaFin}
+                      onChange={(e) => setHoraFin(e.target.value)}
+                      className="w-full py-2.5 bg-transparent text-xs text-slate-700 font-bold focus:outline-none cursor-pointer appearance-none"
+                    >
+                      {opcionesHoras.map((hora) => (
+                        <option key={hora} value={hora}>{hora}</option>
+                      ))}
+                    </select>
+                    <span className="text-[9px] text-slate-400 ml-2 select-none">▼</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 flex gap-3 text-xs mt-4">
+                <span className="text-lg">💡</span>
+                <div>
+                  <p className="font-bold text-indigo-950">Recomendación</p>
+                  <p className="text-indigo-800/90 leading-relaxed mt-0.5">Planificar bloques de 50 min y descansos de 10 min mejora tu concentración y rendimiento.</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* PASO 4 */}
+          {/* PANTALLA 4: TIPOS DE ACTIVIDADES */}
           {vista === 'paso4' && (
             <div className="p-6 space-y-4 animate-fadeIn">
               <div>
@@ -462,11 +320,18 @@ export default function CronogramaPage() {
                 <p className="text-xs text-slate-400 mt-0.5">Puedes agregar clases, estudio, tareas y más.</p>
               </div>
               <div className="space-y-2">
-                {["Clases", "Estudio personal", "Tareas", "Exámenes", "Lectura", "Actividad personal"].map((nombre) => {
-                  const seleccionado = actividadesPreferidas.includes(nombre);
+                {[
+                  { name: "Clases", icon: "🏫" },
+                  { name: "Estudio personal", icon: "📖" },
+                  { name: "Tareas", icon: "📝" },
+                  { name: "Parciales", icon: "🎯" },
+                  { name: "Lectura", icon: "📚" },
+                  { name: "Actividad personal", icon: "🏃" }
+                ].map((act) => {
+                  const seleccionado = actividades.includes(act.name);
                   return (
-                    <button key={nombre} onClick={() => toggleSelection(nombre, actividadesPreferidas, setActividadesPreferidas)} className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-xs font-bold transition-all ${seleccionado ? `${estilosActuales.bgLight} ${estilosActuales.border} ${estilosActuales.text}` : 'border-slate-100 bg-white shadow-sm'}`}>
-                      <span>{nombre}</span>
+                    <button key={act.name} onClick={() => toggleSelection(act.name, actividades, setActividades)} className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-xs font-bold transition-all ${seleccionado ? `${estilosActuales.bgLight} ${estilosActuales.border} ${estilosActuales.text}` : 'border-slate-100 bg-white shadow-sm'}`}>
+                      <div className="flex items-center gap-3"><span>{act.icon}</span><span>{act.name}</span></div>
                       <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${seleccionado ? `${estilosActuales.bg} ${estilosActuales.border} text-white` : 'border-slate-300'}`}>
                         {seleccionado && <span className="text-[10px]">✓</span>}
                       </div>
@@ -477,7 +342,7 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* PASO 5 */}
+          {/* PANTALLA 5: NOMBRE Y PREFERENCIAS */}
           {vista === 'paso5' && (
             <div className="p-6 space-y-5 animate-fadeIn">
               <div>
@@ -493,7 +358,7 @@ export default function CronogramaPage() {
                   <label className="text-xs font-bold text-slate-500">Color del cronograma</label>
                   <div className="flex gap-3 pt-1">
                     {(["blue", "purple", "emerald", "orange", "rose"] as const).map((c) => (
-                      <button key={c} onClick={() => setColorCronograma(c)} className={`w-7 h-7 rounded-full border-2 ${c === 'blue' ? 'bg-blue-300' : c === 'purple' ? 'bg-purple-300' : c === 'emerald' ? 'bg-emerald-300' : c === 'orange' ? 'bg-orange-300' : 'bg-rose-300'} ${colorCronograma === c ? 'border-slate-800 scale-110 shadow' : 'border-transparent opacity-80'}`} />
+                      <button key={c} onClick={() => setColorCronograma(c)} className={`w-7 h-7 rounded-full border-2 ${c === 'blue' ? 'bg-blue-500' : c === 'purple' ? 'bg-purple-500' : c === 'emerald' ? 'bg-emerald-500' : c === 'orange' ? 'bg-orange-400' : 'bg-rose-400'} ${colorCronograma === c ? 'border-slate-800 scale-110 shadow' : 'border-transparent opacity-80'}`} />
                     ))}
                   </div>
                 </div>
@@ -510,387 +375,354 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* VISTA MATERIAS Y PARCIALES */}
-          {vista === 'materiasParciales' && (
-            <div className="p-6 animate-fadeIn">
-              <GestionMateriasParciales
-                userId={userId!}
-                onDatosActualizados={(nuevosParciales) => setParciales(nuevosParciales)}
-              />
-            </div>
-          )}
-
-          {/* VISTA DASHBOARD PRINCIPAL */}
+          {/* PANTALLA 6: CRONOGRAMA INTERACTIVO */}
           {vista === 'vistaSemanal' && (
             <div className="animate-fadeIn relative pb-16">
-              <div className="px-6 pt-4 pb-2 bg-white space-y-3">
-                <SemaforoEstres parciales={parciales} />
-
-                <button
-                  onClick={() => setVista('materiasParciales')}
-                  className="w-full py-2.5 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  📚 Materias y parciales
-                </button>
-
-                {ultimaSincronizacion && (
-                  <p className="text-[10px] text-slate-400 text-center">
-                    Última sincronización: {tiempoDesdeSincronizacion(ultimaSincronizacion)}
-                  </p>
-                )}
-              </div>
-
+              
+              {/* TABS SUPERIORES (Día / Mes / Lista) */}
               <div className="px-6 pt-3 flex justify-between items-center bg-slate-50/60 pb-3 border-b border-slate-100">
-                <div className="flex bg-slate-200/70 p-1 rounded-xl w-full max-w-[300px]">
-                  <button onClick={() => setSubVista('dia')} className={`flex-1 text-center text-[11px] font-bold py-1.5 rounded-lg transition-all ${subVista === 'dia' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Día</button>
-                  <button onClick={() => setSubVista('mes')} className={`flex-1 text-center text-[11px] font-bold py-1.5 rounded-lg transition-all ${subVista === 'mes' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Mes</button>
-                  <button onClick={() => setSubVista('lista')} className={`flex-1 text-center text-[11px] font-bold py-1.5 rounded-lg transition-all ${subVista === 'lista' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Lista</button>
+                <div className="flex bg-slate-200/70 p-1 rounded-xl w-full max-w-[240px]">
+                  <button 
+                    onClick={() => setSubVista('dia')}
+                    className={`flex-1 text-center text-[11px] font-bold py-1.5 rounded-lg transition-all ${subVista === 'dia' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Día
+                  </button>
+                  <button 
+                    onClick={() => setSubVista('mes')}
+                    className={`flex-1 text-center text-[11px] font-bold py-1.5 rounded-lg transition-all ${subVista === 'mes' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Mes
+                  </button>
+                  <button 
+                    onClick={() => setSubVista('lista')}
+                    className={`flex-1 text-center text-[11px] font-bold py-1.5 rounded-lg transition-all ${subVista === 'lista' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Lista
+                  </button>
                 </div>
+                <span className={`text-xs font-bold ${estilosActuales.text} ${estilosActuales.bgLight} px-3 py-1 rounded-lg`}>Mayo</span>
               </div>
 
-              {/* SUBVISTA: DÍA */}
+              {/* RENDERIZADO CONDICIONAL SEGÚN LA SUB-VISTA SELECCIONADA */}
               {subVista === 'dia' && (
                 <>
                   <div className="px-6 py-3 flex justify-between border-b border-slate-100 bg-white">
-                    {generarDiasVisibles().map((day) => {
-                      const esDiaActivo = fechaSeleccionadaVista === day.iso;
-                      const tieneActividad = actividadesGuardadas.some(a => a.fecha === day.iso);
+                    {[
+                      { d: "Lun", n: "25" }, 
+                      { d: "Mar", n: "26" }, 
+                      { d: "Mié", n: "27" }, 
+                      { d: "Jue", n: "28" }, 
+                      { d: "Vie", n: "29" }
+                    ].map((day) => {
+                      const esDiaActivo = diaActivoNumero === day.n;
                       return (
-                        <button key={day.iso} onClick={() => setFechaSeleccionadaVista(day.iso)} className={`relative flex flex-col items-center p-2 rounded-xl w-12 transition-all pb-3.5 ${esDiaActivo ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50'}`}>
-                          <span className="text-[10px] font-bold">{day.abbr}</span>
-                          <span className="text-xs font-black mt-0.5">{day.num}</span>
-                          {tieneActividad && (
-                            <span className={`w-1 h-1 rounded-full absolute bottom-1 ${esDiaActivo ? 'bg-white' : estilosActuales.bg}`} />
-                          )}
+                        <button 
+                          key={day.n} 
+                          onClick={() => setDiaActivoNumero(day.n)}
+                          className={`flex flex-col items-center p-2 rounded-xl w-12 transition-all ${esDiaActivo ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          <span className="text-[10px] font-bold">{day.d}</span>
+                          <span className="text-xs font-black mt-0.5">{day.n}</span>
                         </button>
                       );
                     })}
                   </div>
 
                   <div className="p-6 space-y-4 relative">
-                    <p className="text-[10px] font-bold text-slate-400 mb-1">{formatearFechaLegible(fechaSeleccionadaVista)}</p>
-                    {cargandoActividades && <p className="text-xs text-slate-400">Cargando actividades...</p>}
-                    {!cargandoActividades && actividadesDelDia.length === 0 && (
-                      <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
-                        No tienes actividades este día.
-                      </div>
-                    )}
-                    {actividadesDelDia.map((actividad) => {
-                      const estiloTipo = obtenerEstiloPorTipo(actividad.tipo_actividad);
-                      return (
-                        <div key={actividad.id} onClick={() => { setBloqueSeleccionado(actividad); setVista('detallesActividad'); }} className="flex gap-4 items-center cursor-pointer group">
-                          <span className="text-xs font-bold text-slate-400 w-14">{actividad.hora_inicio.slice(0, 5)}</span>
-                          <div className={`flex-1 p-3.5 border-l-4 rounded-xl border flex justify-between items-center transition-all group-hover:shadow-md ${estiloTipo.bg} ${estiloTipo.text} ${estiloTipo.border}`}>
-                            <div>
-                              <h5 className="text-xs font-bold">{actividad.titulo}</h5>
-                              <p className="text-[10px] opacity-80 mt-0.5 font-medium">
-                                {actividad.ubicacion ? `${actividad.ubicacion} · ` : ''}{actividad.hora_inicio.slice(0, 5)} - {actividad.hora_fin.slice(0, 5)}
-                              </p>
-                            </div>
-                            <button 
-                              onClick={(e) => iniciarEdicionActividad(actividad, e)}
-                              className="p-1.5 rounded-lg hover:bg-white/60 transition-colors text-slate-400 hover:text-slate-700"
-                              title="Editar actividad"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                              </svg>
-                            </button>
-                          </div>
+                    <p className="text-[10px] font-bold text-slate-400 mb-1">Mostrando actividades del día {diaActivoNumero} de Mayo</p>
+                    {bloquesSemana.map((bloque) => (
+                      <div key={bloque.id} onClick={() => { setBloqueSeleccionado(bloque); setVista('detallesActividad'); }} className="flex gap-4 items-start cursor-pointer group">
+                        <span className="text-xs font-bold text-slate-400 pt-1 w-10">{bloque.hora}</span>
+                        <div className={`flex-1 p-3.5 border-l-4 rounded-xl border transition-all group-hover:shadow-md ${bloque.color}`}>
+                          <h5 className="text-xs font-bold">{bloque.titulo}</h5>
+                          <p className="text-[10px] opacity-80 mt-0.5 font-medium">{bloque.subtitulo}</p>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 </>
               )}
 
-              {/* SUBVISTA: MES */}
               {subVista === 'mes' && (
-                <div className="p-6 space-y-4 animate-fadeIn">
-                  <div className="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
-                    <button 
-                      onClick={() => setFechaCalendario(new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() - 1, 1))} 
-                      className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <span className="text-sm font-bold text-[#2A3B50] capitalize">
-                      {nombresMeses[fechaCalendario.getMonth()]} {fechaCalendario.getFullYear()}
-                    </span>
-                    <button 
-                      onClick={() => setFechaCalendario(new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() + 1, 1))} 
-                      className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="grid grid-cols-7 gap-1 mb-2 text-center">
-                      {['Do','Lu','Ma','Mi','Ju','Vi','Sá'].map(d => (
-                        <span key={d} className="text-[10px] font-bold text-slate-400">{d}</span>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 text-center">
-                      {Array.from({ length: new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth(), 1).getDay() }).map((_, i) => (
-                        <div key={`blank-${i}`} className="p-2"></div>
-                      ))}
-                      {Array.from({ length: new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() + 1, 0).getDate() }).map((_, i) => {
-                        const day = i + 1;
-                        const dateISO = `${fechaCalendario.getFullYear()}-${String(fechaCalendario.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const hasActivity = actividadesGuardadas.some(a => a.fecha === dateISO);
-                        const isSelected = fechaSeleccionadaVista === dateISO;
-                        const isToday = obtenerFechaISO(new Date()) === dateISO;
-
-                        return (
-                          <button
-                            key={day}
-                            onClick={() => { setFechaSeleccionadaVista(dateISO); setSubVista('dia'); }}
-                            className={`relative p-2 flex flex-col items-center justify-center rounded-xl text-xs transition-all w-full aspect-square
-                              ${isSelected ? `${estilosActuales.bg} text-white font-bold shadow-md` : 
-                                isToday ? `bg-slate-100 text-[#2A3B50] font-bold` : `text-slate-600 hover:bg-slate-50 font-medium`}
-                            `}
-                          >
-                            <span>{day}</span>
-                            {hasActivity && (
-                              <span className={`w-1 h-1 rounded-full absolute bottom-1.5 ${isSelected ? 'bg-white' : estilosActuales.bg}`}></span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                <div className="p-6 text-center space-y-3 animate-fadeIn">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <span className="text-2xl">📅</span>
+                    <h5 className="text-xs font-bold text-slate-700 mt-2">Vista Mensual Activa</h5>
+                    <p className="text-[11px] text-slate-400 mt-1">Aquí se desplegará el calendario completo en cuadrícula de Mayo 2026.</p>
                   </div>
                 </div>
               )}
 
-              {/* SUBVISTA: LISTA */}
               {subVista === 'lista' && (
                 <div className="p-6 space-y-3 animate-fadeIn">
-                  <p className="text-[10px] font-bold text-slate-400">Todas tus actividades guardadas</p>
-                  {actividadesOrdenadasLista.length === 0 && (
-                    <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
-                      Aún no has agregado actividades.
-                    </div>
-                  )}
-                  {actividadesOrdenadasLista.map((actividad) => {
-                    const estiloTipo = obtenerEstiloPorTipo(actividad.tipo_actividad);
-                    return (
-                      <div 
-                        key={actividad.id} 
-                        onClick={() => { setBloqueSeleccionado(actividad); setVista('detallesActividad'); }} 
-                        className={`p-3.5 rounded-xl border flex justify-between items-center cursor-pointer hover:shadow-md transition-all group ${estiloTipo.bg} ${estiloTipo.border} ${estiloTipo.text}`}
-                      >
-                        <div className="flex flex-col">
-                          <h6 className="text-xs font-bold opacity-95">{actividad.titulo}</h6>
-                          <p className="text-[10px] opacity-75 font-medium mt-0.5">{formatearFechaLegible(actividad.fecha)}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${estiloTipo.badge}`}>
-                            {actividad.tipo_actividad}
-                          </span>
-                          <span className="text-[10px] font-bold bg-white/70 px-2 py-0.5 rounded-md opacity-90">{actividad.hora_inicio.slice(0, 5)}</span>
-                          
-                          <button 
-                            onClick={(e) => iniciarEdicionActividad(actividad, e)}
-                            className="p-1 rounded-md hover:bg-white/70 text-slate-400 hover:text-slate-800 transition-colors ml-1"
-                            title="Editar actividad"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                            </svg>
-                          </button>
-                        </div>
+                  <p className="text-[10px] font-bold text-slate-400">Próximos eventos en formato lista</p>
+                  {bloquesSemana.map((bloque) => (
+                    <div key={bloque.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
+                      <div>
+                        <h6 className="text-xs font-bold text-slate-800">{bloque.titulo}</h6>
+                        <p className="text-[10px] text-slate-400">{bloque.subtitulo}</p>
                       </div>
-                    );
-                  })}
+                      <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md shadow-sm">{bloque.hora}</span>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              <button onClick={() => { limpiarFormularioActividad(); setVista('agregarActividad'); }} className={`absolute bottom-4 right-6 w-12 h-12 ${estilosActuales.bg} text-white rounded-full shadow-xl flex items-center justify-center font-bold text-xl ${estilosActuales.hoverBg} transition-all transform active:scale-95 z-30`}>
+              {/* BOTÓN FLOTANTE "+" — abre Materias y Parciales */}
+              <button onClick={() => setVista('agregarActividad')} className={`absolute bottom-4 right-6 w-12 h-12 ${estilosActuales.bg} text-white rounded-full shadow-xl flex items-center justify-center font-bold text-xl ${estilosActuales.hoverBg} transition-all transform active:scale-95 z-30`}>
                 +
               </button>
             </div>
           )}
 
-          {/* AGREGAR / EDITAR ACTIVIDAD */}
+          {/* PANTALLA 9: MATERIAS Y PARCIALES (antes "Agregar actividad") */}
           {vista === 'agregarActividad' && (
-            <div className="p-6 space-y-4 animate-fadeIn">
-              <div className="flex gap-2 justify-between">
-                {tiposActividad.map((t) => {
-                  const seleccionado = tipoNuevaActividad === t.id;
-                  return (
-                    <button key={t.id} onClick={() => setTipoNuevaActividad(t.id)} className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all ${seleccionado ? `${estilosActuales.bg} text-white` : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Título de la actividad</label>
-                  <input type="text" value={tituloNuevaActividad} onChange={(e) => setTituloNuevaActividad(e.target.value)} placeholder="Ej. Cálculo diferencial" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Ubicación / Aula</label>
-                  <input type="text" value={ubicacionNuevaActividad} onChange={(e) => setUbicacionNuevaActividad(e.target.value)} placeholder="Ej. Aula 201" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Fecha</label>
-                  <input type="date" value={fechaNuevaActividad} onChange={(e) => setFechaNuevaActividad(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">Hora inicio</label>
-                    <select value={horaInicioActividad} onChange={(e) => setHoraInicioActividad(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none">
-                      {opcionesHoras.map((hora) => (<option key={hora} value={hora}>{hora}</option>))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">Hora fin</label>
-                    <select value={horaFinActividad} onChange={(e) => setHoraFinActividad(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none">
-                      {opcionesHoras.map((hora) => (<option key={hora} value={hora}>{hora}</option>))}
-                    </select>
-                  </div>
-                </div>
-
-                {errorActividad && (
-                  <p className="text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-3">
-                    ⚠️ {errorActividad}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* DETALLES DE ACTIVIDAD */}
-          {vista === 'detallesActividad' && bloqueSeleccionado && (
-            <div className="p-6 space-y-5 animate-fadeIn">
-              {(() => {
-                const estiloTipo = obtenerEstiloPorTipo(bloqueSeleccionado.tipo_actividad);
-                return (
-                  <div className={`p-5 border rounded-2xl space-y-1.5 ${estiloTipo.bg} ${estiloTipo.border} ${estiloTipo.text}`}>
-                    <div className="flex justify-between items-start">
-                      <h4 className="text-sm font-black">{bloqueSeleccionado.titulo}</h4>
-                      <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${estiloTipo.badge}`}>
-                        {bloqueSeleccionado.tipo_actividad}
-                      </span>
-                    </div>
-                    <p className="text-xs font-bold opacity-90">
-                      {bloqueSeleccionado.hora_inicio.slice(0, 5)} - {bloqueSeleccionado.hora_fin.slice(0, 5)}
-                      {bloqueSeleccionado.ubicacion ? ` · ${bloqueSeleccionado.ubicacion}` : ''}
-                    </p>
-                    <p className="text-[10px] opacity-75 font-medium pt-1">{formatearFechaLegible(bloqueSeleccionado.fecha)}</p>
-                  </div>
-                );
-              })()}
-              
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={(e) => iniciarEdicionActividad(bloqueSeleccionado, e)}
-                  className="py-3 bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-100 transition-colors"
-                >
-                  Editar parámetros
-                </button>
-                <button onClick={handleEliminarActividad} className="w-full py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors">
-                  Eliminar actividad
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* VISTA AJUSTES DE CALENDARIO / CONFIGURACIÓN RÁPIDA */}
-          {vista === 'configuracionRapida' && (
             <div className="p-6 space-y-6 animate-fadeIn">
-              <div>
-                <h4 className="text-base font-bold text-[#2A3B50]">Ajustes del calendario</h4>
-                <p className="text-xs text-slate-400 mt-0.5">Personaliza los parámetros globales de tu organizador sin perder tus eventos.</p>
-              </div>
 
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500">Nombre del cronograma</label>
-                  <input 
-                    type="text" 
-                    value={nombreCronograma} 
-                    onChange={(e) => setNombreCronograma(e.target.value)} 
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" 
+              {/* ============================= */}
+              {/* TARJETA: MIS MATERIAS         */}
+              {/* ============================= */}
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+                <h4 className="text-sm font-bold text-[#2A3B50]">Mis materias</h4>
+                <p className="text-xs italic text-slate-400 mt-1">
+                  {materias.length === 0
+                    ? "Aún no has agregado materias."
+                    : `${materias.length} materia${materias.length > 1 ? "s" : ""} agregada${materias.length > 1 ? "s" : ""}.`}
+                </p>
+
+                {materias.length > 0 && (
+                  <div className="mt-3 space-y-2 max-h-32 overflow-y-auto pr-1">
+                    {materias.map((m) => (
+                      <div key={m.id} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                        <span className="text-xs font-bold text-slate-700 truncate pr-2">{m.nombre}</span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[10px] font-bold text-slate-400">Dificultad {m.dificultad}/5</span>
+                          <button
+                            onClick={() => eliminarMateria(m.id)}
+                            className="text-slate-300 hover:text-rose-500 transition-colors text-sm leading-none"
+                            aria-label={`Eliminar ${m.nombre}`}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border-t border-slate-100 my-4" />
+
+                <input
+                  type="text"
+                  value={nombreMateriaInput}
+                  onChange={(e) => setNombreMateriaInput(e.target.value)}
+                  placeholder="Nombre de la materia (ej. Cálculo II)"
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#4A72A6] focus:bg-white transition-colors"
+                />
+
+                <div className="mt-4">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-[11px] font-bold text-[#4A72A6]">Dificultad</label>
+                    <span className="text-[11px] font-bold text-slate-400">{dificultadMateriaInput}/5</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    value={dificultadMateriaInput}
+                    onChange={(e) => setDificultadMateriaInput(Number(e.target.value))}
+                    className="w-full accent-[#4A72A6] cursor-pointer"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500">Color principal (Pastel)</label>
-                  <div className="flex gap-3 pt-1">
-                    {(["blue", "purple", "emerald", "orange", "rose"] as const).map((c) => (
-                      <button 
-                        key={c} 
-                        onClick={() => setColorCronograma(c)} 
-                        className={`w-8 h-8 rounded-full border-2 ${
-                          c === 'blue' ? 'bg-blue-300' : 
-                          c === 'purple' ? 'bg-purple-300' : 
-                          c === 'emerald' ? 'bg-emerald-300' : 
-                          c === 'orange' ? 'bg-orange-300' : 'bg-rose-300'
-                        } ${colorCronograma === c ? 'border-slate-800 scale-110 shadow' : 'border-transparent opacity-80'}`} 
-                      />
-                    ))}
-                  </div>
-                </div>
+                <button
+                  onClick={agregarMateria}
+                  disabled={!nombreMateriaInput.trim()}
+                  className={`w-full mt-4 py-3 rounded-2xl text-xs font-bold transition-all active:scale-[0.99] ${
+                    nombreMateriaInput.trim()
+                      ? "bg-[#4A72A6] text-white hover:bg-[#3B5E8C] shadow-sm"
+                      : "bg-slate-200 text-white cursor-not-allowed"
+                  }`}
+                >
+                  + Agregar materia
+                </button>
+              </div>
 
-                <div className="pt-2 space-y-2">
-                  <label className="text-xs font-bold text-slate-500">Días activos en semana</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"].map((dia) => {
-                      const elegido = diasSeleccionados.includes(dia);
+              {/* ============================= */}
+              {/* TARJETA: PARCIALES Y EVALUACIONES */}
+              {/* ============================= */}
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+                <h4 className="text-sm font-bold text-[#2A3B50]">Parciales y evaluaciones</h4>
+                <p className="text-xs italic text-slate-400 mt-1">
+                  {parciales.length === 0
+                    ? "Aún no has agregado parciales."
+                    : `${parciales.length} parcial${parciales.length > 1 ? "es" : ""} agregado${parciales.length > 1 ? "s" : ""}.`}
+                </p>
+
+                {parciales.length > 0 && (
+                  <div className="mt-3 space-y-2 max-h-32 overflow-y-auto pr-1">
+                    {parciales.map((p) => {
+                      const materia = materias.find((m) => m.id === p.materiaId);
                       return (
-                        <button
-                          key={dia}
-                          onClick={() => toggleSelection(dia, diasSeleccionados, setDiasSeleccionados)}
-                          className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all ${
-                            elegido ? `${estilosActuales.bg} text-white shadow-sm` : 'bg-slate-50 border border-slate-200 text-slate-600'
-                          }`}
-                        >
-                          {dia.slice(0, 3)}
-                        </button>
+                        <div key={p.id} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                          <div className="min-w-0 pr-2">
+                            <p className="text-xs font-bold text-slate-700 truncate">{p.titulo}</p>
+                            <p className="text-[10px] text-slate-400 truncate">
+                              {materia?.nombre ?? "Materia eliminada"} · {p.tipo}
+                              {p.fecha ? ` · ${p.fecha}` : ""}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => eliminarParcial(p.id)}
+                            className="text-slate-300 hover:text-rose-500 transition-colors text-sm leading-none flex-shrink-0"
+                            aria-label={`Eliminar ${p.titulo}`}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
+                )}
+
+                <div className="border-t border-slate-100 my-4" />
+
+                {/* Selector de materia */}
+                <div className="relative">
+                  <select
+                    value={materiaSeleccionadaId}
+                    onChange={(e) => setMateriaSeleccionadaId(e.target.value)}
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:border-[#4A72A6] focus:bg-white appearance-none pr-9 transition-colors"
+                  >
+                    <option value="" disabled>
+                      {materias.length === 0 ? "Primero agrega una materia" : "Selecciona una materia"}
+                    </option>
+                    {materias.map((m) => (
+                      <option key={m.id} value={m.id}>{m.nombre}</option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </div>
                 </div>
+
+                {/* Título */}
+                <input
+                  type="text"
+                  value={tituloParcial}
+                  onChange={(e) => setTituloParcial(e.target.value)}
+                  placeholder="Título (ej. Segundo parcial)"
+                  className="w-full mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#4A72A6] focus:bg-white transition-colors"
+                />
+
+                {/* Fecha + Tipo (Parcial) */}
+                <div className="flex gap-3 mt-3">
+                  <input
+                    type="date"
+                    value={fechaParcial}
+                    onChange={(e) => setFechaParcial(e.target.value)}
+                    className="flex-1 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:border-[#4A72A6] focus:bg-white transition-colors"
+                  />
+                  <div className="relative w-32 flex-shrink-0">
+                    <select
+                      value={tipoParcial}
+                      onChange={(e) => setTipoParcial(e.target.value)}
+                      className="w-full h-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:border-[#4A72A6] focus:bg-white appearance-none pr-7 transition-colors"
+                    >
+                      {TIPOS_EVALUACION.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Peso / importancia */}
+                <div className="mt-4">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-[11px] font-bold text-[#4A72A6]">Peso / importancia</label>
+                    <span className="text-[11px] font-bold text-slate-400">{pesoParcial}/5</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    value={pesoParcial}
+                    onChange={(e) => setPesoParcial(Number(e.target.value))}
+                    className="w-full accent-[#4A72A6] cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  onClick={agregarParcial}
+                  disabled={!materiaSeleccionadaId || !tituloParcial.trim()}
+                  className={`w-full mt-4 py-3.5 rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-[0.99] ${
+                    materiaSeleccionadaId && tituloParcial.trim()
+                      ? "bg-[#4A72A6] text-white hover:bg-[#3B5E8C]"
+                      : "bg-slate-200 text-white cursor-not-allowed"
+                  }`}
+                >
+                  + Agregar parcial
+                </button>
               </div>
+            </div>
+          )}
+
+          {/* PANTALLA 10: DETALLES DE ACTIVIDAD */}
+          {vista === 'detallesActividad' && bloqueSeleccionado && (
+            <div className="p-6 space-y-5 animate-fadeIn">
+              <div className="p-5 bg-purple-50/70 border border-purple-100 rounded-2xl text-purple-950 space-y-1">
+                <h4 className="text-sm font-black">{bloqueSeleccionado.titulo}</h4>
+                <p className="text-xs font-bold text-purple-800">{bloqueSeleccionado.subtitulo}</p>
+                <p className="text-[10px] text-purple-600/90 font-medium pt-1">Día {diaActivoNumero} de Mayo</p>
+              </div>
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-700">Descripción</p>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  Clase teórica estructurada conforme al cronograma guardado. Revisar temas de la semana.
+                </p>
+              </div>
+              <button onClick={() => setVista('vistaSemanal')} className="w-full py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors">
+                Eliminar actividad
+              </button>
             </div>
           )}
 
         </div>
 
-        {/* BOTÓN DE ACCIÓN INFERIOR */}
-        {['paso2', 'paso3', 'paso4', 'paso5', 'agregarActividad', 'configuracionRapida'].includes(vista) && (
+        {/* BOTÓN CONTINUAR/GUARDAR INFERIOR (pasos de configuración) */}
+        {vista !== 'vistaSemanal' && vista !== 'detallesActividad' && vista !== 'agregarActividad' && (
           <div className="p-6 bg-white border-t border-slate-100 sm:rounded-b-[40px] z-20">
             <button
-              disabled={(vista === 'agregarActividad' && guardandoActividad) || (vista === 'configuracionRapida' && guardandoAjustes)}
-              onClick={async () => {
-                if (vista === 'paso2') setVista('paso3');
+              onClick={() => {
+                if (vista === 'paso1') setVista('paso2');
+                else if (vista === 'paso2') setVista('paso3');
                 else if (vista === 'paso3') setVista('paso4');
                 else if (vista === 'paso4') setVista('paso5');
-                else if (vista === 'paso5') {
-                  await procesarGuardadoConfiguracion();
-                }
-                else if (vista === 'agregarActividad') handleGuardarActividad();
-                else if (vista === 'configuracionRapida') {
-                  await procesarGuardadoConfiguracion();
-                }
+                else if (vista === 'paso5') setVista('vistaSemanal');
               }}
-              className={`w-full py-3.5 ${estilosActuales.bg} ${estilosActuales.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
+              className={`w-full py-3.5 ${estilosActuales.bg} ${estilosActuales.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all`}
             >
-              {vista === 'paso5'
-                ? "Crear cronograma"
-                : vista === 'agregarActividad'
-                ? (guardandoActividad ? "Guardando..." : (idActividadEditando ? "Guardar cambios" : "Guardar actividad"))
-                : vista === 'configuracionRapida'
-                ? (guardandoAjustes ? "Guardando..." : "Confirmar cambios")
-                : "Continuar"}
+              {vista === 'paso1' ? "Crear mi cronograma" : vista === 'paso5' ? "Crear cronograma" : "Continuar"}
+            </button>
+          </div>
+        )}
+
+        {/* BOTÓN INFERIOR PARA LA VISTA DE MATERIAS Y PARCIALES */}
+        {vista === 'agregarActividad' && (
+          <div className="p-6 bg-white border-t border-slate-100 sm:rounded-b-[40px] z-20">
+            <button
+              onClick={() => setVista('vistaSemanal')}
+              className={`w-full py-3.5 ${estilosActuales.bg} ${estilosActuales.hoverBg} text-white rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-[0.99]`}
+            >
+              Listo
             </button>
           </div>
         )}
