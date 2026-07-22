@@ -763,34 +763,6 @@ export default function HomePage() {
                   </button>
                 )}
 
-              {estadoRacha?.esperandoAceptacion && (
-                <button
-                  onClick={() =>
-                    router.push("/racha")
-                  }
-                  className="
-                    mt-4
-                    w-full
-                    text-left
-                    px-4
-                    py-3
-                    bg-amber-50
-                    border
-                    border-amber-100
-                    rounded-2xl
-                    text-[11px]
-                    font-semibold
-                    text-amber-700
-                    hover:bg-amber-100
-                    transition-colors
-                  "
-                >
-                  ⏳ Invitación enviada a{" "}
-                  {estadoRacha.correoInvitado},
-                  esperando que acepte →
-                </button>
-              )}
-
               {/* CHECK-IN */}
 
               {mostrarCheckin && (
@@ -1129,18 +1101,14 @@ export default function HomePage() {
 
             {navegacionData.map((tab) => {
 
-              const rutasMenu: Record<
-                TabNavegacionId,
-                string
-              > = {
+              const rutasMenu: Record<TabNavegacionId, string> = {
                 inicio: "/home",
                 evaluacion: "/evaluacion",
                 perfil: "/perfil",
                 recursos: "/herramientas",
               };
 
-              const activo =
-                tab.id === "inicio";
+              const activo = tab.id === "inicio";
 
               return (
 
