@@ -3,7 +3,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
-import { insertarNotaDiario, actualizarEntradaDiario } from '@/lib/supabase/contrasena';
+import {
+  insertarNotaDiario,
+  actualizarEntradaDiario,
+  formatearFechaNota,
+  hashPatron,
+  obtenerPatronGuardado,
+  guardarPatronUsuario,
+  eliminarPatronUsuario,
+} from '@/lib/supabase/contrasena';
 
 // Interfaz local compatible con notas_diario (id es UUID string de Supabase)
 interface NotaDiario {
@@ -17,6 +25,9 @@ interface NotaDiario {
 }
 
 type VistaDiario = 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verNota';
+type ModoBloqueo = 'cargando' | 'crear_dibujar' | 'crear_confirmar' | 'verificar';
+
+const MIN_PUNTOS_PATRON = 4;
 
 export default function DiarioPage() {
   const router = useRouter();
@@ -26,6 +37,15 @@ export default function DiarioPage() {
   const [listaNotas,  setListaNotas]  = useState<NotaDiario[]>([]);
   const [notaActiva,  setNotaActiva]  = useState<NotaDiario | null>(null);
   const [cargando,    setCargando]    = useState<boolean>(false);
+
+  // ── Estado del patrón de bloqueo ─────────────────────────────────────────
+  const [modoBloqueo, setModoBloqueo] = useState<ModoBloqueo>('cargando');
+  const [patronHashGuardado, setPatronHashGuardado] = useState<string | null>(null);
+  const [puntosSeleccionados, setPuntosSeleccionados] = useState<number[]>([]);
+  const [patronTemporal, setPatronTemporal] = useState<number[] | null>(null);
+  const [errorPatron, setErrorPatron] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
+  const [verificandoPatron, setVerificandoPatron] = useState(false);
 
   // Estados del formulario de creación
   const [titulo,       setTitulo]       = useState('');
@@ -63,6 +83,111 @@ export default function DiarioPage() {
     };
     init();
   }, [router, cargarNotas]);
+
+  // ── Cargar estado del patrón cada vez que entramos a la pantalla de bloqueo ──
+  useEffect(() => {
+    if (vista !== 'bloqueo' || !userId) return;
+
+    const cargarPatron = async () => {
+      setModoBloqueo('cargando');
+      setPuntosSeleccionados([]);
+      setPatronTemporal(null);
+      setErrorPatron(null);
+
+      const hash = await obtenerPatronGuardado(userId);
+      setPatronHashGuardado(hash);
+      setModoBloqueo(hash ? 'verificar' : 'crear_dibujar');
+    };
+
+    cargarPatron();
+  }, [vista, userId]);
+
+  // ── Interacción con los puntos del patrón ────────────────────────────────
+  const alternarPunto = (idx: number) => {
+    if (verificandoPatron) return;
+    setErrorPatron(null);
+    setPuntosSeleccionados((prev) => (prev.includes(idx) ? prev : [...prev, idx]));
+  };
+
+  const limpiarSeleccion = () => {
+    setPuntosSeleccionados([]);
+    setErrorPatron(null);
+  };
+
+  const dispararError = (mensaje: string) => {
+    setErrorPatron(mensaje);
+    setShake(true);
+    setTimeout(() => setShake(false), 500);
+  };
+
+  const confirmarPatron = async () => {
+    if (verificandoPatron) return;
+
+    if (puntosSeleccionados.length < MIN_PUNTOS_PATRON) {
+      setErrorPatron(`Tu patrón debe tener al menos ${MIN_PUNTOS_PATRON} puntos.`);
+      return;
+    }
+
+    // Paso 1 de creación: guardamos el dibujo temporal y pedimos confirmarlo
+    if (modoBloqueo === 'crear_dibujar') {
+      setPatronTemporal(puntosSeleccionados);
+      setPuntosSeleccionados([]);
+      setModoBloqueo('crear_confirmar');
+      return;
+    }
+
+    // Paso 2 de creación: comparamos con el dibujo temporal
+    if (modoBloqueo === 'crear_confirmar') {
+      const coincide =
+        patronTemporal !== null &&
+        JSON.stringify(patronTemporal) === JSON.stringify(puntosSeleccionados);
+
+      if (!coincide) {
+        dispararError('Los patrones no coinciden. Vuelve a intentarlo.');
+        setPuntosSeleccionados([]);
+        setPatronTemporal(null);
+        setModoBloqueo('crear_dibujar');
+        return;
+      }
+
+      setVerificandoPatron(true);
+      const hash = await hashPatron(puntosSeleccionados);
+      const { error } = await guardarPatronUsuario(userId, hash);
+      setVerificandoPatron(false);
+
+      if (error) {
+        setErrorPatron('No se pudo guardar tu patrón. Intenta de nuevo.');
+        return;
+      }
+
+      setVista('listaNotas');
+      return;
+    }
+
+    // Verificación de patrón existente
+    if (modoBloqueo === 'verificar') {
+      setVerificandoPatron(true);
+      const hashIntento = await hashPatron(puntosSeleccionados);
+      setVerificandoPatron(false);
+
+      if (hashIntento === patronHashGuardado) {
+        setVista('listaNotas');
+      } else {
+        dispararError('Patrón incorrecto. Intenta de nuevo.');
+        setPuntosSeleccionados([]);
+      }
+    }
+  };
+
+  const manejarRestablecerPatron = async () => {
+    if (!confirm('Esto eliminará tu patrón actual y podrás crear uno nuevo. ¿Continuar?')) return;
+    await eliminarPatronUsuario(userId);
+    setPatronHashGuardado(null);
+    setPuntosSeleccionados([]);
+    setPatronTemporal(null);
+    setErrorPatron(null);
+    setModoBloqueo('crear_dibujar');
+  };
 
   // ── Guardar nota nueva en Supabase ───────────────────────────────────────
   const guardarNota = async () => {
@@ -150,15 +275,73 @@ export default function DiarioPage() {
             </div>
           )}
 
-          {/* ── Bloqueo (patrón simulado) ────────────────────────────── */}
+          {/* ── Bloqueo (patrón real, conectado a Supabase) ──────────────── */}
           {vista === 'bloqueo' && (
-            <div className="flex flex-col items-center pt-20 space-y-10">
-              <h2 className="text-lg font-bold">Ingresa tu patrón</h2>
-              <div className="grid grid-cols-3 gap-10 p-4">
-                {[...Array(9)].map((_, i) => (
-                  <button key={i} onClick={() => setVista('listaNotas')} className="w-4 h-4 rounded-full border-2 border-slate-300 hover:border-[#6B66B2] transition-all" />
-                ))}
+            <div className="flex flex-col items-center pt-10 space-y-5 px-2">
+              <h2 className="text-lg font-bold text-center">
+                {modoBloqueo === 'crear_dibujar' && 'Crea tu patrón de seguridad'}
+                {modoBloqueo === 'crear_confirmar' && 'Confirma tu patrón'}
+                {modoBloqueo === 'verificar' && 'Ingresa tu patrón'}
+                {modoBloqueo === 'cargando' && 'Cargando...'}
+              </h2>
+              <p className="text-xs text-slate-400 text-center max-w-xs">
+                {modoBloqueo === 'crear_dibujar' && `Toca al menos ${MIN_PUNTOS_PATRON} puntos, en el orden que quieras usar como tu patrón.`}
+                {modoBloqueo === 'crear_confirmar' && 'Vuelve a tocar los mismos puntos en el mismo orden para confirmar.'}
+                {modoBloqueo === 'verificar' && 'Toca tu patrón para desbloquear tu diario.'}
+              </p>
+
+              <div className={`grid grid-cols-3 gap-8 p-4 ${shake ? 'animate-shake' : ''}`}>
+                {[...Array(9)].map((_, i) => {
+                  const seleccionado = puntosSeleccionados.includes(i);
+                  const orden = puntosSeleccionados.indexOf(i);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => alternarPunto(i)}
+                      disabled={modoBloqueo === 'cargando' || verificandoPatron}
+                      className={`relative w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all duration-150 ${
+                        seleccionado
+                          ? 'border-[#6B66B2] bg-[#6B66B2] text-white scale-110 shadow-md'
+                          : 'border-slate-300 hover:border-[#6B66B2] disabled:opacity-50'
+                      }`}
+                    >
+                      {seleccionado && <span className="text-xs font-bold">{orden + 1}</span>}
+                    </button>
+                  );
+                })}
               </div>
+
+              {errorPatron && (
+                <p className="text-xs font-semibold text-rose-500 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 text-center">
+                  ⚠️ {errorPatron}
+                </p>
+              )}
+
+              <div className="flex gap-3 w-full max-w-xs">
+                <button
+                  onClick={limpiarSeleccion}
+                  disabled={verificandoPatron}
+                  className="flex-1 py-3 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Borrar
+                </button>
+                <button
+                  onClick={confirmarPatron}
+                  disabled={modoBloqueo === 'cargando' || verificandoPatron}
+                  className="flex-1 py-3 bg-[#6B66B2] hover:bg-[#5a5596] text-white rounded-xl text-xs font-bold disabled:opacity-60"
+                >
+                  {verificandoPatron ? 'Verificando...' : 'Confirmar'}
+                </button>
+              </div>
+
+              {modoBloqueo === 'verificar' && (
+                <button
+                  onClick={manejarRestablecerPatron}
+                  className="text-[11px] text-slate-400 underline hover:text-slate-600"
+                >
+                  Olvidé mi patrón
+                </button>
+              )}
             </div>
           )}
 
@@ -180,7 +363,7 @@ export default function DiarioPage() {
                   onClick={() => abrirNota(nota)}>
                   <div>
                     <p className="text-xs font-bold">{nota.titulo}</p>
-                    <p className="text-[10px] text-slate-400">{nota.fecha}</p>
+                    <p className="text-[10px] text-slate-400">{formatearFechaNota(nota.fecha)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xl">{nota.emoji_dia ?? ''}</span>
@@ -206,7 +389,7 @@ export default function DiarioPage() {
                 <span className="text-2xl">{notaActiva.emoji_dia ?? ''}</span>
                 <h2 className="text-lg font-bold text-[#6B66B2]">{notaActiva.titulo}</h2>
               </div>
-              <p className="text-[10px] text-slate-400">{notaActiva.fecha} · {notaActiva.label_dia ?? ''}</p>
+              <p className="text-[10px] text-slate-400">{formatearFechaNota(notaActiva.fecha)} · {notaActiva.label_dia ?? ''}</p>
               <p className="text-xs text-slate-600 leading-relaxed">{notaActiva.contenido}</p>
               <button
                 onClick={() => eliminarNota(notaActiva.id)}
@@ -287,6 +470,12 @@ export default function DiarioPage() {
       <style jsx global>{`
         @keyframes fadeIn  { from { opacity: 0 }  to { opacity: 1 } }
         @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-8px); }
+          40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
       `}</style>
     </div>
   );
