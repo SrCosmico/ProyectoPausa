@@ -131,7 +131,7 @@ export default function RegisterView() {
               type="email"
               required
               disabled={loading}
-              placeholder="ejemplo@ucv.ve"
+              placeholder="ejemplo@gmail.com"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#5B7A9A] focus:bg-white transition-all text-sm disabled:opacity-50"
               value={formData.correo}
               onChange={(e) => { setError(null); setFormData({ ...formData, correo: e.target.value }); }}
