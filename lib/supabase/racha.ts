@@ -18,6 +18,60 @@ const DIAS_MOSTRADOS_UI = 7;
 // C — Vincular pareja
 // ============================================================
 
+// Regex estándar para validación básica de sintaxis
+export const esEmailValido = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+/**
+ * Valida la existencia del usuario y las restricciones de invitación antes de proceder.
+ */
+export async function validarInvitacion(
+  correoEmisor: string,
+  correoDestino: string
+): Promise<{ ok: boolean; mensaje?: string; usuarioDestinoId?: string }> {
+  // 1. Validar sintaxis
+  if (!esEmailValido(correoDestino)) {
+    return { ok: false, mensaje: 'El formato del correo electrónico no es válido.' };
+  }
+
+  // 2. Prevenir auto-invitación
+  if (correoEmisor.toLowerCase() === correoDestino.trim().toLowerCase()) {
+    return { ok: false, mensaje: 'No puedes enviarte una invitación a ti mismo.' };
+  }
+
+  const supabase = getSupabase();
+
+  // 3. Verificar si el usuario destino existe en la BD de Pausa
+  const { data: usuarioDestino, error: errUser } = await supabase
+    .from('perfiles')
+    .select('id, email')
+    .eq('email', correoDestino.trim().toLowerCase())
+    .maybeSingle();
+
+  if (errUser || !usuarioDestino) {
+    return { ok: false, mensaje: 'No encontramos ningún usuario registrado con ese correo en Pausa.' };
+  }
+
+  // 4. Verificar si ya existe una invitación previa o una relación activa
+  const { data: relacionExistente } = await supabase
+    .from('parejas')
+    .select('id, estado')
+    .or(`user_id_1.eq.${usuarioDestino.id},user_id_2.eq.${usuarioDestino.id}`)
+    .maybeSingle();
+
+  if (relacionExistente) {
+    if (relacionExistente.estado === 'activa') {
+      return { ok: false, mensaje: 'Este usuario ya tiene una racha activa.' };
+    }
+    if (relacionExistente.estado === 'pendiente') {
+      return { ok: false, mensaje: 'Ya existe una invitación pendiente asociada a este usuario.' };
+    }
+  }
+
+  return { ok: true, usuarioDestinoId: usuarioDestino.id };
+}
+
 export async function invitarPareja(userId: string, correoPareja: string) {
   const supabase = getSupabase();
   const { data, error } = await supabase
