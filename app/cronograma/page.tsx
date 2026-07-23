@@ -20,15 +20,13 @@ import {
   guardarCacheOffline,
   leerCacheOffline,
   tiempoDesdeSincronizacion,
-  generarResumenTextoSemana,
-  descargarResumenSemanal,
 } from '@/lib/cronograma/modoOffline';
 
 type VistaId = 
   | 'paso1' | 'paso2' | 'paso3' | 'paso4' | 'paso5' 
   | 'vistaSemanal' | 'agregarActividad' | 'detallesActividad'
   | 'configuracionRapida'
-  | 'materiasParciales'; // NUEVO
+  | 'materiasParciales';
 
 type SubVistaCalendario = 'dia' | 'mes' | 'lista';
 
@@ -45,7 +43,6 @@ const tiposActividad = [
   { id: "examen", label: "Examen" },
 ];
 
-// Helper para mapear colores pasteles limpios y legibles por tipo de actividad
 function obtenerEstiloPorTipo(tipo: string) {
   switch (tipo?.toLowerCase()) {
     case 'tarea':
@@ -162,7 +159,6 @@ export default function CronogramaPage() {
       }
       setUserId(session.user.id);
 
-      // Cargar la configuración general desde Supabase
       const { data: config } = await obtenerConfiguracionCronograma(session.user.id);
       if (config) {
         if (config.nombre) setNombreCronograma(config.nombre);
@@ -175,13 +171,11 @@ export default function CronogramaPage() {
       }
 
       await refrescarActividades(session.user.id);
-            const parcialesUsuario = await leerParcialesConMateria(session.user.id);
+      const parcialesUsuario = await leerParcialesConMateria(session.user.id);
       setParciales(parcialesUsuario);
 
-      // Guardamos copia offline para consulta sin conexión
       guardarCacheOffline(session.user.id, {
         actividades: await (async () => {
-          // reutilizamos lo ya cargado por refrescarActividades vía estado actual
           return actividadesGuardadas;
         })(),
         parciales: parcialesUsuario,
@@ -210,15 +204,16 @@ export default function CronogramaPage() {
         setVista('vistaSemanal'); 
         break;
       case 'detallesActividad': setVista('vistaSemanal'); break;
-      case 'configuracionRapida': setVista('vistaSemanal'); break;
+      case 'configuracionRapida': {
+        const confirmarSalida = window.confirm(
+          '¿Salir sin guardar los cambios? Los ajustes que hiciste se perderán si no presionas "Confirmar cambios".'
+        );
+        if (confirmarSalida) setVista('vistaSemanal');
+        break;
+      }
       case 'materiasParciales': setVista('vistaSemanal'); break;
       default: router.push('/home');
     }
-  };
-
-  const manejarDescargaResumen = () => {
-    const contenido = generarResumenTextoSemana(nombreCronograma, actividadesGuardadas, parciales);
-    descargarResumenSemanal(`pausa_resumen_${obtenerFechaISO(new Date())}`, contenido);
   };
 
   const toggleSelection = (item: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
@@ -345,7 +340,6 @@ export default function CronogramaPage() {
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-slate-200">
       <div className="w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 overflow-hidden pb-4">
 
-        {/* Encabezado Dinámico */}
         <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-100 bg-white z-20">
           <button onClick={manejarFlechaAtras} className="p-2 -ml-2 text-slate-700 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-50">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
@@ -362,30 +356,17 @@ export default function CronogramaPage() {
             {vista === 'configuracionRapida' && "Ajustes del calendario"}
           </h3>
 
-          {/* Botones de acceso rápido en la esquina superior derecha */}
           {vista === 'vistaSemanal' ? (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={manejarDescargaResumen}
-                className="p-2 -mr-1 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
-                title="Descargar resumen semanal"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v11m0 0 4-4m-4 4-4-4M4 18h16" />
-                </svg>
-              </button>
-
-              <button 
-                onClick={() => setVista('configuracionRapida')} 
-                className="p-2 -mr-2 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
-                title="Ajustes de Cronograma"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.767c-.293.224-.438.613-.431.983.001.066.002.132.002.198 0 .066-.001.132-.002.198-.007.37.138.76.431.983l1.003.767a1.125 1.125 0 0 1 .26 1.43l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.216-.456a1.125 1.125 0 0 0-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.644-.87a6.52 6.52 0 0 1-.22-.127a1.125 1.125 0 0 0-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.43l1.003-.767c.293-.224.438-.613.431-.983a6.53 6.53 0 0 1-.002-.198c0-.066.001-.132.002-.198.007-.37-.138-.76-.431-.983l-1.003-.767a1.125 1.125 0 0 1-.26-1.43l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128c.332-.183.582-.495.644-.869l.214-1.28Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-              </button>
-            </div>
+            <button 
+              onClick={() => setVista('configuracionRapida')} 
+              className="p-2 -mr-2 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
+              title="Ajustes de Cronograma"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.767c-.293.224-.438.613-.431.983.001.066.002.132.002.198 0 .066-.001.132-.002.198-.007.37.138.76.431.983l1.003.767a1.125 1.125 0 0 1 .26 1.43l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.216-.456a1.125 1.125 0 0 0-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.644-.87a6.52 6.52 0 0 1-.22-.127a1.125 1.125 0 0 0-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.43l1.003-.767c.293-.224.438-.613.431-.983a6.53 6.53 0 0 1-.002-.198c0-.066.001-.132.002-.198.007-.37-.138-.76-.431-.983l-1.003-.767a1.125 1.125 0 0 1-.26-1.43l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128c.332-.183.582-.495.644-.869l.214-1.28Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
           ) : (
             <div className="w-5 h-5" />
           )}
@@ -407,7 +388,6 @@ export default function CronogramaPage() {
 
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
 
-          {/* PASO 2 */}
           {vista === 'paso2' && (
             <div className="p-6 space-y-4 animate-fadeIn">
               <div>
@@ -430,7 +410,6 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* PASO 3 */}
           {vista === 'paso3' && (
             <div className="p-6 space-y-5 animate-fadeIn">
               <div>
@@ -454,7 +433,6 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* PASO 4 */}
           {vista === 'paso4' && (
             <div className="p-6 space-y-4 animate-fadeIn">
               <div>
@@ -477,7 +455,6 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* PASO 5 */}
           {vista === 'paso5' && (
             <div className="p-6 space-y-5 animate-fadeIn">
               <div>
@@ -510,7 +487,6 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* VISTA MATERIAS Y PARCIALES */}
           {vista === 'materiasParciales' && (
             <div className="p-6 animate-fadeIn">
               <GestionMateriasParciales
@@ -520,7 +496,6 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* VISTA DASHBOARD PRINCIPAL */}
           {vista === 'vistaSemanal' && (
             <div className="animate-fadeIn relative pb-16">
               <div className="px-6 pt-4 pb-2 bg-white space-y-3">
@@ -548,7 +523,6 @@ export default function CronogramaPage() {
                 </div>
               </div>
 
-              {/* SUBVISTA: DÍA */}
               {subVista === 'dia' && (
                 <>
                   <div className="px-6 py-3 flex justify-between border-b border-slate-100 bg-white">
@@ -604,7 +578,6 @@ export default function CronogramaPage() {
                 </>
               )}
 
-              {/* SUBVISTA: MES */}
               {subVista === 'mes' && (
                 <div className="p-6 space-y-4 animate-fadeIn">
                   <div className="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
@@ -667,7 +640,6 @@ export default function CronogramaPage() {
                 </div>
               )}
 
-              {/* SUBVISTA: LISTA */}
               {subVista === 'lista' && (
                 <div className="p-6 space-y-3 animate-fadeIn">
                   <p className="text-[10px] font-bold text-slate-400">Todas tus actividades guardadas</p>
@@ -716,7 +688,6 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* AGREGAR / EDITAR ACTIVIDAD */}
           {vista === 'agregarActividad' && (
             <div className="p-6 space-y-4 animate-fadeIn">
               <div className="flex gap-2 justify-between">
@@ -767,7 +738,6 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* DETALLES DE ACTIVIDAD */}
           {vista === 'detallesActividad' && bloqueSeleccionado && (
             <div className="p-6 space-y-5 animate-fadeIn">
               {(() => {
@@ -803,12 +773,17 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {/* VISTA AJUSTES DE CALENDARIO / CONFIGURACIÓN RÁPIDA */}
           {vista === 'configuracionRapida' && (
             <div className="p-6 space-y-6 animate-fadeIn">
               <div>
                 <h4 className="text-base font-bold text-[#2A3B50]">Ajustes del calendario</h4>
                 <p className="text-xs text-slate-400 mt-0.5">Personaliza los parámetros globales de tu organizador sin perder tus eventos.</p>
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                <p className="text-[11px] font-semibold text-amber-700">
+                  ⚠️ Recuerda presionar "Confirmar cambios" al final. Si sales con la flecha de regreso sin confirmar, tus cambios no se guardarán.
+                </p>
               </div>
 
               <div className="space-y-4">
@@ -865,7 +840,6 @@ export default function CronogramaPage() {
 
         </div>
 
-        {/* BOTÓN DE ACCIÓN INFERIOR */}
         {['paso2', 'paso3', 'paso4', 'paso5', 'agregarActividad', 'configuracionRapida'].includes(vista) && (
           <div className="p-6 bg-white border-t border-slate-100 sm:rounded-b-[40px] z-20">
             <button
