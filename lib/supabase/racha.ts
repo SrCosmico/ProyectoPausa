@@ -151,7 +151,7 @@ export async function otorgarProtectorMensualSiCorresponde(parejaId: string): Pr
     .from('protectores_racha')
     .insert({
       pareja_id: parejaId,
-      fecha: hoy,          // placeholder: fecha en que se otorgó (obligatoria en el esquema)
+      fecha: hoy,
       otorgado_mes: mesActual,
       usado_por: null,
       usado_en_fecha: null,
@@ -295,6 +295,12 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       .eq('pareja_id', pareja.id)
       .is('usado_por', null);
 
+    const { data: protectoresUsados } = await supabase
+      .from('protectores_racha')
+      .select('id')
+      .eq('pareja_id', pareja.id)
+      .not('usado_por', 'is', null);
+
     let mensajeMotivador = '';
     if (rachaActual >= 30) mensajeMotivador = '¡Un mes juntos! Son increíbles 🏆';
     else if (rachaActual >= 7) mensajeMotivador = '¡Una semana completa! Sigan así 🌟';
@@ -309,6 +315,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       rachaActual,
       rachaMaxima,
       protectoresDisponibles: protectoresDisponibles?.length ?? 0,
+      protectoresUsados: protectoresUsados?.length ?? 0,
       historialDias,
       mensajeMotivador,
       soyReceptor: pareja.user_id_2 === userId,
@@ -336,7 +343,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     rachaActual: primera?.rachaActual ?? 0,
     rachaMaxima: primera?.rachaMaxima ?? 0,
     protectoresDisponibles: primera?.protectoresDisponibles ?? 0,
-    protectoresUsadosEsteMes: 0,
+    protectoresUsadosEsteMes: primera?.protectoresUsados ?? 0,
     activadaHoy: (primera?.rachaActual ?? 0) > 0,
     historialDias: primera?.historialDias ?? [],
     mensajeMotivador: primera?.mensajeMotivador ?? null,

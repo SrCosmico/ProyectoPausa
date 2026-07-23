@@ -93,7 +93,7 @@ function TarjetaRacha({
 
       <div className="pt-2 border-t border-white/20 flex items-center justify-between text-xs font-medium text-orange-100">
         <span>🏆 Récord: <strong className="text-white">{pareja.rachaMaxima} días</strong></span>
-        <span>🛡️ Protectores: <strong className="text-white">{pareja.protectoresDisponibles}/4</strong></span>
+        <span>🛡️ Protectores: <strong className="text-white">{pareja.protectoresUsados}/4</strong></span>
       </div>
 
       {pareja.protectoresDisponibles > 0 && hayDiaPendienteQueProteger && (

@@ -28,6 +28,7 @@ export interface ParejaActivaInfo {
   rachaActual: number;
   rachaMaxima: number;
   protectoresDisponibles: number;
+  protectoresUsados: number;
   historialDias: CheckinDia[];
   mensajeMotivador: string;
   soyReceptor: boolean;
