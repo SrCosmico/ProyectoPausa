@@ -132,16 +132,13 @@ export default function CronogramaPage() {
   const [parciales, setParciales] = useState<ParcialConMateria[]>([]);
   const [ultimaSincronizacion, setUltimaSincronizacion] = useState<string | null>(null);
 
-  // Guarda una copia de la última configuración confirmada en Supabase,
-  // para poder revertir si el usuario sale de Ajustes sin guardar.
-  const [configGuardada, setConfigGuardada] = useState<{
+  // Borrador de edición de Ajustes: mientras el usuario edita aquí, los valores
+  // REALES (nombreCronograma, colorCronograma, etc.) no se tocan. Solo se
+  // aplican cuando el usuario presiona "Confirmar cambios".
+  const [draftAjustes, setDraftAjustes] = useState<{
     nombre: string;
     color: "blue" | "purple" | "emerald" | "orange" | "rose";
     dias: string[];
-    horaInicio: string;
-    horaFin: string;
-    actividades: string[];
-    recordatorios: boolean;
   } | null>(null);
 
   const mapaEstilos = {
@@ -180,16 +177,6 @@ export default function CronogramaPage() {
         if (config.hora_fin) setHoraFin(config.hora_fin);
         if (config.actividades_preferidas) setActividadesPreferidas(config.actividades_preferidas);
         if (config.recordatorios !== null) setRecordatorios(config.recordatorios);
-
-        setConfigGuardada({
-          nombre: config.nombre ?? nombreCronograma,
-          color: (config.color as any) ?? colorCronograma,
-          dias: config.dias_activos ?? diasSeleccionados,
-          horaInicio: config.hora_inicio ?? horaInicio,
-          horaFin: config.hora_fin ?? horaFin,
-          actividades: config.actividades_preferidas ?? actividadesPreferidas,
-          recordatorios: config.recordatorios ?? recordatorios,
-        });
       }
 
       await refrescarActividades(session.user.id);
@@ -227,22 +214,22 @@ export default function CronogramaPage() {
         break;
       case 'detallesActividad': setVista('vistaSemanal'); break;
       case 'configuracionRapida': {
-        const confirmarSalida = window.confirm(
-          '¿Salir sin guardar los cambios? Los ajustes que hiciste se perderán si no presionas "Confirmar cambios".'
-        );
-        if (confirmarSalida) {
-          // Revertimos los campos a la última versión realmente guardada en Supabase
-          if (configGuardada) {
-            setNombreCronograma(configGuardada.nombre);
-            setColorCronograma(configGuardada.color);
-            setDiasSeleccionados(configGuardada.dias);
-            setHoraInicio(configGuardada.horaInicio);
-            setHoraFin(configGuardada.horaFin);
-            setActividadesPreferidas(configGuardada.actividades);
-            setRecordatorios(configGuardada.recordatorios);
-          }
-          setVista('vistaSemanal');
+        const hayBorradorConCambios =
+          draftAjustes &&
+          (draftAjustes.nombre !== nombreCronograma ||
+            draftAjustes.color !== colorCronograma ||
+            JSON.stringify(draftAjustes.dias) !== JSON.stringify(diasSeleccionados));
+
+        if (hayBorradorConCambios) {
+          const confirmarSalida = window.confirm(
+            '¿Salir sin guardar los cambios? Los ajustes que hiciste se perderán si no presionas "Confirmar cambios".'
+          );
+          if (!confirmarSalida) break;
         }
+        // Descartamos el borrador: el estado real (nombreCronograma, colorCronograma,
+        // diasSeleccionados) nunca fue tocado, así que no hay nada que revertir.
+        setDraftAjustes(null);
+        setVista('vistaSemanal');
         break;
       }
       case 'materiasParciales': setVista('vistaSemanal'); break;
@@ -343,28 +330,30 @@ export default function CronogramaPage() {
 
   const procesarGuardadoConfiguracion = async () => {
     if (!userId) return;
+
+    // Si venimos de la pantalla de Ajustes, aplicamos el borrador al estado real primero
+    const nombreFinal = draftAjustes?.nombre ?? nombreCronograma;
+    const colorFinal = draftAjustes?.color ?? colorCronograma;
+    const diasFinal = draftAjustes?.dias ?? diasSeleccionados;
+
+    if (draftAjustes) {
+      setNombreCronograma(draftAjustes.nombre);
+      setColorCronograma(draftAjustes.color);
+      setDiasSeleccionados(draftAjustes.dias);
+    }
+
     setGuardandoAjustes(true);
     await guardarConfiguracionCronograma(userId, {
-      nombre: nombreCronograma,
-      color: colorCronograma,
-      dias: diasSeleccionados,
+      nombre: nombreFinal,
+      color: colorFinal,
+      dias: diasFinal,
       horaInicio: horaInicio,
       horaFin: horaFin,
       actividades: actividadesPreferidas,
       recordatorios: recordatorios
     });
-    // Actualizamos la copia de "última guardada" para que futuras cancelaciones
-    // reviertan a este nuevo estado correcto
-    setConfigGuardada({
-      nombre: nombreCronograma,
-      color: colorCronograma,
-      dias: diasSeleccionados,
-      horaInicio: horaInicio,
-      horaFin: horaFin,
-      actividades: actividadesPreferidas,
-      recordatorios: recordatorios,
-    });
     setGuardandoAjustes(false);
+    setDraftAjustes(null);
     setVista('vistaSemanal');
   };
 
@@ -405,7 +394,14 @@ export default function CronogramaPage() {
 
           {vista === 'vistaSemanal' ? (
             <button 
-              onClick={() => setVista('configuracionRapida')} 
+              onClick={() => {
+                setDraftAjustes({
+                  nombre: nombreCronograma,
+                  color: colorCronograma,
+                  dias: diasSeleccionados,
+                });
+                setVista('configuracionRapida');
+              }} 
               className="p-2 -mr-2 text-slate-500 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-50"
               title="Ajustes de Cronograma"
             >
@@ -856,7 +852,7 @@ export default function CronogramaPage() {
             </div>
           )}
 
-          {vista === 'configuracionRapida' && (
+          {vista === 'configuracionRapida' && draftAjustes && (
             <div className="p-6 space-y-6 animate-fadeIn">
               <div>
                 <h4 className="text-base font-bold text-[#2A3B50]">Ajustes del calendario</h4>
@@ -874,8 +870,8 @@ export default function CronogramaPage() {
                   <label className="text-xs font-bold text-slate-500">Nombre del cronograma</label>
                   <input 
                     type="text" 
-                    value={nombreCronograma} 
-                    onChange={(e) => setNombreCronograma(e.target.value)} 
+                    value={draftAjustes.nombre} 
+                    onChange={(e) => setDraftAjustes({ ...draftAjustes, nombre: e.target.value })} 
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none" 
                   />
                 </div>
@@ -886,13 +882,13 @@ export default function CronogramaPage() {
                     {(["blue", "purple", "emerald", "orange", "rose"] as const).map((c) => (
                       <button 
                         key={c} 
-                        onClick={() => setColorCronograma(c)} 
+                        onClick={() => setDraftAjustes({ ...draftAjustes, color: c })} 
                         className={`w-8 h-8 rounded-full border-2 ${
                           c === 'blue' ? 'bg-blue-300' : 
                           c === 'purple' ? 'bg-purple-300' : 
                           c === 'emerald' ? 'bg-emerald-300' : 
                           c === 'orange' ? 'bg-orange-300' : 'bg-rose-300'
-                        } ${colorCronograma === c ? 'border-slate-800 scale-110 shadow' : 'border-transparent opacity-80'}`} 
+                        } ${draftAjustes.color === c ? 'border-slate-800 scale-110 shadow' : 'border-transparent opacity-80'}`} 
                       />
                     ))}
                   </div>
@@ -902,11 +898,16 @@ export default function CronogramaPage() {
                   <label className="text-xs font-bold text-slate-500">Días activos en semana</label>
                   <div className="flex flex-wrap gap-1.5">
                     {["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"].map((dia) => {
-                      const elegido = diasSeleccionados.includes(dia);
+                      const elegido = draftAjustes.dias.includes(dia);
                       return (
                         <button
                           key={dia}
-                          onClick={() => toggleSelection(dia, diasSeleccionados, setDiasSeleccionados)}
+                          onClick={() => {
+                            const nuevasDias = elegido
+                              ? draftAjustes.dias.filter(d => d !== dia)
+                              : [...draftAjustes.dias, dia];
+                            setDraftAjustes({ ...draftAjustes, dias: nuevasDias });
+                          }}
                           className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all ${
                             elegido ? `${estilosActuales.bg} text-white shadow-sm` : 'bg-slate-50 border border-slate-200 text-slate-600'
                           }`}
