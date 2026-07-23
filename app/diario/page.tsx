@@ -1,235 +1,522 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
-import { 
-  crearNotaDiario, 
-  obtenerNotasDiario, 
-  actualizarNotaDiario, 
-  borrarNotaDiario, 
-  NotaDiario
-} from '@/lib/supabase/services';
+import {
+  insertarNotaDiario,
+  actualizarEntradaDiario,
+  formatearFechaNota,
+  hashPatron,
+  obtenerPatronGuardado,
+  guardarPatronUsuario,
+  eliminarPatronUsuario,
+} from '@/lib/supabase/contrasena';
 
-export default function DiarioEmocionalView() {
+// Interfaz local compatible con notas_diario (id es UUID string de Supabase)
+interface NotaDiario {
+  id: string;
+  user_id: string;
+  titulo: string;
+  contenido: string;
+  fecha: string;
+  emoji_dia?: string | null;
+  label_dia?: string | null;
+}
+
+type VistaDiario = 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verNota';
+type ModoBloqueo = 'cargando' | 'crear_dibujar' | 'crear_confirmar' | 'verificar';
+
+const MIN_PUNTOS_PATRON = 4;
+
+const opcionesEstado = [
+  { emoji: '💜', label: 'Productivo' },
+  { emoji: '💛', label: 'Cansado'    },
+  { emoji: '💙', label: 'Tranquilo'  },
+  { emoji: '💚', label: 'Aprendizaje'},
+];
+
+export default function DiarioPage() {
   const router = useRouter();
 
-  // Sesión real (antes era un userIdDummy fijo, por eso no conectaba)
-  const [userId, setUserId] = useState<string | null>(null);
-  const [cargandoSesion, setCargandoSesion] = useState(true);
+  const [userId,      setUserId]      = useState<string>('');
+  const [vista,       setVista]       = useState<VistaDiario>('bienvenida');
+  const [listaNotas,  setListaNotas]  = useState<NotaDiario[]>([]);
+  const [notaActiva,  setNotaActiva]  = useState<NotaDiario | null>(null);
+  const [cargando,    setCargando]    = useState<boolean>(false);
 
-  // Estados de la data de la Base de Datos
-  const [notas, setNotas] = useState<NotaDiario[]>([]);
-  const [cargando, setCargando] = useState<boolean>(false);
-  const [mensajeError, setMensajeError] = useState<string | null>(null);
+  // ── NUEVO: filtro de notas por etiqueta/emoji ────────────────────────────
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState<string | null>(null); // null = "Todas"
 
-  // Estados del Formulario (Crear / Editar)
-  const [tituloInput, setTituloInput] = useState<string>('');
-  const [contenidoInput, setContenidoInput] = useState<string>('');
-  const [idNotaEditando, setIdNotaEditando] = useState<string | null>(null);
+  // ── Estado del patrón de bloqueo ─────────────────────────────────────────
+  const [modoBloqueo, setModoBloqueo] = useState<ModoBloqueo>('cargando');
+  const [patronHashGuardado, setPatronHashGuardado] = useState<string | null>(null);
+  const [puntosSeleccionados, setPuntosSeleccionados] = useState<number[]>([]);
+  const [patronTemporal, setPatronTemporal] = useState<number[] | null>(null);
+  const [errorPatron, setErrorPatron] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
+  const [verificandoPatron, setVerificandoPatron] = useState(false);
 
-  // 0. Obtener el usuario real de Supabase Auth (antes: userIdDummy)
+  // Estados del formulario de creación
+  const [titulo,       setTitulo]       = useState('');
+  const [contenido,    setContenido]    = useState('');
+  const [estadoDia,    setEstadoDia]    = useState<{ emoji: string; label: string } | null>(null);
+  const [panelAbierto, setPanelAbierto] = useState(false);
+
+  // ── Fetch de notas desde Supabase ────────────────────────────────────────
+  const cargarNotas = useCallback(async (uid: string) => {
+    if (!uid) return;
+    setCargando(true);
+    const { data, error } = await supabase
+      .from('notas_diario')
+      .select('*')
+      .eq('user_id', uid)
+      .order('fecha', { ascending: false });
+
+    if (!error && data) setListaNotas(data as NotaDiario[]);
+    setCargando(false);
+  }, []);
+
   useEffect(() => {
-    const inicializar = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
+      if (!user) { router.push('/login'); return; }
+      setUserId(user.id);
+      await cargarNotas(user.id);
+    };
+    init();
+  }, [router, cargarNotas]);
+
+  // ── Cargar estado del patrón cada vez que entramos a la pantalla de bloqueo ──
+  useEffect(() => {
+    if (vista !== 'bloqueo' || !userId) return;
+
+    const cargarPatron = async () => {
+      setModoBloqueo('cargando');
+      setPuntosSeleccionados([]);
+      setPatronTemporal(null);
+      setErrorPatron(null);
+
+      const hash = await obtenerPatronGuardado(userId);
+      setPatronHashGuardado(hash);
+      setModoBloqueo(hash ? 'verificar' : 'crear_dibujar');
+    };
+
+    cargarPatron();
+  }, [vista, userId]);
+
+  // ── Interacción con los puntos del patrón ────────────────────────────────
+  const alternarPunto = (idx: number) => {
+    if (verificandoPatron) return;
+    setErrorPatron(null);
+    setPuntosSeleccionados((prev) => (prev.includes(idx) ? prev : [...prev, idx]));
+  };
+
+  const limpiarSeleccion = () => {
+    setPuntosSeleccionados([]);
+    setErrorPatron(null);
+  };
+
+  const dispararError = (mensaje: string) => {
+    setErrorPatron(mensaje);
+    setShake(true);
+    setTimeout(() => setShake(false), 500);
+  };
+
+  const confirmarPatron = async () => {
+    if (verificandoPatron) return;
+
+    if (puntosSeleccionados.length < MIN_PUNTOS_PATRON) {
+      setErrorPatron(`Tu patrón debe tener al menos ${MIN_PUNTOS_PATRON} puntos.`);
+      return;
+    }
+
+    // Paso 1 de creación: guardamos el dibujo temporal y pedimos confirmarlo
+    if (modoBloqueo === 'crear_dibujar') {
+      setPatronTemporal(puntosSeleccionados);
+      setPuntosSeleccionados([]);
+      setModoBloqueo('crear_confirmar');
+      return;
+    }
+
+    // Paso 2 de creación: comparamos con el dibujo temporal
+    if (modoBloqueo === 'crear_confirmar') {
+      const coincide =
+        patronTemporal !== null &&
+        JSON.stringify(patronTemporal) === JSON.stringify(puntosSeleccionados);
+
+      if (!coincide) {
+        dispararError('Los patrones no coinciden. Vuelve a intentarlo.');
+        setPuntosSeleccionados([]);
+        setPatronTemporal(null);
+        setModoBloqueo('crear_dibujar');
         return;
       }
-      setUserId(user.id);
-      setCargandoSesion(false);
-    };
-    inicializar();
-  }, [router]);
 
-  // 1. Cargar las notas automáticamente al abrir la pantalla (Letra R)
-  useEffect(() => {
-    if (!userId) return;
+      setVerificandoPatron(true);
+      const hash = await hashPatron(puntosSeleccionados);
+      const { error } = await guardarPatronUsuario(userId, hash);
+      setVerificandoPatron(false);
 
-    async function cargarHistorialNotas() {
-      try {
-        setCargando(true);
-        const datosBaseDeDatos = await obtenerNotasDiario(userId!);
-        setNotas(datosBaseDeDatos);
-      } catch (err: unknown) {
-        if (err instanceof Error) setMensajeError(err.message);
-      } finally {
-        setCargando(false);
+      if (error) {
+        setErrorPatron('No se pudo guardar tu patrón. Intenta de nuevo.');
+        return;
       }
+
+      setVista('listaNotas');
+      return;
     }
-    cargarHistorialNotas();
-  }, [userId]);
 
-  // 2. Letras C (Create) y U (Update) mediante el envío del formulario
-  const handleGuardarNota = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!contenidoInput.trim() || !userId) return;
+    // Verificación de patrón existente
+    if (modoBloqueo === 'verificar') {
+      setVerificandoPatron(true);
+      const hashIntento = await hashPatron(puntosSeleccionados);
+      setVerificandoPatron(false);
 
-    try {
-      setCargando(true);
-      setMensajeError(null);
-
-      if (idNotaEditando) {
-        await actualizarNotaDiario(idNotaEditando, tituloInput, contenidoInput);
+      if (hashIntento === patronHashGuardado) {
+        setVista('listaNotas');
       } else {
-        await crearNotaDiario(userId, tituloInput, contenidoInput);
+        dispararError('Patrón incorrecto. Intenta de nuevo.');
+        setPuntosSeleccionados([]);
       }
-
-      const datosActualizados = await obtenerNotasDiario(userId);
-      setNotas(datosActualizados);
-      setTituloInput('');
-      setContenidoInput('');
-      setIdNotaEditando(null);
-    } catch (err: unknown) {
-      if (err instanceof Error) setMensajeError(err.message);
-    } finally {
-      setCargando(false);
     }
   };
 
-  // 3. Letra D (Delete): Borrar nota al hacer clic en la papelera
-  const handleEliminarNota = async (id: string) => {
-    if (!confirm('¿Seguro que deseas eliminar esta nota de tu diario?')) return;
-
-    try {
-      setCargando(true);
-      await borrarNotaDiario(id);
-      setNotas(prev => prev.filter(nota => nota.id !== id));
-    } catch (err: unknown) {
-      if (err instanceof Error) setMensajeError(err.message);
-    } finally {
-      setCargando(false);
-    }
+  const manejarRestablecerPatron = async () => {
+    if (!confirm('Esto eliminará tu patrón actual y podrás crear uno nuevo. ¿Continuar?')) return;
+    await eliminarPatronUsuario(userId);
+    setPatronHashGuardado(null);
+    setPuntosSeleccionados([]);
+    setPatronTemporal(null);
+    setErrorPatron(null);
+    setModoBloqueo('crear_dibujar');
   };
 
-  const iniciarEdicion = (nota: NotaDiario) => {
-    setIdNotaEditando(nota.id);
-    setTituloInput(nota.titulo);
-    setContenidoInput(nota.contenido);
-  };
+  // ── Guardar nota nueva en Supabase ───────────────────────────────────────
+  const guardarNota = async () => {
+    if (!userId) return;
+    setCargando(true);
 
-  if (cargandoSesion) {
-    return (
-      <div className="min-h-screen bg-[#FCFBF8] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#5B7A9A] border-t-transparent rounded-full animate-spin" />
-      </div>
+    const { error } = await insertarNotaDiario(
+      userId,
+      titulo || 'Sin título',
+      contenido,
+      estadoDia?.emoji  ?? null,
+      estadoDia?.label  ?? null
     );
-  }
+
+    if (!error) {
+      setTitulo('');
+      setContenido('');
+      setEstadoDia(null);
+      await cargarNotas(userId);
+      setVista('listaNotas');
+    } else {
+      console.error('Error al guardar nota:', error);
+    }
+    setCargando(false);
+  };
+
+  // ── Eliminar nota en Supabase ─────────────────────────────────────────────
+  const eliminarNota = async (notaId: string) => {
+    const { error } = await supabase
+      .from('notas_diario')
+      .delete()
+      .eq('id', notaId);
+
+    if (!error) {
+      setListaNotas((prev) => prev.filter((n) => n.id !== notaId));
+      if (notaActiva?.id === notaId) {
+        setNotaActiva(null);
+        setVista('listaNotas');
+      }
+    }
+  };
+
+  const abrirNota = (nota: NotaDiario) => {
+    setNotaActiva(nota);
+    setVista('verNota');
+  };
+
+  const manejarAtras = () => {
+    if (vista === 'bienvenida')  router.push('/home');
+    else if (vista === 'bloqueo')      setVista('bienvenida');
+    else if (vista === 'listaNotas')   setVista('bloqueo');
+    else if (vista === 'crearNota')    setVista('listaNotas');
+    else if (vista === 'verNota')      setVista('listaNotas');
+  };
+
+  // ── NUEVO: notas filtradas según la etiqueta elegida ─────────────────────
+  const notasFiltradas = filtroEtiqueta
+    ? listaNotas.filter((n) => n.label_dia === filtroEtiqueta)
+    : listaNotas;
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8] flex items-center justify-center p-0 sm:p-4 font-sans text-[#1E293B] selection:bg-blue-100">
-      {/* Contenedor Esqueleto Mobile-First */}
-      <div className="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-white shadow-2xl overflow-y-auto flex flex-col justify-between relative sm:rounded-[40px] border border-gray-100 p-6">
-        
-        <div className="pt-4">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-black text-[#1E293B] tracking-tight">Mi Diario Emocional</h1>
-            <p className="text-xs text-gray-400 mt-1 font-medium">Expresa tus pensamientos para liberar tu mente</p>
-          </div>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-0 sm:p-4 font-sans text-slate-800">
+      <div className="w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col relative sm:rounded-[40px] overflow-hidden border border-slate-100">
 
-          {/* Estado de Error */}
-          {mensajeError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-xs font-semibold rounded-xl">
-              ⚠️ Error: {mensajeError}
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 flex items-center justify-between z-10 bg-white">
+          <button onClick={manejarAtras} className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
+          </button>
+          <h3 className="text-sm font-bold">
+            {vista === 'crearNota' ? 'Nueva nota' : vista === 'verNota' ? 'Detalle' : 'Diario emocional'}
+          </h3>
+          <div className="w-5" />
+        </div>
+
+        {/* Contenido */}
+        <div className="flex-1 overflow-y-auto px-6 py-2 relative">
+
+          {/* ── Bienvenida ──────────────────────────────────────────── */}
+          {vista === 'bienvenida' && (
+            <div className="text-center pt-10 space-y-6">
+              <div className="w-40 h-40 bg-purple-50 rounded-full mx-auto flex items-center justify-center text-6xl">📓</div>
+              <h2 className="text-xl font-bold">Diario emocional</h2>
+              <p className="text-xs text-slate-500 max-w-xs mx-auto">Tu espacio seguro para escribir lo que sientes, sin filtros.</p>
+              <button onClick={() => setVista('bloqueo')} className="w-full py-4 bg-[#6B66B2] text-white rounded-xl font-bold text-sm shadow-md hover:bg-[#5a5596]">
+                Abrir mi diario
+              </button>
             </div>
           )}
 
-          {/* Formulario de Entrada de Datos (Create / Update) */}
-          <form onSubmit={handleGuardarNota} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3 mb-6">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              {idNotaEditando ? '✏️ Editando Nota' : '✍️ Escribir nueva entrada'}
-            </h2>
-            <input 
-              type="text"
-              placeholder="Título de la nota (opcional)"
-              className="w-full px-3 py-2 text-sm font-semibold bg-white border border-gray-100 rounded-xl focus:outline-none focus:border-[#5B7A9A] text-gray-700"
-              value={tituloInput}
-              onChange={(e) => setTituloInput(e.target.value)}
-            />
-            <textarea 
-              required
-              rows={3}
-              placeholder="¿Qué tienes en mente hoy?..."
-              className="w-full px-3 py-2 text-sm font-medium bg-white border border-gray-100 rounded-xl focus:outline-none focus:border-[#5B7A9A] text-gray-700 resize-none"
-              value={contenidoInput}
-              onChange={(e) => setContenidoInput(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={cargando}
-                className="flex-1 bg-[#5B7A9A] hover:bg-[#4A6480] text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all disabled:opacity-50"
-              >
-                {idNotaEditando ? 'Guardar Cambios (U)' : 'Añadir Entrada (C)'}
-              </button>
-              {idNotaEditando && (
+          {/* ── Bloqueo (patrón real, conectado a Supabase) ──────────────── */}
+          {vista === 'bloqueo' && (
+            <div className="flex flex-col items-center pt-10 space-y-5 px-2">
+              <h2 className="text-lg font-bold text-center">
+                {modoBloqueo === 'crear_dibujar' && 'Crea tu patrón de seguridad'}
+                {modoBloqueo === 'crear_confirmar' && 'Confirma tu patrón'}
+                {modoBloqueo === 'verificar' && 'Ingresa tu patrón'}
+                {modoBloqueo === 'cargando' && 'Cargando...'}
+              </h2>
+              <p className="text-xs text-slate-400 text-center max-w-xs">
+                {modoBloqueo === 'crear_dibujar' && `Toca al menos ${MIN_PUNTOS_PATRON} puntos, en el orden que quieras usar como tu patrón.`}
+                {modoBloqueo === 'crear_confirmar' && 'Vuelve a tocar los mismos puntos en el mismo orden para confirmar.'}
+                {modoBloqueo === 'verificar' && 'Toca tu patrón para desbloquear tu diario.'}
+              </p>
+
+              <div className={`grid grid-cols-3 gap-8 p-4 ${shake ? 'animate-shake' : ''}`}>
+                {[...Array(9)].map((_, i) => {
+                  const seleccionado = puntosSeleccionados.includes(i);
+                  const orden = puntosSeleccionados.indexOf(i);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => alternarPunto(i)}
+                      disabled={modoBloqueo === 'cargando' || verificandoPatron}
+                      className={`relative w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all duration-150 ${
+                        seleccionado
+                          ? 'border-[#6B66B2] bg-[#6B66B2] text-white scale-110 shadow-md'
+                          : 'border-slate-300 hover:border-[#6B66B2] disabled:opacity-50'
+                      }`}
+                    >
+                      {seleccionado && <span className="text-xs font-bold">{orden + 1}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {errorPatron && (
+                <p className="text-xs font-semibold text-rose-500 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 text-center">
+                  ⚠️ {errorPatron}
+                </p>
+              )}
+
+              <div className="flex gap-3 w-full max-w-xs">
                 <button
-                  type="button"
-                  onClick={() => { setIdNotaEditando(null); setTituloInput(''); setContenidoInput(''); }}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-2.5 px-3 rounded-xl text-xs transition-all"
+                  onClick={limpiarSeleccion}
+                  disabled={verificandoPatron}
+                  className="flex-1 py-3 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50 disabled:opacity-50"
                 >
-                  Cancelar
+                  Borrar
+                </button>
+                <button
+                  onClick={confirmarPatron}
+                  disabled={modoBloqueo === 'cargando' || verificandoPatron}
+                  className="flex-1 py-3 bg-[#6B66B2] hover:bg-[#5a5596] text-white rounded-xl text-xs font-bold disabled:opacity-60"
+                >
+                  {verificandoPatron ? 'Verificando...' : 'Confirmar'}
+                </button>
+              </div>
+
+              {modoBloqueo === 'verificar' && (
+                <button
+                  onClick={manejarRestablecerPatron}
+                  className="text-[11px] text-slate-400 underline hover:text-slate-600"
+                >
+                  Olvidé mi patrón
                 </button>
               )}
             </div>
-          </form>
+          )}
 
-          {/* Listado de Tarjetas Renderizadas (Read / Delete) */}
-          <div className="space-y-3">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Entradas guardadas</h2>
-            
-            {cargando && notas.length === 0 && (
-              <p className="text-xs font-medium text-gray-400 animate-pulse text-center py-4">Cargando notas...</p>
-            )}
+          {/* ── Lista de notas ───────────────────────────────────────── */}
+          {vista === 'listaNotas' && (
+            <div className="space-y-4 pt-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Notas guardadas</p>
 
-            {!cargando && notas.length === 0 && (
-              <p className="text-xs font-medium text-gray-400 text-center py-4">No hay notas guardadas aún.</p>
-            )}
-
-            {notas.map((nota) => (
-              <div key={nota.id} className="w-full p-4 rounded-2xl border border-gray-100 bg-white shadow-sm flex justify-between items-start gap-4 hover:border-gray-200 transition-all">
-                <div className="space-y-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm text-[#1E293B]">{nota.titulo}</h3>
-                    <span className="text-[10px] font-bold text-gray-300">
-                      {new Date(nota.fecha).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 font-medium leading-relaxed whitespace-pre-wrap">{nota.contenido}</p>
-                </div>
-
-                {/* Botones de acción de la tarjeta */}
-                <div className="flex gap-1 shrink-0">
-                  <button 
-                    onClick={() => iniciarEdicion(nota)}
-                    className="p-1.5 text-gray-400 hover:text-[#5B7A9A] rounded-lg hover:bg-gray-50 transition-colors"
-                    title="Editar nota (U)"
+              {/* NUEVO: filtro por etiqueta/emoji */}
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                <button
+                  onClick={() => setFiltroEtiqueta(null)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                    filtroEtiqueta === null
+                      ? 'bg-[#6B66B2] text-white border-[#6B66B2]'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-[#6B66B2]/50'
+                  }`}
+                >
+                  Todas
+                </button>
+                {opcionesEstado.map((op) => (
+                  <button
+                    key={op.label}
+                    onClick={() => setFiltroEtiqueta(op.label)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                      filtroEtiqueta === op.label
+                        ? 'bg-[#6B66B2] text-white border-[#6B66B2]'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-[#6B66B2]/50'
+                    }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                    </svg>
+                    <span>{op.emoji}</span>
+                    <span>{op.label}</span>
                   </button>
-                  <button 
-                    onClick={() => handleEliminarNota(nota.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                    title="Eliminar nota (D)"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                    </svg>
-                  </button>
-                </div>
+                ))}
               </div>
-            ))}
+
+              {cargando && (
+                <p className="text-xs text-slate-400 text-center py-6 animate-pulse">Cargando notas...</p>
+              )}
+
+              {!cargando && notasFiltradas.length === 0 && listaNotas.length > 0 && (
+                <p className="text-xs text-slate-400 text-center py-6">No tienes notas con esta etiqueta todavía.</p>
+              )}
+
+              {!cargando && listaNotas.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-6">Aún no tienes notas. ¡Crea la primera!</p>
+              )}
+
+              {notasFiltradas.map((nota) => (
+                <div key={nota.id} className="p-4 bg-white border border-slate-100 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:border-[#6B66B2]"
+                  onClick={() => abrirNota(nota)}>
+                  <div>
+                    <p className="text-xs font-bold">{nota.titulo}</p>
+                    <p className="text-[10px] text-slate-400">{formatearFechaNota(nota.fecha)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{nota.emoji_dia ?? ''}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); eliminarNota(nota.id); }}
+                      className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
+                      title="Eliminar nota"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Ver nota ─────────────────────────────────────────────── */}
+          {vista === 'verNota' && notaActiva && (
+            <div className="pt-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{notaActiva.emoji_dia ?? ''}</span>
+                <h2 className="text-lg font-bold text-[#6B66B2]">{notaActiva.titulo}</h2>
+              </div>
+              <p className="text-[10px] text-slate-400">{formatearFechaNota(notaActiva.fecha)} · {notaActiva.label_dia ?? ''}</p>
+              <p className="text-xs text-slate-600 leading-relaxed">{notaActiva.contenido}</p>
+              <button
+                onClick={() => eliminarNota(notaActiva.id)}
+                className="mt-4 w-full py-3 border border-rose-100 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors"
+              >
+                Eliminar nota
+              </button>
+            </div>
+          )}
+
+          {/* ── Crear nota ───────────────────────────────────────────── */}
+          {vista === 'crearNota' && (
+            <div className="h-full flex flex-col pt-2">
+              <input
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+                placeholder="Título"
+                className="w-full text-xs font-bold p-2 focus:outline-none border-b border-slate-100 mb-2"
+              />
+              <textarea
+                value={contenido}
+                onChange={(e) => setContenido(e.target.value)}
+                placeholder="¿Qué tienes en mente hoy?"
+                className="w-full flex-1 p-2 text-xs text-slate-600 focus:outline-none resize-none"
+              />
+
+              <button
+                onClick={() => setPanelAbierto(true)}
+                className="mb-4 p-4 rounded-xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full"
+              >
+                <span className="text-xs font-bold text-purple-700">{estadoDia ? `Día ${estadoDia.label}` : 'Definir mi día'}</span>
+                <span className="text-xl">{estadoDia?.emoji ?? '💜'}</span>
+              </button>
+
+              <button
+                onClick={guardarNota}
+                disabled={cargando || !contenido.trim()}
+                className="w-full py-3 bg-[#6B66B2] disabled:bg-slate-300 text-white rounded-xl font-bold text-xs shadow-md mb-6 hover:bg-[#5a5596] transition-colors"
+              >
+                {cargando ? 'Guardando...' : 'Guardar nota'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Panel de estados del día */}
+        {panelAbierto && (
+          <div className="absolute inset-0 z-50 flex items-end bg-black/20" onClick={() => setPanelAbierto(false)}>
+            <div className="w-full bg-white rounded-t-3xl p-6" onClick={(e) => e.stopPropagation()}>
+              <h4 className="text-xs font-bold text-slate-800 mb-4">¿Cómo fue tu día?</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {opcionesEstado.map((op) => (
+                  <button
+                    key={op.label}
+                    onClick={() => { setEstadoDia(op); setPanelAbierto(false); }}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-purple-50"
+                  >
+                    <span className="text-xl">{op.emoji}</span>
+                    <span className="text-xs font-bold text-slate-700">{op.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="mt-6 pt-4 border-t border-gray-100 text-center">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300">Pausa App • Refugio Mental</p>
-        </div>
-
+        {/* FAB para crear nota */}
+        {vista === 'listaNotas' && (
+          <button
+            onClick={() => setVista('crearNota')}
+            className="absolute bottom-8 right-8 w-14 h-14 bg-[#6B66B2] text-white rounded-full shadow-xl flex items-center justify-center text-2xl z-20 hover:bg-[#5a5596]"
+          >
+            +
+          </button>
+        )}
       </div>
+
+      <style jsx global>{`
+        @keyframes fadeIn  { from { opacity: 0 }  to { opacity: 1 } }
+        @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-8px); }
+          40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+      `}</style>
     </div>
   );
 }
