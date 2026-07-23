@@ -12,12 +12,31 @@ export interface Pareja {
 }
 
 export interface CheckinDia {
-  fecha: string; // YYYY-MM-DD
+  fecha: string;
   yoRegistre: boolean;
   parejaRegistro: boolean;
-  completo: boolean; // ambos registraron ese día
-  protegido: boolean; // se cubrió con un protector de racha
-  antesDePareja: boolean; // día anterior a que la pareja se activara (no cuenta)
+  completo: boolean;
+  protegido: boolean;
+  antesDePareja: boolean;
+}
+
+export interface ParejaActivaInfo {
+  parejaId: string;
+  nombrePareja: string;
+  avatarPareja: string | null;
+  correoInvitado: string | null;
+  rachaActual: number;
+  rachaMaxima: number;
+  protectoresDisponibles: number;
+  historialDias: CheckinDia[];
+  mensajeMotivador: string;
+  soyReceptor: boolean;
+}
+
+export interface ParejaPendienteInfo {
+  parejaId: string;
+  correoInvitado: string | null;
+  soyReceptor: boolean;
 }
 
 export interface EstadoRachaPareja {
@@ -34,7 +53,9 @@ export interface EstadoRachaPareja {
   activadaHoy: boolean;
   historialDias: CheckinDia[];
   mensajeMotivador: string | null;
-  soyReceptor?: boolean; // ✅ true = me invitaron, false = yo invité
+  soyReceptor?: boolean;
+  parejasActivas: ParejaActivaInfo[];
+  parejasPendientes: ParejaPendienteInfo[];
 }
 
 export const MAX_PROTECTORES_MES = 4;

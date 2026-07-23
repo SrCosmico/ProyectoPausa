@@ -14,7 +14,6 @@ export async function validarInvitacion(
   const correoNormalizado = correoInvitado.trim().toLowerCase();
   if (correoNormalizado === correoEmisor.toLowerCase()) return { ok: false, mensaje: 'No puedes invitarte a ti mismo.' };
 
-  // Buscar usuario en auth.users
   const { data: usuarioId, error: errBusqueda } = await supabase
     .rpc('buscar_usuario_por_email', { correo: correoNormalizado });
 
@@ -25,13 +24,10 @@ export async function validarInvitacion(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, mensaje: 'No autenticado.' };
 
-  // Solo verificar si YA EXISTE una pareja activa o pendiente con ESA MISMA persona
   const { data: parejaExistente } = await supabase
     .from('parejas')
     .select('id, estado')
-    .or(
-      `and(user_id_1.eq.${user.id},user_id_2.eq.${usuarioId}),and(user_id_1.eq.${usuarioId},user_id_2.eq.${user.id})`
-    )
+    .or(`and(user_id_1.eq.${user.id},user_id_2.eq.${usuarioId}),and(user_id_1.eq.${usuarioId},user_id_2.eq.${user.id})`)
     .in('estado', ['activa', 'pendiente'])
     .maybeSingle();
 
@@ -90,7 +86,39 @@ export async function cancelarInvitacion(parejaId: string): Promise<{ exito: boo
   return { exito: true };
 }
 
-// ─── Calcular estado de racha ─────────────────────────────────────────────────
+// ─── Calcular racha de una pareja ─────────────────────────────────────────────
+
+async function calcularRachaPareja(
+  userId: string,
+  otroUserId: string
+): Promise<number> {
+  const { data: registros } = await supabase
+    .from('historial_emociones')
+    .select('dia, user_id')
+    .in('user_id', [userId, otroUserId])
+    .order('dia', { ascending: false });
+
+  if (!registros || registros.length === 0) return 0;
+
+  let racha = 0;
+  const hoy = new Date();
+  let diaActual = new Date(hoy);
+
+  while (true) {
+    const fechaStr = diaActual.toISOString().split('T')[0];
+    const del_dia = registros.filter(r => r.dia === fechaStr);
+    const yo = del_dia.some(r => r.user_id === userId);
+    const otro = del_dia.some(r => r.user_id === otroUserId);
+    if (yo && otro) {
+      racha++;
+      diaActual.setDate(diaActual.getDate() - 1);
+    } else break;
+  }
+
+  return racha;
+}
+
+// ─── Calcular estado de racha (retorna TODAS las parejas) ─────────────────────
 
 export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoRachaPareja> {
   const estadoVacio: EstadoRachaPareja = {
@@ -99,6 +127,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     parejaId: null,
     correoInvitado: null,
     nombrePareja: null,
+    avatarPareja: null,
     rachaActual: 0,
     rachaMaxima: 0,
     protectoresDisponibles: 0,
@@ -107,142 +136,120 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     historialDias: [],
     mensajeMotivador: null,
     soyReceptor: false,
+    parejasActivas: [],
+    parejasPendientes: [],
   };
 
-  // Buscar TODAS las parejas del usuario (activas y pendientes)
-  const { data: parejas, error: errPareja } = await supabase
+  const { data: parejas, error } = await supabase
     .from('parejas')
     .select('*')
     .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
     .in('estado', ['activa', 'pendiente'])
     .order('creado_at', { ascending: false });
 
-  if (errPareja || !parejas || parejas.length === 0) return estadoVacio;
+  if (error || !parejas || parejas.length === 0) return estadoVacio;
 
-  // Priorizar pareja activa sobre pendiente
-  const parejaActiva = parejas.find(p => p.estado === 'activa');
-  const parejaPendiente = parejas.find(p => p.estado === 'pendiente');
-  const pareja = parejaActiva ?? parejaPendiente;
-  if (!pareja) return estadoVacio;
+  const activas = parejas.filter(p => p.estado === 'activa');
+  const pendientes = parejas.filter(p => p.estado === 'pendiente');
 
-  // Pareja pendiente
-  if (pareja.estado === 'pendiente') {
-    const soyReceptor = pareja.user_id_2 === userId;
-    return {
-      ...estadoVacio,
-      parejaId: pareja.id,
-      esperandoAceptacion: true,
-      correoInvitado: pareja.correo_invitado,
-      soyReceptor,
-    };
-  }
+  // ── Construir info de cada pareja activa ──────────────────────────────────
+  const parejasActivas = await Promise.all(activas.map(async (pareja) => {
+    const otroUserId = pareja.user_id_1 === userId ? pareja.user_id_2 : pareja.user_id_1;
 
-  // Pareja activa
-  const otroUserId = pareja.user_id_1 === userId ? pareja.user_id_2 : pareja.user_id_1;
+    const { data: perfil } = await supabase
+      .from('perfiles')
+      .select('nombre, avatar_url')
+      .eq('id', otroUserId)
+      .maybeSingle();
 
-  const { data: perfilPareja } = await supabase
-    .from('perfiles')
-    .select('nombre, avatar_url')
-    .eq('id', otroUserId)
-    .maybeSingle();
+    const rachaActual = await calcularRachaPareja(userId, otroUserId);
 
-  const { data: rachaData } = await supabase
-    .from('rachas_parejas')
-    .select('*')
-    .eq('pareja_id', pareja.id)
-    .maybeSingle();
+    const hace7Dias = new Date();
+    hace7Dias.setDate(hace7Dias.getDate() - 6);
+    const fechaInicio7 = hace7Dias.toISOString().split('T')[0];
 
-  // Calcular racha actual desde historial_emociones
-  // Contamos días consecutivos donde ambos registraron, desde hoy hacia atrás
-  const { data: todosRegistros } = await supabase
-    .from('historial_emociones')
-    .select('dia, user_id')
-    .in('user_id', [userId, otroUserId])
-    .order('dia', { ascending: false });
+    const { data: historial } = await supabase
+      .from('historial_emociones')
+      .select('dia, user_id')
+      .in('user_id', [userId, otroUserId])
+      .gte('dia', fechaInicio7);
 
-  let rachaActualCalculada = 0;
-  if (todosRegistros && todosRegistros.length > 0) {
-    const hoy = new Date();
-    let diaActual = new Date(hoy);
-    let contando = true;
-
-    while (contando) {
-      const fechaStr = diaActual.toISOString().split('T')[0];
-      const registrosDelDia = todosRegistros.filter(r => r.dia === fechaStr);
-      const yo = registrosDelDia.some(r => r.user_id === userId);
-      const parejaTambien = registrosDelDia.some(r => r.user_id === otroUserId);
-
-      if (yo && parejaTambien) {
-        rachaActualCalculada++;
-        diaActual.setDate(diaActual.getDate() - 1);
-      } else {
-        contando = false;
-      }
+    const historialDias: CheckinDia[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const fechaStr = d.toISOString().split('T')[0];
+      const del_dia = historial?.filter(h => h.dia === fechaStr) ?? [];
+      historialDias.push({
+        fecha: fechaStr,
+        yoRegistre: del_dia.some(h => h.user_id === userId),
+        parejaRegistro: del_dia.some(h => h.user_id === otroUserId),
+        completo: del_dia.some(h => h.user_id === userId) && del_dia.some(h => h.user_id === otroUserId),
+        protegido: false,
+        antesDePareja: false,
+      });
     }
-  }
 
-  const hace7Dias = new Date();
-  hace7Dias.setDate(hace7Dias.getDate() - 6);
-  const fechaInicio7 = hace7Dias.toISOString().split('T')[0];
+    const { data: rachaData } = await supabase
+      .from('rachas_parejas')
+      .select('racha_maxima')
+      .eq('pareja_id', pareja.id)
+      .maybeSingle();
 
-  const { data: historial } = await supabase
-    .from('historial_emociones')
-    .select('dia, user_id')
-    .in('user_id', [userId, otroUserId])
-    .gte('dia', fechaInicio7)
-    .order('dia', { ascending: true });
+    const { data: protectores } = await supabase
+      .from('protectores_racha')
+      .select('id')
+      .eq('pareja_id', pareja.id)
+      .eq('usado', false);
 
-  const fechaInicioPareja = pareja.creado_at
-    ? new Date(pareja.creado_at).toISOString().split('T')[0]
-    : null;
+    let mensajeMotivador = '';
+    if (rachaActual >= 30) mensajeMotivador = '¡Un mes juntos! Son increíbles 🏆';
+    else if (rachaActual >= 7) mensajeMotivador = '¡Una semana completa! Sigan así 🌟';
+    else if (rachaActual >= 3) mensajeMotivador = '¡Van por buen camino! 💪';
+    else if (rachaActual >= 1) mensajeMotivador = '¡Buen comienzo! Cada día cuenta 🔥';
 
-  const historialDias: CheckinDia[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const fechaStr = d.toISOString().split('T')[0];
-    const antesDePareja = fechaInicioPareja ? fechaStr < fechaInicioPareja : false;
-    const registrosDelDia = historial?.filter(h => h.dia === fechaStr) ?? [];
+    return {
+      parejaId: pareja.id,
+      nombrePareja: perfil?.nombre ?? 'Tu amigo',
+      avatarPareja: perfil?.avatar_url ?? null,
+      correoInvitado: pareja.correo_invitado,
+      rachaActual,
+      rachaMaxima: rachaData?.racha_maxima ?? rachaActual,
+      protectoresDisponibles: protectores?.length ?? 0,
+      historialDias,
+      mensajeMotivador,
+      soyReceptor: pareja.user_id_2 === userId,
+    };
+  }));
 
-    historialDias.push({
-      fecha: fechaStr,
-      yoRegistre: registrosDelDia.some(h => h.user_id === userId),
-      parejaRegistro: registrosDelDia.some(h => h.user_id === otroUserId),
-      completo: registrosDelDia.length >= 2,
-      protegido: false,
-      antesDePareja,
-    });
-  }
+  // ── Construir info de pendientes ──────────────────────────────────────────
+  const parejasPendientes = pendientes.map(p => ({
+    parejaId: p.id,
+    correoInvitado: p.correo_invitado,
+    soyReceptor: p.user_id_2 === userId,
+  }));
 
-  const { data: protectores } = await supabase
-    .from('protectores_racha')
-    .select('id')
-    .eq('pareja_id', pareja.id)
-    .eq('usado', false);
-
-  const rachaActual = rachaActualCalculada;
-  const rachaMaxima = rachaData?.racha_maxima ?? rachaActual;
-
-  let mensajeMotivador = '';
-  if (rachaActual >= 30) mensajeMotivador = '¡Un mes juntos! Son increíbles 🏆';
-  else if (rachaActual >= 7) mensajeMotivador = '¡Una semana completa! Sigan así 🌟';
-  else if (rachaActual >= 3) mensajeMotivador = '¡Van por buen camino! 💪';
-  else if (rachaActual >= 1) mensajeMotivador = '¡Buen comienzo! Cada día cuenta 🔥';
+  // Compatibilidad con campos de la primera pareja activa
+  const primera = parejasActivas[0];
+  const primeraPendiente = parejasPendientes.find(p => !p.soyReceptor);
+  const primeraRecibida = parejasPendientes.find(p => p.soyReceptor);
 
   return {
-    tieneParejaActiva: true,
-    esperandoAceptacion: false,
-    parejaId: pareja.id,
-    nombrePareja: perfilPareja?.nombre ?? 'Tu amigo',
-    avatarPareja: perfilPareja?.avatar_url ?? null,
-    correoInvitado: pareja.correo_invitado,
-    rachaActual,
-    rachaMaxima,
-    protectoresDisponibles: protectores?.length ?? 0,
+    tieneParejaActiva: parejasActivas.length > 0,
+    esperandoAceptacion: parejasPendientes.length > 0,
+    parejaId: primera?.parejaId ?? primeraRecibida?.parejaId ?? primeraPendiente?.parejaId ?? null,
+    correoInvitado: primera?.correoInvitado ?? primeraRecibida?.correoInvitado ?? null,
+    nombrePareja: primera?.nombrePareja ?? null,
+    avatarPareja: primera?.avatarPareja ?? null,
+    rachaActual: primera?.rachaActual ?? 0,
+    rachaMaxima: primera?.rachaMaxima ?? 0,
+    protectoresDisponibles: primera?.protectoresDisponibles ?? 0,
     protectoresUsadosEsteMes: 0,
-    activadaHoy: rachaActual > 0,
-    historialDias,
-    mensajeMotivador,
-    soyReceptor: pareja.user_id_2 === userId,
+    activadaHoy: (primera?.rachaActual ?? 0) > 0,
+    historialDias: primera?.historialDias ?? [],
+    mensajeMotivador: primera?.mensajeMotivador ?? null,
+    soyReceptor: primeraRecibida ? true : false,
+    parejasActivas,
+    parejasPendientes,
   };
 }
