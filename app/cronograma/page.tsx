@@ -119,6 +119,28 @@ export default function CronogramaPage() {
   const [fechaSeleccionadaVista, setFechaSeleccionadaVista] = useState<string>(obtenerFechaISO(new Date()));
   const [centroVistaDia, setCentroVistaDia] = useState<Date>(new Date());
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
+
+  // ── NUEVO: desplegable de año con scroll infinito ────────────────────────
+  const [anioDesplegableAbierto, setAnioDesplegableAbierto] = useState(false);
+  const [aniosDisponibles, setAniosDisponibles] = useState<number[]>(() => {
+    const actual = new Date().getFullYear();
+    return Array.from({ length: 21 }, (_, i) => actual - 10 + i);
+  });
+  const scrollAniosRef = React.useRef<HTMLDivElement>(null);
+
+  const manejarScrollAnios = () => {
+    const el = scrollAniosRef.current;
+    if (!el) return;
+
+    if (el.scrollTop < 40) {
+      const nuevosArriba = Array.from({ length: 10 }, (_, i) => aniosDisponibles[0] - 10 + i);
+      setAniosDisponibles((prev) => [...nuevosArriba, ...prev]);
+      requestAnimationFrame(() => { el.scrollTop += 10 * 32; });
+    } else if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) {
+      const nuevosAbajo = Array.from({ length: 10 }, (_, i) => aniosDisponibles[aniosDisponibles.length - 1] + 1 + i);
+      setAniosDisponibles((prev) => [...prev, ...nuevosAbajo]);
+    }
+  };
   const [bloqueSeleccionado, setBloqueSeleccionado] = useState<ActividadCronogramaGuardada | null>(null);
 
   const [idActividadEditando, setIdActividadEditando] = useState<string | null>(null);
@@ -678,21 +700,47 @@ export default function CronogramaPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 relative">
                       <span className="text-sm font-bold text-[#2A3B50] capitalize">
                         {nombresMeses[fechaCalendario.getMonth()]}
                       </span>
-                      <input
-                        type="number"
-                        value={fechaCalendario.getFullYear()}
-                        onChange={(e) => {
-                          const anio = Number(e.target.value);
-                          if (!isNaN(anio) && e.target.value.length <= 5) {
-                            setFechaCalendario(new Date(anio, fechaCalendario.getMonth(), 1));
-                          }
-                        }}
-                        className="text-sm font-bold text-[#2A3B50] bg-transparent border-none outline-none w-16 text-center [appearance:textfield]"
-                      />
+                      <button
+                        onClick={() => setAnioDesplegableAbierto((v) => !v)}
+                        className="text-sm font-bold text-[#2A3B50] flex items-center gap-1"
+                      >
+                        {fechaCalendario.getFullYear()}
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+
+                      {anioDesplegableAbierto && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setAnioDesplegableAbierto(false)} />
+                          <div
+                            ref={scrollAniosRef}
+                            onScroll={manejarScrollAnios}
+                            className="absolute top-7 left-1/2 -translate-x-1/2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg w-24 max-h-48 overflow-y-auto py-1"
+                          >
+                            {aniosDisponibles.map((anio) => (
+                              <button
+                                key={anio}
+                                onClick={() => {
+                                  setFechaCalendario(new Date(anio, fechaCalendario.getMonth(), 1));
+                                  setAnioDesplegableAbierto(false);
+                                }}
+                                className={`w-full text-center py-1.5 text-xs font-bold transition-colors ${
+                                  anio === fechaCalendario.getFullYear()
+                                    ? `${estilosActuales.bg} text-white`
+                                    : 'text-slate-600 hover:bg-slate-50'
+                                }`}
+                              >
+                                {anio}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                     <button 
                       onClick={() => setFechaCalendario(new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() + 1, 1))} 
