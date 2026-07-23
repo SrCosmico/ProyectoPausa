@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import supabase from "@/lib/supabase";
 import {
   calcularEstadoRachaPareja,
@@ -14,8 +13,16 @@ import {
 import type { EstadoRachaPareja } from "@/models/racha";
 
 const DIAS_ABBR = ["D", "L", "M", "X", "J", "V", "S"];
-const AVATAR_DEFAULT =
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80";
+
+function AvatarIcono({ nombre, size = "md" }: { nombre?: string | null; size?: "sm" | "md" | "lg" }) {
+  const sizes = { sm: "w-9 h-9 text-sm", md: "w-12 h-12 text-base", lg: "w-14 h-14 text-xl" };
+  const inicial = nombre?.charAt(0).toUpperCase() ?? "?";
+  return (
+    <div className={`${sizes[size]} rounded-2xl bg-orange-100 flex items-center justify-center font-bold text-orange-600 flex-shrink-0`}>
+      {inicial}
+    </div>
+  );
+}
 
 export default function RachaPage() {
   const router = useRouter();
@@ -221,9 +228,7 @@ export default function RachaPage() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3.5">
-                    <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-white/40 shadow-inner bg-orange-300">
-                      <Image src={AVATAR_DEFAULT} alt={estado.nombrePareja || "Amigo"} fill className="object-cover" />
-                    </div>
+                    <AvatarIcono nombre={estado.nombrePareja} size="lg" />
                     <div>
                       <span className="text-xs text-orange-100 font-medium">Compartida con</span>
                       <h3 className="text-lg font-bold leading-tight">{estado.nombrePareja}</h3>
@@ -283,9 +288,7 @@ export default function RachaPage() {
             {estado?.tieneParejaActiva ? (
               <div className="bg-white rounded-[28px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <div className="relative w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100">
-                    <Image src={AVATAR_DEFAULT} alt="Avatar" fill className="object-cover" />
-                  </div>
+                  <AvatarIcono nombre={estado.nombrePareja} size="md" />
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">{estado.nombrePareja}</h3>
                     <span className="text-xs text-slate-400">🔥 {estado.rachaActual} días de racha</span>
@@ -315,9 +318,7 @@ export default function RachaPage() {
               {invitacionRecibida ? (
                 <div className="bg-white rounded-[28px] p-4 border border-orange-100 shadow-sm space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-slate-100">
-                      <Image src={AVATAR_DEFAULT} alt="Invitante" fill className="object-cover" />
-                    </div>
+                    <AvatarIcono nombre="?" size="sm" />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-bold text-slate-800 truncate">Tu amigo te ha invitado</h4>
                       <p className="text-[11px] text-slate-400 truncate">{estado.correoInvitado}</p>
