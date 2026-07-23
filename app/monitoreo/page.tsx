@@ -566,11 +566,11 @@ export default function MonitoreoPage() {
               </div>
               
               {estadoActual ? (
-                <div className="mt-2 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center gap-4">
-                  <span className="text-4xl">{estadoActual.emoji}</span>
-                  <div>
+                <div className="mt-2 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center gap-4 min-w-0">
+                  <span className="text-4xl flex-shrink-0">{estadoActual.emoji}</span>
+                  <div className="min-w-0 flex-1">
                     <h4 className="text-base font-bold text-[#334155]">{estadoActual.estado}</h4>
-                    {estadoActual.nota && <p className="text-xs font-medium text-slate-400 mt-0.5 line-clamp-1">"{estadoActual.nota}"</p>}
+                    {estadoActual.nota && <p className="text-xs font-medium text-slate-400 mt-0.5 truncate">"{estadoActual.nota}"</p>}
                   </div>
                 </div>
               ) : (
