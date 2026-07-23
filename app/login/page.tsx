@@ -91,7 +91,7 @@ export default function LoginView() {
           </button>
 
           {/* LOGO */}
-          <div className="flex justify-center -mb-6">
+          <div className="flex justify-center -mb-20">
             <img
               src="/images/logo.png"
               alt="Pausa"
@@ -100,7 +100,7 @@ export default function LoginView() {
           </div>
 
           {/* ENCABEZADO */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 -mt-2">
             <h1 className="text-3xl font-bold text-[#1E293B] mb-2">Bienvenido de nuevo</h1>
             <p className="text-sm text-gray-500">Nos alegra verte otra vez</p>
           </div>
