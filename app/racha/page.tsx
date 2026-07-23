@@ -9,6 +9,7 @@ import {
   aceptarInvitacionPareja,
   validarInvitacion,
   cancelarInvitacion,
+  usarProtector,
 } from "@/lib/supabase/racha";
 import type { EstadoRachaPareja, ParejaActivaInfo, ParejaPendienteInfo } from "@/models/racha";
 
@@ -33,7 +34,17 @@ function AvatarIcono({ nombre, avatar, size = "md" }: { nombre?: string | null; 
 
 // ─── Tarjeta de racha activa ──────────────────────────────────────────────────
 
-function TarjetaRacha({ pareja, onCancelar }: { pareja: ParejaActivaInfo; onCancelar?: () => void }) {
+function TarjetaRacha({
+  pareja,
+  onUsarProtector,
+  usandoProtector,
+}: {
+  pareja: ParejaActivaInfo;
+  onUsarProtector?: (parejaId: string, historialDias: ParejaActivaInfo["historialDias"]) => void;
+  usandoProtector?: boolean;
+}) {
+  const hayDiaPendienteQueProteger = pareja.historialDias.some(d => !d.completo && !d.protegido);
+
   return (
     <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[32px] p-6 text-white shadow-lg space-y-4">
       {pareja.mensajeMotivador && (
@@ -84,6 +95,16 @@ function TarjetaRacha({ pareja, onCancelar }: { pareja: ParejaActivaInfo; onCanc
         <span>🏆 Récord: <strong className="text-white">{pareja.rachaMaxima} días</strong></span>
         <span>🛡️ Protectores: <strong className="text-white">{pareja.protectoresDisponibles}/4</strong></span>
       </div>
+
+      {pareja.protectoresDisponibles > 0 && hayDiaPendienteQueProteger && (
+        <button
+          onClick={() => onUsarProtector?.(pareja.parejaId, pareja.historialDias)}
+          disabled={usandoProtector}
+          className="w-full py-2.5 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold text-xs transition-all disabled:opacity-50"
+        >
+          {usandoProtector ? "Activando..." : "🛡️ Usar protector"}
+        </button>
+      )}
     </div>
   );
 }
@@ -103,6 +124,7 @@ export default function RachaPage() {
   const [aceptandoId, setAceptandoId] = useState<string | null>(null);
   const [rechazandoId, setRechazandoId] = useState<string | null>(null);
   const [cancelandoId, setCancelAndoId] = useState<string | null>(null);
+  const [usandoProtectorId, setUsandoProtectorId] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -170,6 +192,20 @@ export default function RachaPage() {
     await cargarEstado(userId);
   };
 
+  const manejarUsarProtector = async (parejaId: string, historialDias: ParejaActivaInfo["historialDias"]) => {
+    if (!userId) return;
+    const diaFaltante = [...historialDias].reverse().find(d => !d.completo && !d.protegido);
+    if (!diaFaltante) { setError("No hay ningún día pendiente que proteger."); return; }
+
+    setUsandoProtectorId(parejaId); setError(null); setMensajeExito(null);
+    const { ok, mensaje } = await usarProtector(parejaId, diaFaltante.fecha);
+    setUsandoProtectorId(null);
+
+    if (!ok) { setError(mensaje || "No se pudo usar el protector."); return; }
+    setMensajeExito("🛡️ ¡Protector activado! Ese día ya no rompe la racha.");
+    await cargarEstado(userId);
+  };
+
   const recibidas = estado?.parejasPendientes?.filter(p => p.soyReceptor) ?? [];
   const enviadas = estado?.parejasPendientes?.filter(p => !p.soyReceptor) ?? [];
 
@@ -216,7 +252,12 @@ export default function RachaPage() {
           <section className="space-y-3">
             {estado?.parejasActivas && estado.parejasActivas.length > 0 ? (
               estado.parejasActivas.map(pareja => (
-                <TarjetaRacha key={pareja.parejaId} pareja={pareja} />
+                <TarjetaRacha
+                  key={pareja.parejaId}
+                  pareja={pareja}
+                  onUsarProtector={manejarUsarProtector}
+                  usandoProtector={usandoProtectorId === pareja.parejaId}
+                />
               ))
             ) : (
               <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm text-center space-y-2">

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 import type { EstadoRachaPareja, CheckinDia } from '@/models/racha';
+import { obtenerMesActual, MAX_PROTECTORES_MES } from '@/models/racha';
 
 const supabase = createClient();
 
@@ -86,11 +87,12 @@ export async function cancelarInvitacion(parejaId: string): Promise<{ exito: boo
   return { exito: true };
 }
 
-// ─── Calcular racha de una pareja ─────────────────────────────────────────────
+// ─── Calcular racha de una pareja (respeta días protegidos) ───────────────────
 
 async function calcularRachaPareja(
   userId: string,
-  otroUserId: string
+  otroUserId: string,
+  parejaId: string
 ): Promise<number> {
   const { data: registros } = await supabase
     .from('historial_emociones')
@@ -98,24 +100,85 @@ async function calcularRachaPareja(
     .in('user_id', [userId, otroUserId])
     .order('dia', { ascending: false });
 
+  const { data: diasProtegidos } = await supabase
+    .from('protectores_racha')
+    .select('usado_en_fecha')
+    .eq('pareja_id', parejaId)
+    .eq('usado', true)
+    .not('usado_en_fecha', 'is', null);
+
+  const fechasProtegidas = new Set((diasProtegidos ?? []).map(d => d.usado_en_fecha));
+
   if (!registros || registros.length === 0) return 0;
 
   let racha = 0;
-  const hoy = new Date();
-  let diaActual = new Date(hoy);
+  let diaActual = new Date();
 
   while (true) {
     const fechaStr = diaActual.toISOString().split('T')[0];
     const del_dia = registros.filter(r => r.dia === fechaStr);
     const yo = del_dia.some(r => r.user_id === userId);
     const otro = del_dia.some(r => r.user_id === otroUserId);
-    if (yo && otro) {
+    const completo = yo && otro;
+    const protegido = fechasProtegidas.has(fechaStr);
+
+    if (completo || protegido) {
       racha++;
       diaActual.setDate(diaActual.getDate() - 1);
-    } else break;
+    } else {
+      break;
+    }
   }
 
   return racha;
+}
+
+// ─── Otorgar protector mensual (llamar cada vez que se carga el estado) ──────
+
+export async function otorgarProtectorMensualSiCorresponde(parejaId: string): Promise<void> {
+  const mesActual = obtenerMesActual();
+
+  const { count } = await supabase
+    .from('protectores_racha')
+    .select('id', { count: 'exact', head: true })
+    .eq('pareja_id', parejaId);
+
+  if ((count ?? 0) >= MAX_PROTECTORES_MES) return;
+
+  await supabase
+    .from('protectores_racha')
+    .insert({ pareja_id: parejaId, otorgado_mes: mesActual, usado: false })
+    .select()
+    .maybeSingle();
+}
+
+// ─── Usar protector manualmente sobre un día específico ──────────────────────
+
+export async function usarProtector(
+  parejaId: string,
+  fechaAProteger: string
+): Promise<{ ok: boolean; mensaje?: string }> {
+  const { data: protector, error: errBusqueda } = await supabase
+    .from('protectores_racha')
+    .select('id')
+    .eq('pareja_id', parejaId)
+    .eq('usado', false)
+    .limit(1)
+    .maybeSingle();
+
+  if (errBusqueda || !protector) {
+    return { ok: false, mensaje: 'No tienes protectores disponibles.' };
+  }
+
+  const { error: errUpdate } = await supabase
+    .from('protectores_racha')
+    .update({ usado: true, usado_en_fecha: fechaAProteger })
+    .eq('id', protector.id)
+    .eq('usado', false);
+
+  if (errUpdate) return { ok: false, mensaje: 'No se pudo activar el protector.' };
+
+  return { ok: true };
 }
 
 // ─── Calcular estado de racha (retorna TODAS las parejas) ─────────────────────
@@ -156,13 +219,16 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   const parejasActivas = await Promise.all(activas.map(async (pareja) => {
     const otroUserId = pareja.user_id_1 === userId ? pareja.user_id_2 : pareja.user_id_1;
 
+    // Otorga el protector del mes si corresponde
+    await otorgarProtectorMensualSiCorresponde(pareja.id);
+
     const { data: perfil } = await supabase
       .from('perfiles')
       .select('nombre, avatar_url')
       .eq('id', otroUserId)
       .maybeSingle();
 
-    const rachaActual = await calcularRachaPareja(userId, otroUserId);
+    const rachaActual = await calcularRachaPareja(userId, otroUserId, pareja.id);
 
     const hace7Dias = new Date();
     hace7Dias.setDate(hace7Dias.getDate() - 6);
@@ -173,6 +239,14 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       .select('dia, user_id')
       .in('user_id', [userId, otroUserId])
       .gte('dia', fechaInicio7);
+
+    const { data: protegidosSet } = await supabase
+      .from('protectores_racha')
+      .select('usado_en_fecha')
+      .eq('pareja_id', pareja.id)
+      .eq('usado', true);
+
+    const fechasProtegidas = new Set((protegidosSet ?? []).map(p => p.usado_en_fecha));
 
     const historialDias: CheckinDia[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -185,18 +259,28 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
         yoRegistre: del_dia.some(h => h.user_id === userId),
         parejaRegistro: del_dia.some(h => h.user_id === otroUserId),
         completo: del_dia.some(h => h.user_id === userId) && del_dia.some(h => h.user_id === otroUserId),
-        protegido: false,
+        protegido: fechasProtegidas.has(fechaStr),
         antesDePareja: false,
       });
     }
 
+    // Récord de racha: se actualiza si la racha actual lo supera
     const { data: rachaData } = await supabase
       .from('rachas_parejas')
       .select('racha_maxima')
       .eq('pareja_id', pareja.id)
       .maybeSingle();
 
-    const { data: protectores } = await supabase
+    const rachaMaximaGuardada = rachaData?.racha_maxima ?? 0;
+    const rachaMaxima = Math.max(rachaMaximaGuardada, rachaActual);
+
+    if (rachaMaxima > rachaMaximaGuardada) {
+      await supabase
+        .from('rachas_parejas')
+        .upsert({ pareja_id: pareja.id, racha_maxima: rachaMaxima });
+    }
+
+    const { data: protectoresDisponibles } = await supabase
       .from('protectores_racha')
       .select('id')
       .eq('pareja_id', pareja.id)
@@ -214,8 +298,8 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       avatarPareja: perfil?.avatar_url ?? null,
       correoInvitado: pareja.correo_invitado,
       rachaActual,
-      rachaMaxima: rachaData?.racha_maxima ?? rachaActual,
-      protectoresDisponibles: protectores?.length ?? 0,
+      rachaMaxima,
+      protectoresDisponibles: protectoresDisponibles?.length ?? 0,
       historialDias,
       mensajeMotivador,
       soyReceptor: pareja.user_id_2 === userId,
