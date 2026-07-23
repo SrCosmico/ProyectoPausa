@@ -29,6 +29,22 @@ export default function PerfilPage() {
   const [nuevoNombre, setNuevoNombre]     = useState('');
   const [guardandoNombre, setGuardandoNombre] = useState(false);
 
+  // ─── NUEVO: Privacidad (cambio de contraseña) ─────────────────────────────
+  const [modalPrivacidad, setModalPrivacidad] = useState(false);
+  const [claveActual, setClaveActual] = useState('');
+  const [claveNueva, setClaveNueva] = useState('');
+  const [claveConfirmar, setClaveConfirmar] = useState('');
+  const [guardandoClave, setGuardandoClave] = useState(false);
+  const [errorClave, setErrorClave] = useState<string | null>(null);
+  const [exitoClave, setExitoClave] = useState(false);
+
+  // ─── NUEVO: Notificaciones (guardadas en localStorage por ahora) ─────────
+  const [modalNotificaciones, setModalNotificaciones] = useState(false);
+  const [notifDiaria, setNotifDiaria] = useState(true);
+  const [notifRacha, setNotifRacha] = useState(true);
+  const [notifParciales, setNotifParciales] = useState(true);
+  const [notifCrisis, setNotifCrisis] = useState(true);
+
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -40,11 +56,8 @@ export default function PerfilPage() {
       setUserId(user.id);
       setCorreo(user.email || '');
 
-      // Leer perfil desde Supabase
       const perfil = await leerPerfilUsuario(user.id);
 
-      // ✅ Prioridad: tabla perfiles → user_metadata → email prefix
-      // Ignoramos usuarioDefecto ('Valeria López') si la tabla no tiene nombre real
       const nombreReal =
         (perfil.nombre && perfil.nombre !== 'Valeria López' ? perfil.nombre : null) ||
         user.user_metadata?.nombre_usuario ||
@@ -54,13 +67,24 @@ export default function PerfilPage() {
 
       setNombre(nombreReal);
       
-      // Prioridad: Supabase > localStorage
       if (perfil.avatar) {
         setFoto(perfil.avatar);
         localStorage.setItem('userAvatar', perfil.avatar);
       } else {
         const avatarLocal = localStorage.getItem('userAvatar');
         if (avatarLocal) setFoto(avatarLocal);
+      }
+
+      // Cargar preferencias de notificaciones guardadas localmente
+      const prefsGuardadas = localStorage.getItem('preferenciasNotificaciones');
+      if (prefsGuardadas) {
+        try {
+          const prefs = JSON.parse(prefsGuardadas);
+          setNotifDiaria(prefs.diaria ?? true);
+          setNotifRacha(prefs.racha ?? true);
+          setNotifParciales(prefs.parciales ?? true);
+          setNotifCrisis(prefs.crisis ?? true);
+        } catch {}
       }
 
       setCargando(false);
@@ -80,7 +104,6 @@ export default function PerfilPage() {
     setSubiendoFoto(true);
 
     try {
-      // Convertir a base64 y guardar en localStorage + tabla perfiles
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -88,11 +111,9 @@ export default function PerfilPage() {
         reader.readAsDataURL(file);
       });
 
-      // Guardar en localStorage (para acceso rápido en home)
       localStorage.setItem('userAvatar', base64);
       setFoto(base64);
 
-      // Guardar en tabla perfiles para persistencia entre dispositivos
       await actualizarPerfil(userId, { avatar_url: base64 });
 
     } catch (err) {
@@ -126,6 +147,70 @@ export default function PerfilPage() {
     setGuardandoNombre(false);
   };
 
+  // ─── NUEVO: Cambiar contraseña ─────────────────────────────────────────────
+
+  const abrirPrivacidad = () => {
+    setClaveActual('');
+    setClaveNueva('');
+    setClaveConfirmar('');
+    setErrorClave(null);
+    setExitoClave(false);
+    setModalPrivacidad(true);
+  };
+
+  const guardarNuevaClave = async () => {
+    setErrorClave(null);
+
+    if (claveNueva.length < 6) {
+      setErrorClave('La nueva contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (claveNueva !== claveConfirmar) {
+      setErrorClave('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setGuardandoClave(true);
+
+    // Reautenticamos con la contraseña actual antes de cambiarla, por seguridad
+    const { error: errorLogin } = await supabase.auth.signInWithPassword({
+      email: correo,
+      password: claveActual,
+    });
+
+    if (errorLogin) {
+      setErrorClave('Tu contraseña actual no es correcta.');
+      setGuardandoClave(false);
+      return;
+    }
+
+    const { error: errorUpdate } = await supabase.auth.updateUser({ password: claveNueva });
+
+    setGuardandoClave(false);
+
+    if (errorUpdate) {
+      setErrorClave('No se pudo cambiar la contraseña. Intenta de nuevo.');
+      return;
+    }
+
+    setExitoClave(true);
+    setTimeout(() => setModalPrivacidad(false), 1200);
+  };
+
+  // ─── NUEVO: Notificaciones ──────────────────────────────────────────────────
+
+  const abrirNotificaciones = () => setModalNotificaciones(true);
+
+  const guardarNotificaciones = () => {
+    localStorage.setItem('preferenciasNotificaciones', JSON.stringify({
+      diaria: notifDiaria,
+      racha: notifRacha,
+      parciales: notifParciales,
+      crisis: notifCrisis,
+    }));
+    setModalNotificaciones(false);
+  };
+
   // ─── Cerrar sesión ─────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
@@ -139,10 +224,10 @@ export default function PerfilPage() {
   // ─── Opciones del menú ─────────────────────────────────────────────────────
 
   const opcionesMenu: OpcionMenu[] = [
-    { id: 'editar',        icono: '✏️', titulo: 'Editar información',     descripcion: 'Cambia tu nombre',                      accion: abrirEditar     },
-    { id: 'historial',     icono: '📊', titulo: 'Historial emocional',    descripcion: 'Revisa tu evolución de bienestar',       ruta: '/monitoreo.2'   },
-    { id: 'privacidad',    icono: '🔒', titulo: 'Privacidad y seguridad', descripcion: 'Gestiona tu contraseña y datos'                                  },
-    { id: 'notificaciones',icono: '🔔', titulo: 'Notificaciones',         descripcion: 'Configura tus alertas y recordatorios'                           },
+    { id: 'editar',        icono: '✏️', titulo: 'Editar información',           descripcion: 'Cambia tu nombre',                                    accion: abrirEditar        },
+    { id: 'historial',     icono: '📊', titulo: 'Historial y evaluaciones',     descripcion: 'Registros emocionales por mes y resultados del test', ruta: '/historial'         },
+    { id: 'privacidad',    icono: '🔒', titulo: 'Privacidad y seguridad',       descripcion: 'Cambia tu contraseña',                                accion: abrirPrivacidad    },
+    { id: 'notificaciones',icono: '🔔', titulo: 'Notificaciones',               descripcion: 'Configura tus alertas y recordatorios',               accion: abrirNotificaciones},
   ];
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -192,7 +277,6 @@ export default function PerfilPage() {
                 )}
               </div>
 
-              {/* Botón cámara */}
               <button
                 onClick={() => !subiendoFoto && fileInputRef.current?.click()}
                 disabled={subiendoFoto}
@@ -303,6 +387,110 @@ export default function PerfilPage() {
                 {guardandoNombre ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PRIVACIDAD Y SEGURIDAD — cambiar contraseña */}
+      {modalPrivacidad && (
+        <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40" onClick={() => setModalPrivacidad(false)}>
+          <div className="bg-white w-full sm:max-w-md rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-[#2A3B50]">Cambiar contraseña</h3>
+              <button onClick={() => setModalPrivacidad(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            {errorClave && (
+              <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-xl">
+                ⚠️ {errorClave}
+              </div>
+            )}
+            {exitoClave && (
+              <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold rounded-xl">
+                ✅ Contraseña actualizada correctamente
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1.5">Contraseña actual</label>
+              <input
+                type="password"
+                value={claveActual}
+                onChange={e => setClaveActual(e.target.value)}
+                placeholder="********"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1.5">Nueva contraseña</label>
+              <input
+                type="password"
+                value={claveNueva}
+                onChange={e => setClaveNueva(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1.5">Confirmar nueva contraseña</label>
+              <input
+                type="password"
+                value={claveConfirmar}
+                onChange={e => setClaveConfirmar(e.target.value)}
+                placeholder="********"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#4A72A6] transition-colors"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setModalPrivacidad(false)} className="flex-1 py-3 border border-slate-200 text-slate-600 rounded-2xl text-sm font-bold hover:bg-slate-50 transition-colors">Cancelar</button>
+              <button
+                onClick={guardarNuevaClave}
+                disabled={guardandoClave || !claveActual || !claveNueva || !claveConfirmar}
+                className="flex-1 py-3 bg-[#4A72A6] hover:bg-[#3B5E8C] text-white rounded-2xl text-sm font-bold transition-colors disabled:opacity-40"
+              >
+                {guardandoClave ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL NOTIFICACIONES */}
+      {modalNotificaciones && (
+        <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40" onClick={() => setModalNotificaciones(false)}>
+          <div className="bg-white w-full sm:max-w-md rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-[#2A3B50]">Notificaciones</h3>
+              <button onClick={() => setModalNotificaciones(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            {[
+              { label: 'Recordatorio diario', desc: 'Te avisamos si aún no registras tu emoción hoy', valor: notifDiaria, set: setNotifDiaria },
+              { label: 'Racha con amigos', desc: 'Alertas sobre tu racha y protectores', valor: notifRacha, set: setNotifRacha },
+              { label: 'Parciales próximos', desc: 'Avisos cuando se acerque un parcial registrado', valor: notifParciales, set: setNotifParciales },
+              { label: 'Modo crisis', desc: 'Notificaciones de apoyo si detectamos bienestar bajo', valor: notifCrisis, set: setNotifCrisis },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="pr-3">
+                  <p className="text-xs font-bold text-slate-700">{item.label}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{item.desc}</p>
+                </div>
+                <button
+                  onClick={() => item.set(!item.valor)}
+                  className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${item.valor ? 'bg-[#4A72A6]' : 'bg-slate-300'}`}
+                >
+                  <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform ${item.valor ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            ))}
+
+            <button
+              onClick={guardarNotificaciones}
+              className="w-full py-3 bg-[#4A72A6] hover:bg-[#3B5E8C] text-white rounded-2xl text-sm font-bold transition-colors mt-2"
+            >
+              Guardar preferencias
+            </button>
           </div>
         </div>
       )}
