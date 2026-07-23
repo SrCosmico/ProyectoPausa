@@ -142,7 +142,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
 
   const { data: perfilPareja } = await supabase
     .from('perfiles')
-    .select('nombre')
+    .select('nombre, avatar_url')
     .eq('id', otroUserId)
     .maybeSingle();
 
@@ -151,6 +151,35 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     .select('*')
     .eq('pareja_id', pareja.id)
     .maybeSingle();
+
+  // Calcular racha actual desde historial_emociones
+  // Contamos días consecutivos donde ambos registraron, desde hoy hacia atrás
+  const { data: todosRegistros } = await supabase
+    .from('historial_emociones')
+    .select('dia, user_id')
+    .in('user_id', [userId, otroUserId])
+    .order('dia', { ascending: false });
+
+  let rachaActualCalculada = 0;
+  if (todosRegistros && todosRegistros.length > 0) {
+    const hoy = new Date();
+    let diaActual = new Date(hoy);
+    let contando = true;
+
+    while (contando) {
+      const fechaStr = diaActual.toISOString().split('T')[0];
+      const registrosDelDia = todosRegistros.filter(r => r.dia === fechaStr);
+      const yo = registrosDelDia.some(r => r.user_id === userId);
+      const parejaTambien = registrosDelDia.some(r => r.user_id === otroUserId);
+
+      if (yo && parejaTambien) {
+        rachaActualCalculada++;
+        diaActual.setDate(diaActual.getDate() - 1);
+      } else {
+        contando = false;
+      }
+    }
+  }
 
   const hace7Dias = new Date();
   hace7Dias.setDate(hace7Dias.getDate() - 6);
@@ -191,8 +220,8 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     .eq('pareja_id', pareja.id)
     .eq('usado', false);
 
-  const rachaActual = rachaData?.racha_actual ?? 0;
-  const rachaMaxima = rachaData?.racha_maxima ?? 0;
+  const rachaActual = rachaActualCalculada;
+  const rachaMaxima = rachaData?.racha_maxima ?? rachaActual;
 
   let mensajeMotivador = '';
   if (rachaActual >= 30) mensajeMotivador = '¡Un mes juntos! Son increíbles 🏆';
@@ -205,12 +234,13 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     esperandoAceptacion: false,
     parejaId: pareja.id,
     nombrePareja: perfilPareja?.nombre ?? 'Tu amigo',
+    avatarPareja: perfilPareja?.avatar_url ?? null,
     correoInvitado: pareja.correo_invitado,
     rachaActual,
     rachaMaxima,
     protectoresDisponibles: protectores?.length ?? 0,
     protectoresUsadosEsteMes: 0,
-    activadaHoy: false,
+    activadaHoy: rachaActual > 0,
     historialDias,
     mensajeMotivador,
     soyReceptor: pareja.user_id_2 === userId,

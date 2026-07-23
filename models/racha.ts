@@ -26,6 +26,7 @@ export interface EstadoRachaPareja {
   esperandoAceptacion: boolean;
   correoInvitado: string | null;
   nombrePareja: string | null;
+  avatarPareja?: string | null;
   rachaActual: number;
   rachaMaxima: number;
   protectoresDisponibles: number;

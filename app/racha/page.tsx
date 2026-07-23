@@ -14,9 +14,16 @@ import type { EstadoRachaPareja } from "@/models/racha";
 
 const DIAS_ABBR = ["D", "L", "M", "X", "J", "V", "S"];
 
-function AvatarIcono({ nombre, size = "md" }: { nombre?: string | null; size?: "sm" | "md" | "lg" }) {
+function AvatarIcono({ nombre, avatar, size = "md" }: { nombre?: string | null; avatar?: string | null; size?: "sm" | "md" | "lg" }) {
   const sizes = { sm: "w-9 h-9 text-sm", md: "w-12 h-12 text-base", lg: "w-14 h-14 text-xl" };
   const inicial = nombre?.charAt(0).toUpperCase() ?? "?";
+  if (avatar) {
+    return (
+      <div className={`${sizes[size]} rounded-2xl overflow-hidden flex-shrink-0`}>
+        <img src={avatar} alt={nombre ?? "Avatar"} className="w-full h-full object-cover" />
+      </div>
+    );
+  }
   return (
     <div className={`${sizes[size]} rounded-2xl bg-orange-100 flex items-center justify-center font-bold text-orange-600 flex-shrink-0`}>
       {inicial}
@@ -228,7 +235,7 @@ export default function RachaPage() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3.5">
-                    <AvatarIcono nombre={estado.nombrePareja} size="lg" />
+                    <AvatarIcono nombre={estado.nombrePareja} avatar={estado.avatarPareja} size="lg" />
                     <div>
                       <span className="text-xs text-orange-100 font-medium">Compartida con</span>
                       <h3 className="text-lg font-bold leading-tight">{estado.nombrePareja}</h3>
@@ -288,7 +295,7 @@ export default function RachaPage() {
             {estado?.tieneParejaActiva ? (
               <div className="bg-white rounded-[28px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <AvatarIcono nombre={estado.nombrePareja} size="md" />
+                  <AvatarIcono nombre={estado.nombrePareja} avatar={estado.avatarPareja} size="md" />
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">{estado.nombrePareja}</h3>
                     <span className="text-xs text-slate-400">🔥 {estado.rachaActual} días de racha</span>
