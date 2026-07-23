@@ -553,26 +553,10 @@ export default function MonitoreoPage() {
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
             </button>
             <h3 className="text-sm font-bold text-[#2A3B50]">Monitoreo de Bienestar</h3>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-400 p-0.5 flex items-center justify-center">
-              <div className="w-full h-full bg-white rounded-full flex items-center justify-center text-[11px] font-black text-indigo-500">JS</div>
-            </div>
+            <div className="w-9" />
           </div>
 
           <div className="p-6 space-y-6">
-            {estadoBienestarSemana === 'crisis' && (
-              <button
-                onClick={() => irAModoCrisisAutomatico(promedioSemana)}
-                className="w-full p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-left hover:bg-rose-100 transition-colors"
-              >
-                <span className="text-2xl">💙</span>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-rose-800">Hemos notado que tu bienestar ha sido bajo</p>
-                  <p className="text-[11px] text-rose-600 font-medium mt-0.5">Toca aquí para ver ayuda inmediata</p>
-                </div>
-                <span className="text-rose-400">›</span>
-              </button>
-            )}
-
             <div>
               <div className="flex justify-between items-end">
                 <p className="text-xs font-bold text-[#8C9BAE] tracking-wider uppercase">Tu estado de hoy</p>
@@ -760,9 +744,6 @@ export default function MonitoreoPage() {
           </div>
         )}
 
-        <div className="bg-white border-t border-slate-100 px-6 py-3.5 flex justify-around items-center sm:rounded-b-[40px] z-30 flex-shrink-0">
-          <span className="text-[10px] font-bold text-[#4A72A6]">Inicio / Evaluación / Perfil</span>
-        </div>
       </div>
     </div>
   );
