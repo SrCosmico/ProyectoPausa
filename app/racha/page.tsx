@@ -43,7 +43,10 @@ function TarjetaRacha({
   onUsarProtector?: (parejaId: string, historialDias: ParejaActivaInfo["historialDias"]) => void;
   usandoProtector?: boolean;
 }) {
-  const hayDiaPendienteQueProteger = pareja.historialDias.some(d => !d.completo && !d.protegido);
+  const hoyStr = new Date().toISOString().split("T")[0];
+  const hayDiaPendienteQueProteger = pareja.historialDias.some(
+    (d) => d.fecha !== hoyStr && !d.completo && !d.protegido
+  );
 
   return (
     <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[32px] p-6 text-white shadow-lg space-y-4">
@@ -194,7 +197,11 @@ export default function RachaPage() {
 
   const manejarUsarProtector = async (parejaId: string, historialDias: ParejaActivaInfo["historialDias"]) => {
     if (!userId) return;
-    const diaFaltante = [...historialDias].reverse().find(d => !d.completo && !d.protegido);
+    const hoyStr = new Date().toISOString().split("T")[0];
+    const diaFaltante = [...historialDias]
+      .reverse()
+      .find((d) => d.fecha !== hoyStr && !d.completo && !d.protegido);
+
     if (!diaFaltante) { setError("No hay ningún día pendiente que proteger."); return; }
 
     setUsandoProtectorId(parejaId); setError(null); setMensajeExito(null);
