@@ -87,12 +87,13 @@ export async function cancelarInvitacion(parejaId: string): Promise<{ exito: boo
   return { exito: true };
 }
 
-// ─── Calcular racha de una pareja (respeta días protegidos) ───────────────────
+// ─── Calcular racha de una pareja (respeta días protegidos, nunca antes de la pareja) ──
 
 async function calcularRachaPareja(
   userId: string,
   otroUserId: string,
-  parejaId: string
+  parejaId: string,
+  fechaCreacionPareja: string
 ): Promise<number> {
   const { data: registros } = await supabase
     .from('historial_emociones')
@@ -107,7 +108,11 @@ async function calcularRachaPareja(
     .not('usado_por', 'is', null)
     .not('usado_en_fecha', 'is', null);
 
-  const fechasProtegidas = new Set((diasProtegidos ?? []).map(d => d.usado_en_fecha));
+  const fechasProtegidas = new Set(
+    (diasProtegidos ?? [])
+      .map(d => d.usado_en_fecha)
+      .filter((fecha): fecha is string => !!fecha && fecha >= fechaCreacionPareja)
+  );
 
   if (!registros || registros.length === 0) return 0;
 
@@ -116,6 +121,10 @@ async function calcularRachaPareja(
 
   while (true) {
     const fechaStr = diaActual.toISOString().split('T')[0];
+
+    // Nunca contar días anteriores a que la pareja exista
+    if (fechaStr < fechaCreacionPareja) break;
+
     const del_dia = registros.filter(r => r.dia === fechaStr);
     const yo = del_dia.some(r => r.user_id === userId);
     const otro = del_dia.some(r => r.user_id === otroUserId);
@@ -229,6 +238,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   // ── Construir info de cada pareja activa ──────────────────────────────────
   const parejasActivas = await Promise.all(activas.map(async (pareja) => {
     const otroUserId = pareja.user_id_1 === userId ? pareja.user_id_2 : pareja.user_id_1;
+    const fechaCreacionPareja = pareja.creado_at.split('T')[0];
 
     await otorgarProtectorMensualSiCorresponde(pareja.id);
 
@@ -238,7 +248,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       .eq('id', otroUserId)
       .maybeSingle();
 
-    const rachaActual = await calcularRachaPareja(userId, otroUserId, pareja.id);
+    const rachaActual = await calcularRachaPareja(userId, otroUserId, pareja.id, fechaCreacionPareja);
 
     const hace7Dias = new Date();
     hace7Dias.setDate(hace7Dias.getDate() - 6);
@@ -256,9 +266,11 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       .eq('pareja_id', pareja.id)
       .not('usado_por', 'is', null);
 
-    const fechasProtegidas = new Set((protegidosSet ?? []).map(p => p.usado_en_fecha));
-
-    const fechaCreacionPareja = pareja.creado_at.split('T')[0];
+    const fechasProtegidas = new Set(
+      (protegidosSet ?? [])
+        .map(p => p.usado_en_fecha)
+        .filter((fecha): fecha is string => !!fecha && fecha >= fechaCreacionPareja)
+    );
 
     const historialDias: CheckinDia[] = [];
     for (let i = 6; i >= 0; i--) {
