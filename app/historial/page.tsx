@@ -116,10 +116,38 @@ export default function HistorialPage() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans">
-      <div className="w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
+      <div className="relative w-full max-w-md h-screen sm:h-[850px] bg-slate-50 shadow-2xl flex flex-col sm:rounded-[40px] border border-gray-100 overflow-hidden">
+
+        {/* FONDO DECORATIVO */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <img
+            src="/images/forma_verde.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute -top-12 -left-16 w-60 h-auto opacity-35 select-none rotate-6"
+          />
+          <img
+            src="/images/ramita_derecha.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-[22%] -right-10 w-28 sm:w-32 h-auto opacity-40 select-none rotate-[10deg]"
+          />
+          <img
+            src="/images/onda_del_medio.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-[52%] left-1/2 -translate-x-1/2 w-[140%] max-w-none h-auto opacity-25 select-none"
+          />
+          <img
+            src="/images/ramita_izquierda.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute bottom-[4%] -left-10 w-32 h-auto opacity-40 select-none -rotate-[15deg] scale-x-[-1]"
+          />
+        </div>
 
         {/* HEADER */}
-        <div className="px-6 pt-6 pb-4 flex items-center justify-between bg-white border-b border-slate-100 flex-shrink-0">
+        <div className="relative z-10 px-6 pt-6 pb-4 flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-slate-100 flex-shrink-0">
           <button onClick={() => router.push('/perfil')} className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
@@ -130,7 +158,7 @@ export default function HistorialPage() {
         </div>
 
         {/* TABS */}
-        <div className="px-6 pt-4 pb-2 bg-white border-b border-slate-100">
+        <div className="relative z-10 px-6 pt-4 pb-2 bg-white/95 backdrop-blur-sm border-b border-slate-100">
           <div className="flex bg-slate-100 p-1 rounded-xl">
             <button
               onClick={() => setPestana('registros')}
@@ -152,7 +180,7 @@ export default function HistorialPage() {
         </div>
 
         {/* CONTENIDO */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="relative z-10 flex-1 overflow-y-auto p-6">
           {cargando ? (
             <div className="flex justify-center pt-10">
               <div className="w-8 h-8 border-4 border-[#4A72A6] border-t-transparent rounded-full animate-spin" />
@@ -160,7 +188,7 @@ export default function HistorialPage() {
           ) : pestana === 'registros' ? (
             <div className="space-y-4">
               {/* Navegación de mes */}
-              <div className="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex justify-between items-center bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-sm border border-slate-100">
                 <button
                   onClick={() => setFechaCalendario(new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() - 1, 1))}
                   className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
@@ -183,7 +211,7 @@ export default function HistorialPage() {
               </div>
 
               {/* Calendario mensual */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+              <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-slate-100">
                 <div className="grid grid-cols-7 gap-1 mb-2 text-center">
                   {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map(d => (
                     <span key={d} className="text-[10px] font-bold text-slate-400">{d}</span>
@@ -217,7 +245,7 @@ export default function HistorialPage() {
               </div>
 
               {/* Leyenda */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap gap-3 justify-center">
+              <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap gap-3 justify-center">
                 {[
                   { n: 5, l: 'Muy bien' },
                   { n: 4, l: 'Bien' },
@@ -233,7 +261,7 @@ export default function HistorialPage() {
               </div>
 
               {registros.length === 0 && (
-                <div className="p-4 bg-white border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400">
+                <div className="p-4 bg-white/90 backdrop-blur-sm border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400">
                   Aún no tienes registros emocionales.
                 </div>
               )}
@@ -241,7 +269,7 @@ export default function HistorialPage() {
           ) : (
             <div className="space-y-3">
               {evaluaciones.length === 0 ? (
-                <div className="p-4 bg-white border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400">
+                <div className="p-4 bg-white/90 backdrop-blur-sm border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400">
                   Aún no has completado ninguna evaluación PSS-4.
                 </div>
               ) : (
@@ -251,7 +279,7 @@ export default function HistorialPage() {
                     <button
                       key={ev.id}
                       onClick={() => setEvaluacionSeleccionada(ev)}
-                      className={`w-full text-left p-4 rounded-2xl border shadow-sm hover:shadow-md active:scale-[0.99] transition-all ${estilo.bg}`}
+                      className={`w-full text-left p-4 rounded-2xl border shadow-sm hover:shadow-md active:scale-[0.99] transition-all backdrop-blur-sm ${estilo.bg}`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
