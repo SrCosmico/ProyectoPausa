@@ -48,6 +48,9 @@ export default function DiarioPage() {
   // ── NUEVO: filtro de notas por etiqueta/emoji ────────────────────────────
   const [filtroEtiqueta, setFiltroEtiqueta] = useState<string | null>(null); // null = "Todas"
 
+  // NUEVO: fuerza que el editor enriquecido se vacíe visualmente al abrir una nota nueva
+  const [editorKey, setEditorKey] = useState(0);
+
   // ── Estado del patrón de bloqueo ─────────────────────────────────────────
   const [modoBloqueo, setModoBloqueo] = useState<ModoBloqueo>('cargando');
   const [patronHashGuardado, setPatronHashGuardado] = useState<string | null>(null);
@@ -209,6 +212,7 @@ export default function DiarioPage() {
       setTitulo('');
       setContenido('');
       setEstadoDia(null);
+      setEditorKey((k) => k + 1);
       await cargarNotas(userId);
       setVista('listaNotas');
     } else {
@@ -430,7 +434,10 @@ export default function DiarioPage() {
                 <h2 className="text-lg font-bold text-[#6B66B2]">{notaActiva.titulo}</h2>
               </div>
               <p className="text-[10px] text-slate-400">{formatearFechaNota(notaActiva.fecha)} · {notaActiva.label_dia ?? ''}</p>
-              <p className="text-xs text-slate-600 leading-relaxed">{notaActiva.contenido}</p>
+              <div
+                className="text-xs text-slate-600 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1"
+                dangerouslySetInnerHTML={{ __html: notaActiva.contenido }}
+              />
               <button
                 onClick={() => eliminarNota(notaActiva.id)}
                 className="mt-4 w-full py-3 border border-rose-100 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors"
@@ -449,16 +456,72 @@ export default function DiarioPage() {
                 placeholder="Título"
                 className="w-full text-xs font-bold p-2 focus:outline-none border-b border-slate-100 mb-2"
               />
-              <textarea
-                value={contenido}
-                onChange={(e) => setContenido(e.target.value)}
-                placeholder="¿Qué tienes en mente hoy?"
-                className="w-full flex-1 p-2 text-xs text-slate-600 focus:outline-none resize-none"
+
+              {/* Barra de herramientas del editor */}
+              <div className="flex items-center gap-1.5 flex-wrap py-2 border-b border-slate-100 mb-2">
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => document.execCommand('bold')}
+                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-black flex items-center justify-center transition-colors"
+                  title="Negrita"
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => document.execCommand('italic')}
+                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs italic flex items-center justify-center transition-colors"
+                  title="Cursiva"
+                >
+                  I
+                </button>
+                <span className="w-px h-5 bg-slate-200 mx-1" />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => document.execCommand('insertUnorderedList')}
+                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-sm flex items-center justify-center transition-colors"
+                  title="Lista con viñetas"
+                >
+                  •≡
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => document.execCommand('insertOrderedList')}
+                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center transition-colors"
+                  title="Lista numerada"
+                >
+                  1≡
+                </button>
+                <span className="w-px h-5 bg-slate-200 mx-1" />
+                {['#1E293B', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => document.execCommand('foreColor', false, color)}
+                    className="w-5 h-5 rounded-full border border-slate-200 flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                    title="Color de texto"
+                  />
+                ))}
+              </div>
+
+              <div
+                key={editorKey}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(e) => setContenido((e.target as HTMLDivElement).innerHTML)}
+                data-placeholder="¿Qué tienes en mente hoy?"
+                className="w-full flex-1 p-2 text-xs text-slate-600 focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
               />
 
               <button
                 onClick={() => setPanelAbierto(true)}
-                className="mb-4 p-4 rounded-xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full"
+                className="mb-4 mt-3 p-4 rounded-xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full"
               >
                 <span className="text-xs font-bold text-purple-700">{estadoDia ? `Día ${estadoDia.label}` : 'Definir mi día'}</span>
                 <span className="text-xl">{estadoDia?.emoji ?? '💜'}</span>
