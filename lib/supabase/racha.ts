@@ -1,5 +1,14 @@
 import { createClient } from '@/lib/supabase/client';
-import type { EstadoRachaPareja, DiaRacha } from '@/models/racha';
+import type { EstadoRachaPareja } from '@/models/racha';
+
+type DiaRacha = {
+  fecha: string;
+  completo: boolean;
+  protegido: boolean;
+  antesDePareja: boolean;
+  yoRegistre: boolean;
+  parejaRegistro: boolean;
+};
 
 const supabase = createClient();
 
@@ -114,9 +123,14 @@ export async function calcularEstadoRachaPareja(
   const estadoVacio: EstadoRachaPareja = {
     tieneParejaActiva: false,
     esperandoAceptacion: false,
+    parejaId: null,
+    correoInvitado: '',
+    nombrePareja: '',
     rachaActual: 0,
     rachaMaxima: 0,
     protectoresDisponibles: 0,
+    protectoresUsadosEsteMes: 0,
+    activadaHoy: false,
     historialDias: [],
     mensajeMotivador: '',
   };
@@ -164,7 +178,7 @@ export async function calcularEstadoRachaPareja(
 
   const { data: historial } = await supabase
     .from('historial_emociones')
-    .select('dia')
+    .select('dia, user_id')
     .in('user_id', [userId, otroUserId])
     .gte('dia', fechaInicio)
     .order('dia', { ascending: true });
@@ -182,13 +196,17 @@ export async function calcularEstadoRachaPareja(
 
     const antesDePareja = fechaInicioPareja ? fechaStr < fechaInicioPareja : false;
     const registrosDelDia = historial?.filter(h => h.dia === fechaStr) ?? [];
-    const ambosRegistraron = registrosDelDia.length >= 2;
+    const yoRegistre = registrosDelDia.some(h => h.user_id === userId);
+    const parejaRegistro = registrosDelDia.some(h => h.user_id === otroUserId);
+    const ambosRegistraron = yoRegistre && parejaRegistro;
 
     historialDias.push({
       fecha: fechaStr,
       completo: ambosRegistraron,
       protegido: false,
       antesDePareja,
+      yoRegistre,
+      parejaRegistro,
     });
   }
 
@@ -218,6 +236,8 @@ export async function calcularEstadoRachaPareja(
     rachaActual,
     rachaMaxima,
     protectoresDisponibles: protectores?.length ?? 0,
+    protectoresUsadosEsteMes: 0,
+    activadaHoy: false,
     historialDias,
     mensajeMotivador,
   };
