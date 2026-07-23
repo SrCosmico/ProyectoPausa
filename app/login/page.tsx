@@ -95,7 +95,7 @@ export default function LoginView() {
             <img
               src="/images/logo.png"
               alt="Pausa"
-              className="w-[200px] h-[200px] object-contain select-none"
+              className="w-[360px] h-[360px] object-contain select-none"
             />
           </div>
 
