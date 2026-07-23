@@ -94,7 +94,7 @@ export default function LoginView() {
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 rounded-[28px] bg-white shadow-md border border-slate-100 flex items-center justify-center p-3">
               <img
-                src="/images/logo-pausa.png"
+                src="/images/logo.png"
                 alt="Pausa"
                 className="w-full h-full object-contain"
               />
