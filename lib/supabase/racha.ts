@@ -147,10 +147,10 @@ export async function calcularEstadoRachaPareja(
     const soyReceptor = pareja.user_id_2 === userId;
     return {
       ...estadoVacio,
+      parejaId: pareja.id,          // ✅ siempre incluido
       esperandoAceptacion: true,
-      parejaId: pareja.id,
       correoInvitado: pareja.correo_invitado,
-      soyReceptor, // true = me invitaron a mí, false = yo invité
+      soyReceptor,
     };
   }
 
@@ -207,15 +207,25 @@ export async function calcularEstadoRachaPareja(
     });
   }
 
-  // Protectores disponibles
+  // Protectores disponibles y usados
   const { data: protectores } = await supabase
     .from('protectores_racha')
     .select('id')
     .eq('pareja_id', pareja.id)
     .eq('usado', false);
 
+  const { data: protectoresUsadosEsteMesData } = await supabase
+    .from('protectores_racha')
+    .select('id')
+    .eq('pareja_id', pareja.id)
+    .eq('usado', true);
+
   const rachaActual = rachaData?.racha_actual ?? 0;
   const rachaMaxima = rachaData?.racha_maxima ?? 0;
+  const protectoresUsadosEsteMes = protectoresUsadosEsteMesData?.length ?? 0;
+  const activadaHoy = pareja.fecha_inicio
+    ? new Date(pareja.fecha_inicio).toISOString().split('T')[0] === new Date().toISOString().split('T')[0]
+    : false;
 
   // Mensaje motivador
   let mensajeMotivador = '';
@@ -233,8 +243,8 @@ export async function calcularEstadoRachaPareja(
     rachaActual,
     rachaMaxima,
     protectoresDisponibles: protectores?.length ?? 0,
-    protectoresUsadosEsteMes: 0,
-    activadaHoy: false,
+    protectoresUsadosEsteMes,
+    activadaHoy,
     historialDias,
     mensajeMotivador,
   };
