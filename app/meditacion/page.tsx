@@ -182,10 +182,38 @@ export default function MeditacionRespiracionApp() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans select-none antialiased">
-      <div className="w-full max-w-md h-screen sm:h-[840px] bg-white shadow-2xl flex flex-col justify-between relative sm:rounded-[40px] border border-slate-100 overflow-hidden pb-6">
-        
+      <div className="relative w-full max-w-md h-screen sm:h-[840px] bg-[#FAFAF8] shadow-2xl flex flex-col justify-between sm:rounded-[40px] border border-slate-100 overflow-hidden pb-6">
+
+        {/* --- FONDO DECORATIVO --- */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <img
+            src="/images/onda_del_medio.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-[30%] left-1/2 -translate-x-1/2 w-[130%] max-w-none h-auto opacity-40 select-none"
+          />
+          <img
+            src="/images/ramita_izquierda.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-[4%] -left-10 w-32 sm:w-36 h-auto opacity-50 select-none -rotate-12"
+          />
+          <img
+            src="/images/ramita_derecha.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-[58%] -right-10 w-32 sm:w-36 h-auto opacity-45 select-none rotate-6"
+          />
+          <img
+            src="/images/forma_grande.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[120%] max-w-none h-auto opacity-60 select-none"
+          />
+        </div>
+
         {/* --- HEADER --- */}
-        <div className="px-6 pt-5 pb-3 flex items-center justify-between z-10 min-h-[60px]">
+        <div className="relative z-10 px-6 pt-5 pb-3 flex items-center justify-between min-h-[60px]">
           <button 
             onClick={() => {
               if (step === "active_session") {
@@ -196,7 +224,7 @@ export default function MeditacionRespiracionApp() {
                 setStep("main_menu");
               }
             }}
-            className="p-2 -ml-2 text-slate-700 hover:text-slate-900 transition-colors"
+            className="p-2.5 -ml-2 text-slate-600 bg-white/80 backdrop-blur-sm rounded-full shadow-sm hover:text-slate-900 hover:bg-white transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
@@ -205,32 +233,41 @@ export default function MeditacionRespiracionApp() {
         </div>
 
         {/* --- SCREEN WORKSPACE WINDOWS --- */}
-        <div className="flex-1 overflow-y-auto px-6 flex flex-col">
+        <div className="relative z-10 flex-1 overflow-y-auto px-6 flex flex-col">
           
           {/* STEP 1: MAIN MENU SELECTION SCREEN (HOME INTERNO DEL MÓDULO) */}
           {step === "main_menu" && (
-            <div className="space-y-6 flex-1 flex flex-col pt-2">
-              <div className="space-y-5">
+            <div className="space-y-7 flex-1 flex flex-col pt-2">
+
+              {/* Encabezado con ícono ambiental */}
+              <div className="text-center space-y-3 pt-2">
+                <div className="w-20 h-20 mx-auto rounded-[28px] bg-gradient-to-br from-emerald-50 to-blue-50 border border-white shadow-sm flex items-center justify-center text-4xl">
+                  🌿
+                </div>
                 <div>
                   <h2 className="text-2xl font-bold text-[#2A3B50]">Meditación y respiración</h2>
-                  <p className="text-sm text-slate-400 font-medium mt-1">Encuentra unos minutos para reconectar contigo.</p>
+                  <p className="text-sm text-slate-400 font-medium mt-1.5 max-w-[280px] mx-auto leading-relaxed">
+                    Encuentra unos minutos para reconectar contigo.
+                  </p>
                 </div>
+              </div>
 
+              <div className="space-y-4">
                 <div 
                   onClick={() => handleSelectOption("respiracion")}
-                  className="w-full flex items-center justify-between p-5 bg-[#EDF3FC] border border-blue-100/70 rounded-3xl cursor-pointer hover:shadow-md transition-all group"
+                  className="w-full flex items-center justify-between p-5 bg-white/90 backdrop-blur-sm border border-blue-100 rounded-[28px] cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
                 >
                   <div className="flex items-center gap-4">
-                    <span className="text-3xl p-3 bg-white/90 rounded-2xl shadow-sm">🍃</span>
+                    <span className="text-3xl p-3.5 bg-[#EDF3FC] rounded-2xl shadow-inner">🍃</span>
                     <div>
                       <h4 className="text-base font-bold text-[#2A3B50]">Respiración guiada</h4>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5 max-w-[210px] leading-relaxed">
+                      <p className="text-xs text-slate-500 font-medium mt-0.5 max-w-[200px] leading-relaxed">
                         Aprende a controlar el estrés mediante ejercicios respiratorios.
                       </p>
-                      <span className="text-[11px] font-bold text-slate-400 mt-2 block">🕒 2 a 20 minutos</span>
+                      <span className="text-[11px] font-bold text-[#4A72A6] mt-2 inline-flex items-center gap-1">🕒 2 a 20 minutos</span>
                     </div>
                   </div>
-                  <button className="bg-[#4A72A6] text-white p-2.5 rounded-full shadow-md group-hover:scale-105 transition-transform">
+                  <button className="bg-[#4A72A6] text-white p-3 rounded-full shadow-md shadow-blue-100 group-hover:scale-110 transition-transform flex-shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-4 h-4 translate-x-[1px]">
                       <path d="M8 5v14l11-7z" />
                     </svg>
@@ -239,24 +276,30 @@ export default function MeditacionRespiracionApp() {
 
                 <div 
                   onClick={() => handleSelectOption("meditacion")}
-                  className="w-full flex items-center justify-between p-5 bg-[#F6EDFA] border border-purple-100/70 rounded-3xl cursor-pointer hover:shadow-md transition-all group"
+                  className="w-full flex items-center justify-between p-5 bg-white/90 backdrop-blur-sm border border-purple-100 rounded-[28px] cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
                 >
                   <div className="flex items-center gap-4">
-                    <span className="text-3xl p-3 bg-white/90 rounded-2xl shadow-sm">🧘‍♀️</span>
+                    <span className="text-3xl p-3.5 bg-[#F6EDFA] rounded-2xl shadow-inner">🧘‍♀️</span>
                     <div>
                       <h4 className="text-base font-bold text-[#2A3B50]">Meditación guiada</h4>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5 max-w-[210px] leading-relaxed">
+                      <p className="text-xs text-slate-500 font-medium mt-0.5 max-w-[200px] leading-relaxed">
                         Momentos de calma y atención plena para despejar tu mente.
                       </p>
-                      <span className="text-[11px] font-bold text-slate-400 mt-2 block">🕒 5 a 20 minutes</span>
+                      <span className="text-[11px] font-bold text-purple-500 mt-2 inline-flex items-center gap-1">🕒 5 a 20 minutos</span>
                     </div>
                   </div>
-                  <button className="bg-purple-600 text-white p-2.5 rounded-full shadow-md group-hover:scale-105 transition-transform">
+                  <button className="bg-purple-600 text-white p-3 rounded-full shadow-md shadow-purple-100 group-hover:scale-110 transition-transform flex-shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-4 h-4 translate-x-[1px]">
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   </button>
                 </div>
+              </div>
+
+              {/* Nota de calma inferior */}
+              <div className="mt-auto mb-4 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-400">
+                <span>🌤️</span>
+                <span>Tómate este momento solo para ti</span>
               </div>
             </div>
           )}
@@ -273,7 +316,7 @@ export default function MeditacionRespiracionApp() {
                 </div>
 
                 <div className="w-full flex justify-center py-4">
-                  <div className="w-48 h-48 rounded-full bg-slate-50 flex items-center justify-center relative border border-slate-100">
+                  <div className="w-48 h-48 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center relative border border-slate-100 shadow-sm">
                     <span className="text-6xl animate-bounce duration-1000">
                       {sessionType === "respiracion" ? "🌬️" : "🧘‍♀️"}
                     </span>
@@ -293,7 +336,7 @@ export default function MeditacionRespiracionApp() {
                           className={`py-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
                             isSelected
                               ? "bg-emerald-500 border-emerald-500 text-white font-bold shadow-md shadow-emerald-100"
-                              : "bg-white border-slate-200 text-[#2A3B50] font-medium hover:bg-slate-50"
+                              : "bg-white/90 border-slate-200 text-[#2A3B50] font-medium hover:bg-slate-50"
                           }`}
                         >
                           <span className="text-base">{min}</span>
@@ -304,7 +347,7 @@ export default function MeditacionRespiracionApp() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="p-4 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Técnica recomendada</span>
                   <h4 className="text-xs font-bold text-[#2A3B50]">
                     {sessionType === "respiracion" ? "Respiración 6-6-6-6 (Box Breathing Expandido)" : "Atención Plena & Presencia"}
@@ -366,7 +409,7 @@ export default function MeditacionRespiracionApp() {
                     className={`w-52 h-52 rounded-full shadow-inner flex flex-col items-center justify-center p-6 border border-slate-100 z-10 text-center transition-all duration-500 ${
                       isTouching
                         ? "bg-emerald-100 scale-110"
-                        : "bg-slate-50 scale-100"
+                        : "bg-white/90 backdrop-blur-sm scale-100"
                     }`}
                   >
                     <span className="text-2xl font-black tracking-wider text-[#2A3B50] uppercase transition-all duration-500">
@@ -378,7 +421,7 @@ export default function MeditacionRespiracionApp() {
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-center gap-2 text-slate-700 font-semibold bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                <div className="mt-6 flex items-center gap-2 text-slate-700 font-semibold bg-white/90 backdrop-blur-sm px-4 py-2 rounded-2xl border border-slate-100">
                   <p className="text-xs text-slate-500 mt-4 text-center">
                     Mantén presionado el círculo para mejorar tu concentración durante la respiración.
                   </p>  <span>⏳</span>
@@ -396,7 +439,7 @@ export default function MeditacionRespiracionApp() {
                 </div>
               </div>
 
-              <div className="w-full text-center bg-slate-50 border border-slate-200/60 p-4 min-h-[76px] flex items-center justify-center rounded-2xl mb-6">
+              <div className="w-full text-center bg-white/90 backdrop-blur-sm border border-slate-200/60 p-4 min-h-[76px] flex items-center justify-center rounded-2xl mb-6">
                 <p className="text-xs text-slate-600 font-bold leading-relaxed max-w-xs transition-all duration-300">
                   {currentInstruction ? (sessionType === "meditacion" ? currentInstruction : currentSubtext) : "Prepárate..."}
                 </p>
@@ -405,7 +448,7 @@ export default function MeditacionRespiracionApp() {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => setIsPaused(!isPaused)}
-                  className="py-3.5 border-2 border-slate-200 text-slate-500 font-bold text-xs uppercase rounded-xl bg-white hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                  className="py-3.5 border-2 border-slate-200 text-slate-500 font-bold text-xs uppercase rounded-xl bg-white/90 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
                 >
                   {isPaused ? (<><span>▶</span> Reanudar</>) : (<><span>⏸</span> Pausar</>)}
                 </button>
@@ -432,7 +475,7 @@ export default function MeditacionRespiracionApp() {
                   <p className="text-xs text-slate-400 font-semibold">Has concluido tu práctica satisfactoriamente.</p>
                 </div>
 
-                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl text-left space-y-4 relative overflow-hidden shadow-sm">
+                <div className="p-6 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-3xl text-left space-y-4 relative overflow-hidden shadow-sm">
                   <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Registro de la sesión</h4>
                     <span className="text-xs font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">Completado</span>
