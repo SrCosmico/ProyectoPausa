@@ -228,25 +228,31 @@ export default function RachaPage() {
     <div className="min-h-screen bg-[#F8FAFC] flex justify-center p-0 sm:p-4">
       <div className="relative w-full max-w-md bg-[#F8FAFC] min-h-screen sm:min-h-[850px] shadow-2xl sm:rounded-[40px] border border-slate-100 flex flex-col overflow-hidden">
 
-        {/* FONDO DECORATIVO — ramitas */}
+        {/* FONDO DECORATIVO — ramitas grandes repartidas por toda la pantalla */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <img
             src="/images/ramita_izquierda.png"
             alt=""
             aria-hidden="true"
-            className="absolute top-[10%] -left-6 w-28 sm:w-32 h-auto opacity-60 select-none -rotate-6"
+            className="absolute -top-4 -left-16 w-64 sm:w-72 h-auto opacity-80 select-none -rotate-12"
           />
           <img
             src="/images/ramita_derecha.png"
             alt=""
             aria-hidden="true"
-            className="absolute top-[46%] -right-8 w-32 sm:w-36 h-auto opacity-50 select-none rotate-3"
+            className="absolute top-[24%] -right-20 w-64 sm:w-72 h-auto opacity-70 select-none rotate-6"
           />
           <img
             src="/images/ramita_izquierda.png"
             alt=""
             aria-hidden="true"
-            className="absolute bottom-[6%] -left-10 w-36 sm:w-40 h-auto opacity-40 select-none rotate-12 scale-x-[-1]"
+            className="absolute top-[55%] -left-20 w-60 sm:w-64 h-auto opacity-70 select-none rotate-[20deg] scale-x-[-1]"
+          />
+          <img
+            src="/images/ramita_derecha.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute bottom-[2%] -right-16 w-72 sm:w-80 h-auto opacity-80 select-none -rotate-[10deg]"
           />
         </div>
 
@@ -254,7 +260,7 @@ export default function RachaPage() {
         <div className="relative z-10 flex flex-col h-full overflow-y-auto">
 
           {/* Header */}
-          <header className="bg-white/95 backdrop-blur-sm px-6 pt-6 pb-5 border-b border-slate-100 flex items-center gap-3.5 sticky top-0 z-10">
+          <header className="bg-white/90 backdrop-blur-sm px-6 pt-6 pb-5 border-b border-slate-100 flex items-center gap-3.5 sticky top-0 z-10">
             <button onClick={() => router.push("/home")} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 border border-slate-200/60 flex items-center justify-center transition-all flex-shrink-0">
               <svg className="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -292,7 +298,7 @@ export default function RachaPage() {
                   />
                 ))
               ) : (
-                <div className="bg-white/95 backdrop-blur-sm rounded-[32px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
+                <div className="bg-white/90 backdrop-blur-sm rounded-[32px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
                   <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-xl mx-auto">🔥</div>
                   <h3 className="text-sm font-bold text-slate-800">Aún no tienes una racha activa</h3>
                   <p className="text-xs text-slate-400 max-w-[240px] mx-auto">¡Invita a un amigo para empezar juntos!</p>
@@ -305,7 +311,7 @@ export default function RachaPage() {
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">👥 Mis amigos</h2>
               {estado?.parejasActivas && estado.parejasActivas.length > 0 ? (
                 estado.parejasActivas.map(pareja => (
-                  <div key={pareja.parejaId} className="bg-white/95 backdrop-blur-sm rounded-[28px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
+                  <div key={pareja.parejaId} className="bg-white/90 backdrop-blur-sm rounded-[28px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3.5">
                       <AvatarIcono nombre={pareja.nombrePareja} avatar={pareja.avatarPareja} size="md" />
                       <div>
@@ -320,7 +326,7 @@ export default function RachaPage() {
                   </div>
                 ))
               ) : (
-                <div className="bg-white/95 backdrop-blur-sm rounded-[28px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
+                <div className="bg-white/90 backdrop-blur-sm rounded-[28px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
                   <span className="text-2xl">👥</span>
                   <p className="text-xs font-medium text-slate-600">Todavía no tienes amigos agregados</p>
                 </div>
@@ -335,7 +341,7 @@ export default function RachaPage() {
               <div className="space-y-2">
                 <span className="text-[11px] font-semibold text-slate-400 px-1">Recibidas</span>
                 {recibidas.length > 0 ? recibidas.map(p => (
-                  <div key={p.parejaId} className="bg-white/95 backdrop-blur-sm rounded-[28px] p-4 border border-orange-100 shadow-sm space-y-3">
+                  <div key={p.parejaId} className="bg-white/90 backdrop-blur-sm rounded-[28px] p-4 border border-orange-100 shadow-sm space-y-3">
                     <div className="flex items-center gap-3">
                       <AvatarIcono nombre="?" size="sm" />
                       <div className="flex-1 min-w-0">
@@ -361,7 +367,7 @@ export default function RachaPage() {
                     </div>
                   </div>
                 )) : (
-                  <div className="bg-white/95 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
+                  <div className="bg-white/90 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
                     <span className="text-lg">📬</span>
                     <p className="text-xs text-slate-400">Aún no has recibido invitaciones.</p>
                   </div>
@@ -372,7 +378,7 @@ export default function RachaPage() {
               <div className="space-y-2">
                 <span className="text-[11px] font-semibold text-slate-400 px-1">Invitaciones pendientes</span>
                 {enviadas.length > 0 ? enviadas.map(p => (
-                  <div key={p.parejaId} className="bg-white/95 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
+                  <div key={p.parejaId} className="bg-white/90 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 text-sm font-bold flex-shrink-0">⏳</div>
                       <div className="min-w-0">
@@ -392,7 +398,7 @@ export default function RachaPage() {
                     </div>
                   </div>
                 )) : (
-                  <div className="bg-white/95 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
+                  <div className="bg-white/90 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
                     <span className="text-lg">📭</span>
                     <p className="text-xs text-slate-400">No tienes invitaciones pendientes.</p>
                   </div>
@@ -402,7 +408,7 @@ export default function RachaPage() {
 
             {/* INVITAR */}
             <section className="pt-2">
-              <div className="bg-white/95 backdrop-blur-sm rounded-[32px] p-6 border border-slate-100 shadow-sm space-y-4">
+              <div className="bg-white/90 backdrop-blur-sm rounded-[32px] p-6 border border-slate-100 shadow-sm space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-500 text-lg">➕</div>
                   <div>
