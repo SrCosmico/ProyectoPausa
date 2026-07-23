@@ -258,6 +258,8 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
 
     const fechasProtegidas = new Set((protegidosSet ?? []).map(p => p.usado_en_fecha));
 
+    const fechaCreacionPareja = pareja.creado_at.split('T')[0];
+
     const historialDias: CheckinDia[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
@@ -270,7 +272,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
         parejaRegistro: del_dia.some(h => h.user_id === otroUserId),
         completo: del_dia.some(h => h.user_id === userId) && del_dia.some(h => h.user_id === otroUserId),
         protegido: fechasProtegidas.has(fechaStr),
-        antesDePareja: false,
+        antesDePareja: fechaStr < fechaCreacionPareja,
       });
     }
 

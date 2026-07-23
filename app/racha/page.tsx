@@ -45,7 +45,7 @@ function TarjetaRacha({
 }) {
   const hoyStr = new Date().toISOString().split("T")[0];
   const hayDiaPendienteQueProteger = pareja.historialDias.some(
-    (d) => d.fecha !== hoyStr && !d.completo && !d.protegido
+    (d) => d.fecha !== hoyStr && !d.completo && !d.protegido && !d.antesDePareja
   );
 
   return (
@@ -200,7 +200,7 @@ export default function RachaPage() {
     const hoyStr = new Date().toISOString().split("T")[0];
     const diaFaltante = [...historialDias]
       .reverse()
-      .find((d) => d.fecha !== hoyStr && !d.completo && !d.protegido);
+      .find((d) => d.fecha !== hoyStr && !d.completo && !d.protegido && !d.antesDePareja);
 
     if (!diaFaltante) { setError("No hay ningún día pendiente que proteger."); return; }
 
