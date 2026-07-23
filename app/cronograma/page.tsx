@@ -132,6 +132,18 @@ export default function CronogramaPage() {
   const [parciales, setParciales] = useState<ParcialConMateria[]>([]);
   const [ultimaSincronizacion, setUltimaSincronizacion] = useState<string | null>(null);
 
+  // Guarda una copia de la última configuración confirmada en Supabase,
+  // para poder revertir si el usuario sale de Ajustes sin guardar.
+  const [configGuardada, setConfigGuardada] = useState<{
+    nombre: string;
+    color: "blue" | "purple" | "emerald" | "orange" | "rose";
+    dias: string[];
+    horaInicio: string;
+    horaFin: string;
+    actividades: string[];
+    recordatorios: boolean;
+  } | null>(null);
+
   const mapaEstilos = {
     blue: { bg: "bg-blue-400", hoverBg: "hover:bg-blue-500", text: "text-blue-500", bgLight: "bg-blue-50/70", border: "border-blue-200" },
     purple: { bg: "bg-purple-400", hoverBg: "hover:bg-purple-500", text: "text-purple-500", bgLight: "bg-purple-50/70", border: "border-purple-200" },
@@ -168,6 +180,16 @@ export default function CronogramaPage() {
         if (config.hora_fin) setHoraFin(config.hora_fin);
         if (config.actividades_preferidas) setActividadesPreferidas(config.actividades_preferidas);
         if (config.recordatorios !== null) setRecordatorios(config.recordatorios);
+
+        setConfigGuardada({
+          nombre: config.nombre ?? nombreCronograma,
+          color: (config.color as any) ?? colorCronograma,
+          dias: config.dias_activos ?? diasSeleccionados,
+          horaInicio: config.hora_inicio ?? horaInicio,
+          horaFin: config.hora_fin ?? horaFin,
+          actividades: config.actividades_preferidas ?? actividadesPreferidas,
+          recordatorios: config.recordatorios ?? recordatorios,
+        });
       }
 
       await refrescarActividades(session.user.id);
@@ -208,7 +230,19 @@ export default function CronogramaPage() {
         const confirmarSalida = window.confirm(
           '¿Salir sin guardar los cambios? Los ajustes que hiciste se perderán si no presionas "Confirmar cambios".'
         );
-        if (confirmarSalida) setVista('vistaSemanal');
+        if (confirmarSalida) {
+          // Revertimos los campos a la última versión realmente guardada en Supabase
+          if (configGuardada) {
+            setNombreCronograma(configGuardada.nombre);
+            setColorCronograma(configGuardada.color);
+            setDiasSeleccionados(configGuardada.dias);
+            setHoraInicio(configGuardada.horaInicio);
+            setHoraFin(configGuardada.horaFin);
+            setActividadesPreferidas(configGuardada.actividades);
+            setRecordatorios(configGuardada.recordatorios);
+          }
+          setVista('vistaSemanal');
+        }
         break;
       }
       case 'materiasParciales': setVista('vistaSemanal'); break;
@@ -319,14 +353,27 @@ export default function CronogramaPage() {
       actividades: actividadesPreferidas,
       recordatorios: recordatorios
     });
+    // Actualizamos la copia de "última guardada" para que futuras cancelaciones
+    // reviertan a este nuevo estado correcto
+    setConfigGuardada({
+      nombre: nombreCronograma,
+      color: colorCronograma,
+      dias: diasSeleccionados,
+      horaInicio: horaInicio,
+      horaFin: horaFin,
+      actividades: actividadesPreferidas,
+      recordatorios: recordatorios,
+    });
     setGuardandoAjustes(false);
     setVista('vistaSemanal');
   };
 
   const actividadesDelDia = actividadesGuardadas.filter(a => a.fecha === fechaSeleccionadaVista);
+  const parcialesDelDia = parciales.filter(p => p.fecha === fechaSeleccionadaVista);
   const actividadesOrdenadasLista = [...actividadesGuardadas].sort((a, b) =>
     a.fecha === b.fecha ? a.hora_inicio.localeCompare(b.hora_inicio) : a.fecha.localeCompare(b.fecha)
   );
+  const fechasConParcial = new Set(parciales.map(p => p.fecha));
 
   if (cargandoSesion) {
     return (
@@ -544,11 +591,29 @@ export default function CronogramaPage() {
                   <div className="p-6 space-y-4 relative">
                     <p className="text-[10px] font-bold text-slate-400 mb-1">{formatearFechaLegible(fechaSeleccionadaVista)}</p>
                     {cargandoActividades && <p className="text-xs text-slate-400">Cargando actividades...</p>}
-                    {!cargandoActividades && actividadesDelDia.length === 0 && (
+                    {!cargandoActividades && actividadesDelDia.length === 0 && parcialesDelDia.length === 0 && (
                       <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
                         No tienes actividades este día.
                       </div>
                     )}
+
+                    {parcialesDelDia.map((p) => (
+                      <div key={`parcial-${p.id}`} className="flex gap-4 items-center">
+                        <span className="text-xs font-bold text-slate-400 w-14">📌</span>
+                        <div
+                          className="flex-1 p-3.5 border-l-4 rounded-xl border flex justify-between items-center bg-rose-50 text-rose-700 border-rose-200/80"
+                        >
+                          <div>
+                            <h5 className="text-xs font-bold">{p.materia.nombre} — {p.titulo}</h5>
+                            <p className="text-[10px] opacity-80 mt-0.5 font-medium">Evaluación registrada</p>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800">
+                            {p.tipo}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+
                     {actividadesDelDia.map((actividad) => {
                       const estiloTipo = obtenerEstiloPorTipo(actividad.tipo_actividad);
                       return (
@@ -615,7 +680,7 @@ export default function CronogramaPage() {
                       {Array.from({ length: new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() + 1, 0).getDate() }).map((_, i) => {
                         const day = i + 1;
                         const dateISO = `${fechaCalendario.getFullYear()}-${String(fechaCalendario.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const hasActivity = actividadesGuardadas.some(a => a.fecha === dateISO);
+                        const hasActivity = actividadesGuardadas.some(a => a.fecha === dateISO) || fechasConParcial.has(dateISO);
                         const isSelected = fechaSeleccionadaVista === dateISO;
                         const isToday = obtenerFechaISO(new Date()) === dateISO;
 
@@ -643,11 +708,29 @@ export default function CronogramaPage() {
               {subVista === 'lista' && (
                 <div className="p-6 space-y-3 animate-fadeIn">
                   <p className="text-[10px] font-bold text-slate-400">Todas tus actividades guardadas</p>
-                  {actividadesOrdenadasLista.length === 0 && (
+                  {actividadesOrdenadasLista.length === 0 && parciales.length === 0 && (
                     <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
                       Aún no has agregado actividades.
                     </div>
                   )}
+
+                  {[...parciales]
+                    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+                    .map((p) => (
+                      <div
+                        key={`parcial-lista-${p.id}`}
+                        className="p-3.5 rounded-xl border flex justify-between items-center bg-rose-50 border-rose-200/80 text-rose-700"
+                      >
+                        <div className="flex flex-col">
+                          <h6 className="text-xs font-bold opacity-95">{p.materia.nombre} — {p.titulo}</h6>
+                          <p className="text-[10px] opacity-75 font-medium mt-0.5">{formatearFechaLegible(p.fecha)}</p>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800">
+                          {p.tipo}
+                        </span>
+                      </div>
+                    ))}
+
                   {actividadesOrdenadasLista.map((actividad) => {
                     const estiloTipo = obtenerEstiloPorTipo(actividad.tipo_actividad);
                     return (
