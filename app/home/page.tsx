@@ -107,7 +107,7 @@ export const accesoRapidoData: AccesoRapido[] = [
     id: "diario",
     titulo: "Diario personal",
     descripcion: "Escribe lo que piensas",
-    ruta: "/contrasena.2",
+    ruta: "/diario",
   },
   {
     id: "racha",
