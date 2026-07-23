@@ -36,6 +36,97 @@ function AnimoFeedback({ promedioAnimo }: { promedioAnimo: number }) {
   );
 }
 
+// ─── NUEVO: Termómetro emocional (barra de distribución + desglose) ──────────
+
+interface RegistroHistoricoRef {
+  nivel: number;
+  emoji: string;
+  estado: string;
+}
+
+const CONFIG_NIVEL: Record<number, { colorBarra: string; colorTexto: string; colorFondo: string }> = {
+  5: { colorBarra: 'bg-emerald-400', colorTexto: 'text-emerald-700', colorFondo: 'bg-emerald-50' },
+  4: { colorBarra: 'bg-lime-400',    colorTexto: 'text-lime-700',    colorFondo: 'bg-lime-50' },
+  3: { colorBarra: 'bg-yellow-400',  colorTexto: 'text-yellow-700',  colorFondo: 'bg-yellow-50' },
+  2: { colorBarra: 'bg-orange-400',  colorTexto: 'text-orange-700',  colorFondo: 'bg-orange-50' },
+  1: { colorBarra: 'bg-rose-400',    colorTexto: 'text-rose-700',    colorFondo: 'bg-rose-50' },
+};
+
+function TermometroEmocional({ registros }: { registros: RegistroHistoricoRef[] }) {
+  if (registros.length === 0) {
+    return (
+      <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm text-center">
+        <span className="text-2xl">🌡️</span>
+        <p className="text-xs text-slate-400 mt-2">
+          Aún no tienes registros suficientes para armar tu termómetro emocional.
+        </p>
+      </div>
+    );
+  }
+
+  const conteoPorNivel: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let emojiPorNivel: Record<number, string> = {};
+  let estadoPorNivel: Record<number, string> = {};
+
+  registros.forEach((r) => {
+    if (conteoPorNivel[r.nivel] !== undefined) {
+      conteoPorNivel[r.nivel]++;
+      emojiPorNivel[r.nivel] = r.emoji;
+      estadoPorNivel[r.nivel] = r.estado;
+    }
+  });
+
+  const total = registros.length;
+  const niveles = [5, 4, 3, 2, 1];
+
+  return (
+    <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm space-y-4">
+      <div>
+        <h4 className="text-sm font-bold text-[#2A3B50]">🌡️ Tu termómetro emocional</h4>
+        <p className="text-[11px] text-slate-400 mt-0.5">
+          Distribución de cómo te has sentido en tus {total} {total === 1 ? 'registro' : 'registros'}
+        </p>
+      </div>
+
+      <div className="w-full h-3.5 rounded-full overflow-hidden flex shadow-inner bg-slate-100">
+        {niveles.map((nivel) => {
+          const porcentaje = (conteoPorNivel[nivel] / total) * 100;
+          if (porcentaje === 0) return null;
+          return (
+            <div
+              key={nivel}
+              className={`${CONFIG_NIVEL[nivel].colorBarra} h-full transition-all duration-500`}
+              style={{ width: `${porcentaje}%` }}
+              title={`${Math.round(porcentaje)}%`}
+            />
+          );
+        })}
+      </div>
+
+      <div className="space-y-1.5">
+        {niveles
+          .filter((nivel) => conteoPorNivel[nivel] > 0)
+          .map((nivel) => {
+            const porcentaje = Math.round((conteoPorNivel[nivel] / total) * 100);
+            const cfg = CONFIG_NIVEL[nivel];
+            return (
+              <div
+                key={nivel}
+                className={`flex items-center justify-between px-3 py-2 rounded-xl ${cfg.colorFondo}`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-lg">{emojiPorNivel[nivel]}</span>
+                  <span className={`text-xs font-bold ${cfg.colorTexto}`}>{estadoPorNivel[nivel]}</span>
+                </div>
+                <span className={`text-xs font-black ${cfg.colorTexto}`}>{porcentaje}%</span>
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface RegistroHistorico {
@@ -63,7 +154,6 @@ const opcionesEmociones = [
   { n: 5, e: '🤩', s: 'Muy bien' }
 ];
 
-// Tips organizados por nivel de ánimo (1-5)
 const TIPS_POR_NIVEL: Record<number, TipAntiestres[]> = {
   1: [
     { id: 101, categoria: 'Respiración', contenido: 'Respira lento: inhala 4 segundos, sostén 4, exhala 4. Repite 3 veces. Tu sistema nervioso se calmará.' },
@@ -324,7 +414,6 @@ export default function MonitoreoPage() {
 
   const estadoActual = registros.find(r => r.fecha === obtenerFechaLocal());
 
-  // ✅ NUEVO: navegación centralizada y consistente hacia Modo Crisis automático
   const irAModoCrisisAutomatico = (promedio: number) => {
     const params = new URLSearchParams({
       auto: 'true',
@@ -539,6 +628,9 @@ export default function MonitoreoPage() {
             {promedioAnimo !== null && promedioAnimo >= 2.5 && registros.length >= 3 && (
               <AnimoFeedback promedioAnimo={promedioAnimo} />
             )}
+
+            {/* NUEVO: Termómetro emocional con distribución de todos los registros */}
+            <TermometroEmocional registros={registros} />
 
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm space-y-4">
               <h4 className="text-sm font-bold text-[#2A3B50]">Balance de los últimos 7 días</h4>
