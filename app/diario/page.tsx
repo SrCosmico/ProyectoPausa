@@ -232,29 +232,7 @@ export default function DiarioPage() {
     if (imagenInputRef.current) imagenInputRef.current.value = '';
   };
 
-  // ── NUEVO: insertar imagen como base64 dentro del editor enriquecido ─────
-  const manejarInsertarImagen = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    if (file.size > 3 * 1024 * 1024) {
-      alert('La imagen no puede superar los 3 MB.');
-      if (imagenInputRef.current) imagenInputRef.current.value = '';
-      return;
-    }
-
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    editorRef.current?.focus();
-    document.execCommand('insertImage', false, base64);
-    if (editorRef.current) setContenido(editorRef.current.innerHTML);
-    if (imagenInputRef.current) imagenInputRef.current.value = '';
-  };
 
   // ── NUEVO: grabar audio y adjuntarlo a la nota como reproductor embebido ──
   const iniciarGrabacion = async () => {
