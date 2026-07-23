@@ -53,6 +53,14 @@ export default function DiarioPage() {
   // NUEVO: fuerza que el editor enriquecido se vacíe visualmente al abrir una nota nueva
   const [editorKey, setEditorKey] = useState(0);
 
+  // ── NUEVO: grabación de audio ─────────────────────────────────────────────
+  const [grabando, setGrabando] = useState(false);
+  const [tiempoGrabacion, setTiempoGrabacion] = useState(0);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const chunksAudioRef = React.useRef<Blob[]>([]);
+  const timerGrabacionRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const MAX_SEGUNDOS_AUDIO = 120;
+
   // ── Estado del patrón de bloqueo ─────────────────────────────────────────
   const [modoBloqueo, setModoBloqueo] = useState<ModoBloqueo>('cargando');
   const [patronHashGuardado, setPatronHashGuardado] = useState<string | null>(null);
@@ -222,6 +230,99 @@ export default function DiarioPage() {
     if (editorRef.current) setContenido(editorRef.current.innerHTML);
 
     if (imagenInputRef.current) imagenInputRef.current.value = '';
+  };
+
+  // ── NUEVO: insertar imagen como base64 dentro del editor enriquecido ─────
+  const manejarInsertarImagen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('La imagen no puede superar los 3 MB.');
+      if (imagenInputRef.current) imagenInputRef.current.value = '';
+      return;
+    }
+
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    editorRef.current?.focus();
+    document.execCommand('insertImage', false, base64);
+    if (editorRef.current) setContenido(editorRef.current.innerHTML);
+    if (imagenInputRef.current) imagenInputRef.current.value = '';
+  };
+
+  // ── NUEVO: grabar audio y adjuntarlo a la nota como reproductor embebido ──
+  const iniciarGrabacion = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksAudioRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksAudioRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (timerGrabacionRef.current) clearInterval(timerGrabacionRef.current);
+        setTiempoGrabacion(0);
+
+        const blob = new Blob(chunksAudioRef.current, { type: 'audio/webm' });
+
+        if (blob.size > 4 * 1024 * 1024) {
+          alert('El audio grabado es muy largo/pesado. Intenta con una nota más corta.');
+          return;
+        }
+
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        editorRef.current?.focus();
+        document.execCommand(
+          'insertHTML',
+          false,
+          `<audio controls src="${base64}" class="w-full my-2"></audio><br>`
+        );
+        if (editorRef.current) setContenido(editorRef.current.innerHTML);
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setGrabando(true);
+
+      let segundos = 0;
+      timerGrabacionRef.current = setInterval(() => {
+        segundos += 1;
+        setTiempoGrabacion(segundos);
+        if (segundos >= MAX_SEGUNDOS_AUDIO) {
+          detenerGrabacion();
+        }
+      }, 1000);
+
+    } catch (err) {
+      console.error('Error al acceder al micrófono:', err);
+      alert('No se pudo acceder al micrófono. Verifica los permisos del navegador.');
+    }
+  };
+
+  const detenerGrabacion = () => {
+    mediaRecorderRef.current?.stop();
+    setGrabando(false);
+  };
+
+  const formatearTiempoGrabacion = (segundos: number) => {
+    const m = Math.floor(segundos / 60);
+    const s = segundos % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
   // ── Guardar nota nueva en Supabase ───────────────────────────────────────
@@ -554,6 +655,20 @@ export default function DiarioPage() {
                   className="hidden"
                   onChange={manejarInsertarImagen}
                 />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => (grabando ? detenerGrabacion() : iniciarGrabacion())}
+                  className={`h-7 rounded-lg flex items-center justify-center transition-colors px-2 gap-1.5 ${
+                    grabando ? 'bg-rose-500 text-white' : 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+                  }`}
+                  title={grabando ? 'Detener grabación' : 'Grabar audio'}
+                >
+                  <span className={grabando ? 'animate-pulse' : ''}>🎙️</span>
+                  {grabando && (
+                    <span className="text-[10px] font-bold tabular-nums">{formatearTiempoGrabacion(tiempoGrabacion)}</span>
+                  )}
+                </button>
               </div>
 
               <div
