@@ -9,6 +9,7 @@ import {
   invitarPareja,
   aceptarInvitacionPareja,
   validarInvitacion,
+  cancelarInvitacion,
 } from "@/lib/supabase/racha";
 import type { EstadoRachaPareja } from "@/models/racha";
 
@@ -64,7 +65,6 @@ export default function RachaPage() {
     setMensajeExito(null);
     setEnviandoInvitacion(true);
 
-    // Validar sintaxis y reglas
     const resValidacion = await validarInvitacion(userEmail, correoInvitacion);
     if (!resValidacion.ok) {
       setEnviandoInvitacion(false);
@@ -72,7 +72,6 @@ export default function RachaPage() {
       return;
     }
 
-    // Enviar invitación
     const { error: err } = await invitarPareja(userId, correoInvitacion.trim().toLowerCase());
 
     setEnviandoInvitacion(false);
@@ -121,9 +120,9 @@ export default function RachaPage() {
     await cargarEstado(userId);
   };
 
+  // ✅ FIX: usa cancelarInvitacion del servicio y resetea estado local antes de recargar
   const manejarCancelar = async () => {
     if (!userId || !estado?.parejaId) {
-      console.log("Sin userId o parejaId", { userId, parejaId: estado?.parejaId });
       setError("No hay invitación para cancelar");
       return;
     }
@@ -132,34 +131,21 @@ export default function RachaPage() {
     setError(null);
     setMensajeExito(null);
 
-    const parejaId = estado.parejaId;
-    console.log("🔍 DEBUG - Intentando cancelar pareja con ID:", parejaId);
+    const { exito, error: errCancelar } = await cancelarInvitacion(estado.parejaId);
 
-    const { error } = await supabase
-      .from("parejas")
-      .delete()
-      .eq("id", parejaId)
-      .select();
-
-    console.log("🔍 DEBUG - Respuesta del delete:", { error });
-
-    if (error) {
-      console.error("❌ Error al cancelar:", error);
+    if (!exito) {
       setCancelando(false);
-      setError("No se pudo cancelar la invitación: " + error.message);
+      setError(errCancelar || "No se pudo cancelar la invitación.");
       return;
     }
 
-    console.log("✅ Pareja eliminada correctamente");
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
+    // Reset inmediato del estado local para que la UI se actualice de inmediato
+    setEstado(null);
     setMensajeExito("¡Invitación cancelada correctamente!");
     setCancelando(false);
 
-    console.log("🔍 DEBUG - Recargando estado del usuario:", userId);
+    // Recargar desde Supabase para confirmar el estado real
     await cargarEstado(userId);
-    console.log("🔍 DEBUG - Estado recargado:", estado);
   };
 
   const invitacionRecibida = !!(
@@ -189,38 +175,27 @@ export default function RachaPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex justify-center p-0 sm:p-4">
       <div className="w-full max-w-md bg-[#F8FAFC] min-h-screen sm:min-h-[850px] sm:max-h-[900px] shadow-2xl sm:rounded-[40px] border border-slate-100 flex flex-col overflow-y-auto">
-        
-        {/* Encabezado Principal */}
+
+        {/* Encabezado */}
         <header className="bg-white px-6 pt-6 pb-5 border-b border-slate-100 flex items-center gap-3.5 sticky top-0 z-10 backdrop-blur-md bg-white/90">
           <button
             onClick={() => router.push("/home")}
             className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 border border-slate-200/60 flex items-center justify-center transition-all flex-shrink-0 shadow-sm"
             aria-label="Volver"
           >
-            <svg
-              className="w-5 h-5 stroke-current"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="2.5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
+            <svg className="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-800 leading-tight">
-              🔥 Racha con amigos
-            </h1>
+            <h1 className="text-xl font-bold text-slate-800 leading-tight">🔥 Racha con amigos</h1>
             <p className="text-xs text-slate-400 font-medium">Fortaleciendo su bienestar juntos</p>
           </div>
         </header>
 
         <div className="p-6 space-y-6">
 
-          {/* Banner de Errores y Exito */}
+          {/* Banners */}
           {error && (
             <div className="p-3.5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-2xl flex items-center gap-2">
               <span>⚠️</span>
@@ -234,11 +209,11 @@ export default function RachaPage() {
             </div>
           )}
 
-          {/* SECCIÓN 1: 🔥 Racha Activa o Estado Inicial */}
+          {/* SECCIÓN 1: Racha Activa o Estado Inicial */}
           <section className="space-y-3">
             {estado?.tieneParejaActiva ? (
               <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[32px] p-6 text-white shadow-lg space-y-5">
-                
+
                 {estado.mensajeMotivador && (
                   <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl px-3.5 py-2 text-xs font-medium text-orange-50 inline-flex items-center gap-2">
                     <span>🌟</span> {estado.mensajeMotivador}
@@ -248,12 +223,7 @@ export default function RachaPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3.5">
                     <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-white/40 shadow-inner bg-orange-300">
-                      <Image
-                        src={AVATAR_DEFAULT}
-                        alt={estado.nombrePareja || "Amigo"}
-                        fill
-                        className="object-cover"
-                      />
+                      <Image src={AVATAR_DEFAULT} alt={estado.nombrePareja || "Amigo"} fill className="object-cover" />
                     </div>
                     <div>
                       <span className="text-xs text-orange-100 font-medium">Compartida con</span>
@@ -269,9 +239,7 @@ export default function RachaPage() {
                 </div>
 
                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
-                  <p className="text-[11px] font-semibold text-orange-100 mb-3 text-center">
-                    Últimos 7 días
-                  </p>
+                  <p className="text-[11px] font-semibold text-orange-100 mb-3 text-center">Últimos 7 días</p>
                   <div className="grid grid-cols-7 gap-1.5">
                     {estado.historialDias.map((dia) => {
                       const fechaObj = new Date(dia.fecha + "T12:00:00");
@@ -279,17 +247,12 @@ export default function RachaPage() {
                       return (
                         <div key={dia.fecha} className="flex flex-col items-center gap-1.5">
                           <span className="text-[10px] font-bold text-orange-100/70">{letraDia}</span>
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
-                              dia.antesDePareja
-                                ? "bg-white/10 opacity-30"
-                                : dia.completo
-                                ? "bg-white text-orange-600 font-bold"
-                                : dia.protegido
-                                ? "bg-blue-400/30 text-white"
-                                : "bg-black/10"
-                            }`}
-                          >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
+                            dia.antesDePareja ? "bg-white/10 opacity-30"
+                            : dia.completo ? "bg-white text-orange-600 font-bold"
+                            : dia.protegido ? "bg-blue-400/30 text-white"
+                            : "bg-black/10"
+                          }`}>
                             {dia.antesDePareja ? "—" : dia.completo ? "🔥" : dia.protegido ? "🛡️" : "·"}
                           </div>
                         </div>
@@ -302,13 +265,10 @@ export default function RachaPage() {
                   <span>🏆 Récord: <strong className="text-white">{estado.rachaMaxima} días</strong></span>
                   <span>🛡️ Protectores: <strong className="text-white">{estado.protectoresDisponibles}/4</strong></span>
                 </div>
-
               </div>
             ) : (
               <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
-                <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-xl mx-auto text-orange-500">
-                  🔥
-                </div>
+                <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-xl mx-auto text-orange-500">🔥</div>
                 <h3 className="text-sm font-bold text-slate-800">Aún no tienes una racha activa</h3>
                 <p className="text-xs text-slate-400 max-w-[240px] mx-auto">
                   La racha siempre se construye con un amigo. ¡Invítalo para empezar juntos!
@@ -317,29 +277,21 @@ export default function RachaPage() {
             )}
           </section>
 
-          {/* SECCIÓN 2: 👥 Mis Amigos */}
+          {/* SECCIÓN 2: Mis Amigos */}
           <section className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-              👥 Mis amigos
-            </h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">👥 Mis amigos</h2>
 
             {estado?.tieneParejaActiva ? (
               <div className="bg-white rounded-[28px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
                   <div className="relative w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100">
-                    <Image
-                      src={AVATAR_DEFAULT}
-                      alt="Avatar por defecto"
-                      fill
-                      className="object-cover"
-                    />
+                    <Image src={AVATAR_DEFAULT} alt="Avatar" fill className="object-cover" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">{estado.nombrePareja}</h3>
                     <span className="text-xs text-slate-400">🔥 {estado.rachaActual} días de racha</span>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[11px] font-bold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   🟢 Activo
@@ -354,16 +306,13 @@ export default function RachaPage() {
             )}
           </section>
 
-          {/* SECCIÓN 3: 📩 Invitaciones */}
+          {/* SECCIÓN 3: Invitaciones */}
           <section className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-              📩 Invitaciones
-            </h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">📩 Invitaciones</h2>
 
-            {/* Invitaciones Recibidas */}
+            {/* Recibidas */}
             <div className="space-y-2">
               <span className="text-[11px] font-semibold text-slate-400 px-1">Recibidas</span>
-
               {invitacionRecibida ? (
                 <div className="bg-white rounded-[28px] p-4 border border-orange-100 shadow-sm space-y-3">
                   <div className="flex items-center gap-3">
@@ -400,25 +349,20 @@ export default function RachaPage() {
               )}
             </div>
 
-            {/* Invitaciones Pendientes (Enviadas) */}
+            {/* Pendientes enviadas */}
             <div className="space-y-2">
               <span className="text-[11px] font-semibold text-slate-400 px-1">Invitaciones pendientes</span>
-
               {invitacionPendienteEnviada ? (
                 <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 text-sm font-bold flex-shrink-0">
-                      ⏳
-                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 text-sm font-bold flex-shrink-0">⏳</div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-slate-700 truncate">{estado.correoInvitado}</p>
                       <span className="text-[10px] text-slate-400 block">Pendiente de aceptación</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
-                      Pendiente
-                    </span>
+                    <span className="text-[10px] bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full">Pendiente</span>
                     <button
                       onClick={manejarCancelar}
                       disabled={cancelando}
@@ -437,19 +381,16 @@ export default function RachaPage() {
             </div>
           </section>
 
-          {/* SECCIÓN 4: ➕ Invitar Amigo */}
+          {/* SECCIÓN 4: Invitar Amigo */}
           <section className="pt-2">
             <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-500 text-lg">
-                  ➕
-                </div>
+                <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-500 text-lg">➕</div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">Invitar amigo</h3>
                   <p className="text-xs text-slate-400">Escribe su correo para iniciar su racha juntos</p>
                 </div>
               </div>
-
               <div className="space-y-3">
                 <input
                   type="email"
@@ -460,8 +401,8 @@ export default function RachaPage() {
                 />
                 <button
                   onClick={manejarInvitar}
-                  disabled={enviandoInvitacion || !correoInvitacion.trim() || estado?.tieneParejaActiva}
-                  className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-white rounded-2xl font-bold text-xs transition-all shadow-md shadow-orange-500/10 disabled:shadow-none"
+                  disabled={enviandoInvitacion || !correoInvitacion.trim() || !!estado?.tieneParejaActiva}
+                  className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-white rounded-2xl font-bold text-xs transition-all shadow-md shadow-orange-500/10 disabled:shadow-none disabled:text-slate-400"
                 >
                   {enviandoInvitacion ? "Enviando..." : "Enviar invitación"}
                 </button>
