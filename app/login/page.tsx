@@ -92,7 +92,7 @@ export default function LoginView() {
 
           {/* LOGO */}
           <div className="flex justify-center mb-6">
-            <div className="w-32 h-32 rounded-[32px] bg-white shadow-md border border-slate-100 flex items-center justify-center p-2">
+            <div className="w-60 h-60 rounded-[32px] bg-white shadow-md border border-slate-100 flex items-center justify-center p-2">
               <img
                 src="/images/logo.png"
                 alt="Pausa"
