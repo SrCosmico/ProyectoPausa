@@ -86,37 +86,38 @@ export default function RachaPage() {
     await cargarEstado(userId);
   };
 
-  const manejarAceptar = async (id?: string) => {
-    if (!userId) return;
-    if (id) setAceptandoId(id);
+  const manejarAceptar = async () => {
+    if (!userId || !estado?.parejaId) return;
+    setAceptandoId(estado.parejaId);
     setError(null);
 
-    const { error: err } = await aceptarInvitacionPareja();
+    const { error: err } = await aceptarInvitacionPareja(estado.parejaId);
 
     setAceptandoId(null);
     if (err) {
-      setError("No encontramos ninguna invitación pendiente para tu correo.");
+      setError("No se pudo aceptar la invitación. Intenta de nuevo.");
       return;
     }
     setMensajeExito("¡Invitación aceptada! La racha con tu amigo está activa.");
     await cargarEstado(userId);
   };
 
-  const manejarRechazar = async (id: string) => {
-    if (!userId) return;
-    setRechazandoId(id);
+  const manejarRechazar = async () => {
+    if (!userId || !estado?.parejaId) return;
+    setRechazandoId(estado.parejaId);
     setError(null);
 
     const { error: err } = await supabase
-      .from("parejas")
+      .from('parejas')
       .delete()
-      .eq("id", id);
+      .eq('id', estado.parejaId);
 
     setRechazandoId(null);
     if (err) {
       setError("Ocurrió un problema al rechazar la invitación.");
       return;
     }
+    setEstado(null);
     await cargarEstado(userId);
   };
 
@@ -331,11 +332,11 @@ export default function RachaPage() {
                       {aceptandoId ? "Aceptando..." : "Aceptar"}
                     </button>
                     <button
-                      onClick={() => manejarRechazar("id_pendiente")}
+                      onClick={() => manejarRechazar()}
                       disabled={!!rechazandoId}
                       className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-colors disabled:opacity-50"
                     >
-                      Rechazar
+                      {rechazandoId ? "..." : "Rechazar"}
                     </button>
                   </div>
                 </div>

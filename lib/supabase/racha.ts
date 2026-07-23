@@ -79,13 +79,17 @@ export async function invitarPareja(
 
 // ─── Aceptar invitación ───────────────────────────────────────────────────────
 
-export async function aceptarInvitacionPareja(): Promise<{ error: string | null }> {
+export async function aceptarInvitacionPareja(parejaId: string): Promise<{ error: string | null }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'No autenticado.' };
 
   const { error } = await supabase
     .from('parejas')
-    .update({ estado: 'activa', fecha_inicio: new Date().toISOString() })
+    .update({ 
+      estado: 'activa', 
+      fecha_inicio: new Date().toISOString() 
+    })
+    .eq('id', parejaId)
     .eq('user_id_2', user.id)
     .eq('estado', 'pendiente');
 
@@ -230,7 +234,7 @@ export async function calcularEstadoRachaPareja(
     rachaMaxima,
     protectoresDisponibles: protectores?.length ?? 0,
     protectoresUsadosEsteMes: 0,
-    activadaHoy: fechaInicioPareja === new Date().toISOString().split('T')[0],
+    activadaHoy: false,
     historialDias,
     mensajeMotivador,
   };
