@@ -1,445 +1,224 @@
 import { createClient } from '@/lib/supabase/client';
-import {
-  MAX_PROTECTORES_MES,
-  obtenerFechaLocalISO,
-  obtenerMesActual,
-  obtenerMensajeMotivadorAleatorio,
-  type Pareja,
-  type CheckinDia,
-  type EstadoRachaPareja,
-} from '@/models/racha';
+import type { EstadoRachaPareja, DiaRacha } from '@/models/racha';
 
-const getSupabase = () => createClient();
+const supabase = createClient();
 
-const VENTANA_HISTORIAL_MAX_DIAS = 90;
-const DIAS_MOSTRADOS_UI = 7;
+// ─── Validar invitación ───────────────────────────────────────────────────────
+// ✅ Usa la función SQL buscar_usuario_por_email para buscar en auth.users
 
-// ============================================================
-// C — Vincular pareja
-// ============================================================
-
-// Regex estándar para validación básica de sintaxis
-export const esEmailValido = (email: string): boolean => {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-};
-
-/**
- * Valida la existencia del usuario y las restricciones de invitación antes de proceder.
- */
 export async function validarInvitacion(
   correoEmisor: string,
-  correoDestino: string
-): Promise<{ ok: boolean; mensaje?: string; usuarioDestinoId?: string }> {
-  // 1. Validar sintaxis
-  if (!esEmailValido(correoDestino)) {
-    return { ok: false, mensaje: 'El formato del correo electrónico no es válido.' };
+  correoInvitado: string
+): Promise<{ ok: boolean; mensaje?: string }> {
+
+  if (!correoInvitado?.trim()) {
+    return { ok: false, mensaje: 'Ingresa un correo válido.' };
   }
 
-  // 2. Prevenir auto-invitación
-  if (correoEmisor.toLowerCase() === correoDestino.trim().toLowerCase()) {
-    return { ok: false, mensaje: 'No puedes enviarte una invitación a ti mismo.' };
+  const correoNormalizado = correoInvitado.trim().toLowerCase();
+
+  if (correoNormalizado === correoEmisor.toLowerCase()) {
+    return { ok: false, mensaje: 'No puedes invitarte a ti mismo.' };
   }
 
-  const supabase = getSupabase();
+  // ✅ Buscar en auth.users usando la función SECURITY DEFINER
+  const { data: usuarioId, error: errBusqueda } = await supabase
+    .rpc('buscar_usuario_por_email', { correo: correoNormalizado });
 
-  // 3. Verificar si el usuario destino existe en la BD de Pausa
-  const { data: usuarioDestino, error: errUser } = await supabase
-    .from('perfiles')
-    .select('id, email')
-    .eq('email', correoDestino.trim().toLowerCase())
-    .maybeSingle();
-
-  if (errUser || !usuarioDestino) {
-    return { ok: false, mensaje: 'No encontramos ningún usuario registrado con ese correo en Pausa.' };
-  }
-
-  // 4. Verificar si ya existe una invitación previa o una relación activa (por ID o correo)
-  const { data: relacionExistente } = await supabase
-    .from('parejas')
-    .select('id, estado')
-    .or(
-      `user_id_1.eq.${usuarioDestino.id},user_id_2.eq.${usuarioDestino.id},correo_invitado.eq.${correoDestino.trim().toLowerCase()}`
-    )
-    .maybeSingle();
-
-  if (relacionExistente) {
-    if (relacionExistente.estado === 'activa') {
-      return { ok: false, mensaje: 'Este usuario ya tiene una racha activa.' };
-    }
-    if (relacionExistente.estado === 'pendiente') {
-      return { ok: false, mensaje: 'Ya existe una invitación pendiente asociada a este usuario.' };
-    }
-  }
-
-  return { ok: true, usuarioDestinoId: usuarioDestino.id };
-}
-
-export async function invitarPareja(userId: string, correoPareja: string) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('parejas')
-    .insert([{ user_id_1: userId, correo_invitado: correoPareja.trim().toLowerCase() }])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error al invitar pareja:', error.message);
-    return { data: null, error };
-  }
-  return { data: data as Pareja, error: null };
-}
-
-export async function aceptarInvitacionPareja() {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.rpc('aceptar_invitacion_pareja');
-
-  if (error) {
-    console.error('Error al aceptar invitación de pareja:', error.message);
-    return { data: null, error: error.message };
-  }
-  return { data: data as Pareja, error: null };
-}
-
-export async function cancelarInvitacion(parejaId: string) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('parejas')
-    .delete()
-    .eq('id', parejaId)
-    .select();
-
-  if (error) {
-    console.error('Error al cancelar invitación:', error.message);
-    return { exito: false, error: error.message };
-  }
-
-  if (!data || data.length === 0) {
-    return { exito: false, error: 'No se pudo eliminar el registro (verifica permisos RLS).' };
-  }
-
-  return { exito: true, error: null };
-}
-
-// ============================================================
-// R — Lecturas base
-// ============================================================
-
-export async function leerParejaDelUsuario(userId: string): Promise<Pareja | null> {
-  const supabase = getSupabase();
-
-  // Obtener correo del usuario autenticado para buscar invitaciones recibidas
-  const { data: authUser } = await supabase.auth.getUser();
-  const emailActual = authUser?.user?.email?.toLowerCase();
-
-  let query = supabase.from('parejas').select('*');
-
-  if (emailActual) {
-    query = query.or(`user_id_1.eq.${userId},user_id_2.eq.${userId},correo_invitado.eq.${emailActual}`);
-  } else {
-    query = query.or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
-  }
-
-  const { data, error } = await query
-    .order('creado_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error al leer pareja del usuario:', error.message);
-    return null;
-  }
-
-  console.log('🔍 DEBUG racha.ts - leerParejaDelUsuario retorna:', data);
-  return data as Pareja | null;
-}
-
-function idParejaContraria(pareja: Pareja, miUserId: string): string | null {
-  if (pareja.user_id_1 === miUserId) return pareja.user_id_2;
-  if (pareja.user_id_2 === miUserId) return pareja.user_id_1;
-  return null;
-}
-
-export async function leerNombrePareja(parejaUserId: string): Promise<string> {
-  const supabase = getSupabase();
-  const { data } = await supabase
-    .from('perfiles')
-    .select('nombre')
-    .eq('id', parejaUserId)
-    .maybeSingle();
-  return data?.nombre || 'Tu pareja';
-}
-
-async function leerCheckinsRango(
-  userId: string,
-  parejaUserId: string,
-  fechaDesde: string,
-  fechaHasta: string
-): Promise<Record<string, { u1: boolean; u2: boolean }>> {
-  const supabase = getSupabase();
-  const mapa: Record<string, { u1: boolean; u2: boolean }> = {};
-
-  if (fechaDesde > fechaHasta) return mapa;
-
-  const { data, error } = await supabase
-    .from('historial_emociones')
-    .select('user_id, dia')
-    .in('user_id', [userId, parejaUserId])
-    .gte('dia', fechaDesde)
-    .lte('dia', fechaHasta);
-
-  if (error) {
-    console.error('Error al leer checkins de la pareja:', error.message);
-    return mapa;
-  }
-
-  (data ?? []).forEach((fila: { user_id: string; dia: string }) => {
-    if (!mapa[fila.dia]) mapa[fila.dia] = { u1: false, u2: false };
-    if (fila.user_id === userId) mapa[fila.dia].u1 = true;
-    if (fila.user_id === parejaUserId) mapa[fila.dia].u2 = true;
-  });
-
-  return mapa;
-}
-
-async function leerFechasProtegidas(parejaId: string): Promise<Set<string>> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('protectores_racha')
-    .select('fecha')
-    .eq('pareja_id', parejaId);
-
-  if (error) {
-    console.error('Error al leer protectores usados:', error.message);
-    return new Set();
-  }
-  return new Set((data ?? []).map((f: { fecha: string }) => f.fecha));
-}
-
-async function contarProtectoresDelMes(parejaId: string, mes: string): Promise<number> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('protectores_racha')
-    .select('fecha')
-    .eq('pareja_id', parejaId)
-    .gte('fecha', `${mes}-01`)
-    .lte('fecha', `${mes}-31`);
-
-  if (error) {
-    console.error('Error al contar protectores del mes:', error.message);
-    return 0;
-  }
-  return (data ?? []).length;
-}
-
-async function leerRachaMaximaGuardada(parejaId: string): Promise<number> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('rachas_parejas')
-    .select('racha_maxima')
-    .eq('pareja_id', parejaId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error al leer racha máxima:', error.message);
-    return 0;
-  }
-  return data?.racha_maxima ?? 0;
-}
-
-async function actualizarRachaMaximaSiCorresponde(parejaId: string, rachaActual: number) {
-  const supabase = getSupabase();
-  const actual = await leerRachaMaximaGuardada(parejaId);
-  if (rachaActual <= actual) return;
-
-  const { error } = await supabase
-    .from('rachas_parejas')
-    .upsert(
-      { pareja_id: parejaId, racha_maxima: rachaActual, actualizado_at: new Date().toISOString() },
-      { onConflict: 'pareja_id' }
-    );
-
-  if (error) console.error('Error al actualizar racha máxima:', error.message);
-}
-
-async function usarProtectorRacha(
-  parejaId: string,
-  fecha: string,
-  userId: string
-): Promise<{ exito: boolean }> {
-  const supabase = getSupabase();
-  const { error } = await supabase
-    .from('protectores_racha')
-    .insert([{ pareja_id: parejaId, fecha, usado_por: userId }]);
-
-  if (error && !error.message.toLowerCase().includes('duplicate')) {
-    console.error('Error al usar protector de racha:', error.message);
-    return { exito: false };
-  }
-  return { exito: true };
-}
-
-// ============================================================
-// Cálculo principal: estado completo de la racha en pareja
-// ============================================================
-
-export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoRachaPareja> {
-  const vacio: EstadoRachaPareja = {
-    parejaId: null,
-    tieneParejaActiva: false,
-    esperandoAceptacion: false,
-    correoInvitado: null,
-    nombrePareja: null,
-    rachaActual: 0,
-    rachaMaxima: 0,
-    protectoresDisponibles: MAX_PROTECTORES_MES,
-    protectoresUsadosEsteMes: 0,
-    activadaHoy: false,
-    historialDias: [],
-    mensajeMotivador: null,
-  };
-
-  const pareja = await leerParejaDelUsuario(userId);
-  
-  // Si no existe pareja, retornar estado vacío
-  if (!pareja) {
-    console.log('🔍 DEBUG - No hay pareja, retornando estado vacío');
-    return vacio;
-  }
-
-  // Validar que la pareja aún existe en BD (por si fue eliminada)
-  const supabase = getSupabase();
-  const { data: parejaActual } = await supabase
-    .from('parejas')
-    .select('*')
-    .eq('id', pareja.id)
-    .maybeSingle();
-
-  console.log('🔍 DEBUG - parejaActual después de verificar en BD:', parejaActual);
-
-  // Si la pareja fue eliminada, retornar estado vacío
-  if (!parejaActual) {
-    console.log('🔍 DEBUG - La pareja fue eliminada, retornando estado vacío');
-    return vacio;
-  }
-
-  // Evaluar si la invitación está pendiente
-  if (parejaActual.estado !== 'activa' || !parejaActual.user_id_2) {
+  if (errBusqueda || !usuarioId) {
     return {
-      ...vacio,
-      parejaId: parejaActual.id,
-      esperandoAceptacion: true,
-      correoInvitado: parejaActual.correo_invitado,
+      ok: false,
+      mensaje: 'No encontramos ningún usuario registrado con ese correo en Pausa.',
     };
   }
 
-  const parejaUserId = idParejaContraria(parejaActual, userId);
-  if (!parejaUserId) return { ...vacio, parejaId: parejaActual.id };
+  // Verificar que no tenga ya una pareja activa o invitación pendiente
+  const { data: parejaExistente } = await supabase
+    .from('parejas')
+    .select('id, estado')
+    .or(
+      `user_id_1.eq.${usuarioId},user_id_2.eq.${usuarioId}`
+    )
+    .in('estado', ['activa', 'pendiente'])
+    .maybeSingle();
 
-  const nombrePareja = await leerNombrePareja(parejaUserId);
-
-  // ── LÍMITE CLAVE: la racha nunca puede empezar antes de que la pareja exista ──
-  const fechaCreacionPareja = new Date(parejaActual.creado_at);
-  const parejaFechaISO = obtenerFechaLocalISO(fechaCreacionPareja);
-
-  const hoy = new Date();
-  const hoyISO = obtenerFechaLocalISO(hoy);
-
-  const limiteVentana = new Date(hoy);
-  limiteVentana.setDate(limiteVentana.getDate() - VENTANA_HISTORIAL_MAX_DIAS);
-  const limiteVentanaISO = obtenerFechaLocalISO(limiteVentana);
-
-  // La fecha desde la que consultamos nunca es anterior a la creación de la pareja
-  const desdeISO = parejaFechaISO > limiteVentanaISO ? parejaFechaISO : limiteVentanaISO;
-
-  const checkins = await leerCheckinsRango(userId, parejaUserId, desdeISO, hoyISO);
-  const fechasProtegidas = await leerFechasProtegidas(parejaActual.id);
-  const rachaMaximaGuardada = await leerRachaMaximaGuardada(parejaActual.id);
-
-  const hoyCompleto = Boolean(checkins[hoyISO]?.u1 && checkins[hoyISO]?.u2);
-
-  const cursor = new Date(hoy);
-  if (!hoyCompleto) cursor.setDate(cursor.getDate() - 1);
-
-  let rachaActual = 0;
-  let mesEnCurso = obtenerMesActual(cursor);
-  let protectoresRestantesMes =
-    MAX_PROTECTORES_MES - (await contarProtectoresDelMes(parejaActual.id, mesEnCurso));
-
-  while (true) {
-    const fechaCursorISO = obtenerFechaLocalISO(cursor);
-
-    // Nunca contar (ni consumir protectores) en días anteriores a la pareja
-    if (fechaCursorISO < parejaFechaISO) break;
-
-    const mesCursor = obtenerMesActual(cursor);
-    if (mesCursor !== mesEnCurso) {
-      mesEnCurso = mesCursor;
-      protectoresRestantesMes =
-        MAX_PROTECTORES_MES - (await contarProtectoresDelMes(parejaActual.id, mesEnCurso));
-    }
-
-    const dia = checkins[fechaCursorISO];
-    const completo = Boolean(dia?.u1 && dia?.u2);
-    let protegido = fechasProtegidas.has(fechaCursorISO);
-
-    if (!completo && !protegido && protectoresRestantesMes > 0) {
-      const { exito } = await usarProtectorRacha(parejaActual.id, fechaCursorISO, userId);
-      if (exito) {
-        protegido = true;
-        protectoresRestantesMes -= 1;
-        fechasProtegidas.add(fechaCursorISO);
-      }
-    }
-
-    if (completo || protegido) {
-      rachaActual += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    } else {
-      break;
-    }
+  if (parejaExistente) {
+    return {
+      ok: false,
+      mensaje: 'Ese usuario ya tiene una racha activa o una invitación pendiente.',
+    };
   }
 
-  const rachaMaxima = Math.max(rachaMaximaGuardada, rachaActual);
-  if (rachaActual > rachaMaximaGuardada) {
-    await actualizarRachaMaximaSiCorresponde(parejaActual.id, rachaActual);
+  return { ok: true };
+}
+
+// ─── Invitar pareja ───────────────────────────────────────────────────────────
+
+export async function invitarPareja(
+  userIdEmisor: string,
+  correoInvitado: string
+): Promise<{ error: string | null }> {
+  // Obtener el user_id del invitado usando la función SQL
+  const { data: userIdInvitado, error: errBusqueda } = await supabase
+    .rpc('buscar_usuario_por_email', { correo: correoInvitado.toLowerCase() });
+
+  if (errBusqueda || !userIdInvitado) {
+    return { error: 'No se encontró el usuario.' };
   }
 
-  const protectoresUsadosEsteMes = await contarProtectoresDelMes(
-    parejaActual.id,
-    obtenerMesActual(hoy)
-  );
+  const { error } = await supabase.from('parejas').insert({
+    user_id_1: userIdEmisor,
+    user_id_2: userIdInvitado,
+    estado: 'pendiente',
+    correo_invitado: correoInvitado.toLowerCase(),
+  });
 
-  const historialDias: CheckinDia[] = [];
-  for (let i = DIAS_MOSTRADOS_UI - 1; i >= 0; i--) {
-    const d = new Date(hoy);
+  return { error: error?.message ?? null };
+}
+
+// ─── Aceptar invitación ───────────────────────────────────────────────────────
+
+export async function aceptarInvitacionPareja(): Promise<{ error: string | null }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'No autenticado.' };
+
+  const { error } = await supabase
+    .from('parejas')
+    .update({ estado: 'activa', fecha_inicio: new Date().toISOString() })
+    .eq('user_id_2', user.id)
+    .eq('estado', 'pendiente');
+
+  return { error: error?.message ?? null };
+}
+
+// ─── Cancelar invitación ──────────────────────────────────────────────────────
+
+export async function cancelarInvitacion(
+  parejaId: string
+): Promise<{ exito: boolean; error?: string }> {
+  const { error } = await supabase
+    .from('parejas')
+    .delete()
+    .eq('id', parejaId);
+
+  if (error) return { exito: false, error: error.message };
+  return { exito: true };
+}
+
+// ─── Calcular estado de racha ─────────────────────────────────────────────────
+
+export async function calcularEstadoRachaPareja(
+  userId: string
+): Promise<EstadoRachaPareja> {
+
+  const estadoVacio: EstadoRachaPareja = {
+    tieneParejaActiva: false,
+    esperandoAceptacion: false,
+    rachaActual: 0,
+    rachaMaxima: 0,
+    protectoresDisponibles: 0,
+    historialDias: [],
+    mensajeMotivador: '',
+  };
+
+  // Buscar pareja activa o pendiente
+  const { data: pareja, error: errPareja } = await supabase
+    .from('parejas')
+    .select('*')
+    .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
+    .in('estado', ['activa', 'pendiente'])
+    .maybeSingle();
+
+  if (errPareja || !pareja) return estadoVacio;
+
+  // Pareja pendiente
+  if (pareja.estado === 'pendiente') {
+    return {
+      ...estadoVacio,
+      esperandoAceptacion: true,
+      parejaId: pareja.id,
+      correoInvitado: pareja.correo_invitado,
+    };
+  }
+
+  // Obtener ID y nombre del otro usuario
+  const otroUserId = pareja.user_id_1 === userId ? pareja.user_id_2 : pareja.user_id_1;
+
+  const { data: perfilPareja } = await supabase
+    .from('perfiles')
+    .select('nombre')
+    .eq('id', otroUserId)
+    .maybeSingle();
+
+  // Obtener racha activa
+  const { data: rachaData } = await supabase
+    .from('rachas_parejas')
+    .select('*')
+    .eq('pareja_id', pareja.id)
+    .maybeSingle();
+
+  // Obtener historial de los últimos 7 días
+  const hace7Dias = new Date();
+  hace7Dias.setDate(hace7Dias.getDate() - 6);
+  const fechaInicio = hace7Dias.toISOString().split('T')[0];
+
+  const { data: historial } = await supabase
+    .from('historial_emociones')
+    .select('dia')
+    .in('user_id', [userId, otroUserId])
+    .gte('dia', fechaInicio)
+    .order('dia', { ascending: true });
+
+  // Construir historial de 7 días
+  const historialDias: DiaRacha[] = [];
+  const fechaInicioPareja = pareja.fecha_inicio
+    ? new Date(pareja.fecha_inicio).toISOString().split('T')[0]
+    : null;
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
     d.setDate(d.getDate() - i);
-    const fechaISO = obtenerFechaLocalISO(d);
-    const dia = checkins[fechaISO];
-    const yoRegistre = Boolean(dia?.u1);
-    const parejaRegistro = Boolean(dia?.u2);
+    const fechaStr = d.toISOString().split('T')[0];
+
+    const antesDePareja = fechaInicioPareja ? fechaStr < fechaInicioPareja : false;
+    const registrosDelDia = historial?.filter(h => h.dia === fechaStr) ?? [];
+    const ambosRegistraron = registrosDelDia.length >= 2;
 
     historialDias.push({
-      fecha: fechaISO,
-      yoRegistre,
-      parejaRegistro,
-      completo: yoRegistre && parejaRegistro,
-      protegido: fechasProtegidas.has(fechaISO),
-      antesDePareja: fechaISO < parejaFechaISO,
+      fecha: fechaStr,
+      completo: ambosRegistraron,
+      protegido: false,
+      antesDePareja,
     });
   }
 
+  // Protectores disponibles
+  const { data: protectores } = await supabase
+    .from('protectores_racha')
+    .select('id')
+    .eq('pareja_id', pareja.id)
+    .eq('usado', false);
+
+  const rachaActual = rachaData?.racha_actual ?? 0;
+  const rachaMaxima = rachaData?.racha_maxima ?? 0;
+
+  // Mensaje motivador
+  let mensajeMotivador = '';
+  if (rachaActual >= 30) mensajeMotivador = '¡Un mes juntos! Son increíbles 🏆';
+  else if (rachaActual >= 7) mensajeMotivador = '¡Una semana completa! Sigan así 🌟';
+  else if (rachaActual >= 3) mensajeMotivador = '¡Van por buen camino! 💪';
+  else if (rachaActual >= 1) mensajeMotivador = '¡Buen comienzo! Cada día cuenta 🔥';
+
   return {
-    parejaId: parejaActual.id,
     tieneParejaActiva: true,
     esperandoAceptacion: false,
-    correoInvitado: parejaActual.correo_invitado,
-    nombrePareja,
+    parejaId: pareja.id,
+    nombrePareja: perfilPareja?.nombre ?? 'Tu amigo',
+    correoInvitado: pareja.correo_invitado,
     rachaActual,
     rachaMaxima,
-    protectoresDisponibles: Math.max(0, MAX_PROTECTORES_MES - protectoresUsadosEsteMes),
-    protectoresUsadosEsteMes,
-    activadaHoy: hoyCompleto,
+    protectoresDisponibles: protectores?.length ?? 0,
     historialDias,
-    mensajeMotivador: hoyCompleto ? obtenerMensajeMotivadorAleatorio() : null,
+    mensajeMotivador,
   };
 }
