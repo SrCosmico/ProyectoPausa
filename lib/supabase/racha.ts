@@ -53,11 +53,13 @@ export async function validarInvitacion(
     return { ok: false, mensaje: 'No encontramos ningún usuario registrado con ese correo en Pausa.' };
   }
 
-  // 4. Verificar si ya existe una invitación previa o una relación activa
+  // 4. Verificar si ya existe una invitación previa o una relación activa (por ID o correo)
   const { data: relacionExistente } = await supabase
     .from('parejas')
     .select('id, estado')
-    .or(`user_id_1.eq.${usuarioDestino.id},user_id_2.eq.${usuarioDestino.id}`)
+    .or(
+      `user_id_1.eq.${usuarioDestino.id},user_id_2.eq.${usuarioDestino.id},correo_invitado.eq.${correoDestino.trim().toLowerCase()}`
+    )
     .maybeSingle();
 
   if (relacionExistente) {
@@ -98,16 +100,46 @@ export async function aceptarInvitacionPareja() {
   return { data: data as Pareja, error: null };
 }
 
+export async function cancelarInvitacion(parejaId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('parejas')
+    .delete()
+    .eq('id', parejaId)
+    .select();
+
+  if (error) {
+    console.error('Error al cancelar invitación:', error.message);
+    return { exito: false, error: error.message };
+  }
+
+  if (!data || data.length === 0) {
+    return { exito: false, error: 'No se pudo eliminar el registro (verifica permisos RLS).' };
+  }
+
+  return { exito: true, error: null };
+}
+
 // ============================================================
 // R — Lecturas base
 // ============================================================
 
 export async function leerParejaDelUsuario(userId: string): Promise<Pareja | null> {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('parejas')
-    .select('*')
-    .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
+
+  // Obtener correo del usuario autenticado para buscar invitaciones recibidas
+  const { data: authUser } = await supabase.auth.getUser();
+  const emailActual = authUser?.user?.email?.toLowerCase();
+
+  let query = supabase.from('parejas').select('*');
+
+  if (emailActual) {
+    query = query.or(`user_id_1.eq.${userId},user_id_2.eq.${userId},correo_invitado.eq.${emailActual}`);
+  } else {
+    query = query.or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+  }
+
+  const { data, error } = await query
     .order('creado_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -116,6 +148,8 @@ export async function leerParejaDelUsuario(userId: string): Promise<Pareja | nul
     console.error('Error al leer pareja del usuario:', error.message);
     return null;
   }
+
+  console.log('🔍 DEBUG racha.ts - leerParejaDelUsuario retorna:', data);
   return data as Pareja | null;
 }
 
@@ -265,24 +299,46 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   };
 
   const pareja = await leerParejaDelUsuario(userId);
-  if (!pareja) return vacio;
+  
+  // Si no existe pareja, retornar estado vacío
+  if (!pareja) {
+    console.log('🔍 DEBUG - No hay pareja, retornando estado vacío');
+    return vacio;
+  }
 
-  if (pareja.estado !== 'activa' || !pareja.user_id_2) {
+  // Validar que la pareja aún existe en BD (por si fue eliminada)
+  const supabase = getSupabase();
+  const { data: parejaActual } = await supabase
+    .from('parejas')
+    .select('*')
+    .eq('id', pareja.id)
+    .maybeSingle();
+
+  console.log('🔍 DEBUG - parejaActual después de verificar en BD:', parejaActual);
+
+  // Si la pareja fue eliminada, retornar estado vacío
+  if (!parejaActual) {
+    console.log('🔍 DEBUG - La pareja fue eliminada, retornando estado vacío');
+    return vacio;
+  }
+
+  // Evaluar si la invitación está pendiente
+  if (parejaActual.estado !== 'activa' || !parejaActual.user_id_2) {
     return {
       ...vacio,
-      parejaId: pareja.id,
+      parejaId: parejaActual.id,
       esperandoAceptacion: true,
-      correoInvitado: pareja.correo_invitado,
+      correoInvitado: parejaActual.correo_invitado,
     };
   }
 
-  const parejaUserId = idParejaContraria(pareja, userId);
-  if (!parejaUserId) return { ...vacio, parejaId: pareja.id };
+  const parejaUserId = idParejaContraria(parejaActual, userId);
+  if (!parejaUserId) return { ...vacio, parejaId: parejaActual.id };
 
   const nombrePareja = await leerNombrePareja(parejaUserId);
 
   // ── LÍMITE CLAVE: la racha nunca puede empezar antes de que la pareja exista ──
-  const fechaCreacionPareja = new Date(pareja.creado_at);
+  const fechaCreacionPareja = new Date(parejaActual.creado_at);
   const parejaFechaISO = obtenerFechaLocalISO(fechaCreacionPareja);
 
   const hoy = new Date();
@@ -296,8 +352,8 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   const desdeISO = parejaFechaISO > limiteVentanaISO ? parejaFechaISO : limiteVentanaISO;
 
   const checkins = await leerCheckinsRango(userId, parejaUserId, desdeISO, hoyISO);
-  const fechasProtegidas = await leerFechasProtegidas(pareja.id);
-  const rachaMaximaGuardada = await leerRachaMaximaGuardada(pareja.id);
+  const fechasProtegidas = await leerFechasProtegidas(parejaActual.id);
+  const rachaMaximaGuardada = await leerRachaMaximaGuardada(parejaActual.id);
 
   const hoyCompleto = Boolean(checkins[hoyISO]?.u1 && checkins[hoyISO]?.u2);
 
@@ -307,7 +363,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   let rachaActual = 0;
   let mesEnCurso = obtenerMesActual(cursor);
   let protectoresRestantesMes =
-    MAX_PROTECTORES_MES - (await contarProtectoresDelMes(pareja.id, mesEnCurso));
+    MAX_PROTECTORES_MES - (await contarProtectoresDelMes(parejaActual.id, mesEnCurso));
 
   while (true) {
     const fechaCursorISO = obtenerFechaLocalISO(cursor);
@@ -319,7 +375,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     if (mesCursor !== mesEnCurso) {
       mesEnCurso = mesCursor;
       protectoresRestantesMes =
-        MAX_PROTECTORES_MES - (await contarProtectoresDelMes(pareja.id, mesEnCurso));
+        MAX_PROTECTORES_MES - (await contarProtectoresDelMes(parejaActual.id, mesEnCurso));
     }
 
     const dia = checkins[fechaCursorISO];
@@ -327,7 +383,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     let protegido = fechasProtegidas.has(fechaCursorISO);
 
     if (!completo && !protegido && protectoresRestantesMes > 0) {
-      const { exito } = await usarProtectorRacha(pareja.id, fechaCursorISO, userId);
+      const { exito } = await usarProtectorRacha(parejaActual.id, fechaCursorISO, userId);
       if (exito) {
         protegido = true;
         protectoresRestantesMes -= 1;
@@ -345,11 +401,11 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
 
   const rachaMaxima = Math.max(rachaMaximaGuardada, rachaActual);
   if (rachaActual > rachaMaximaGuardada) {
-    await actualizarRachaMaximaSiCorresponde(pareja.id, rachaActual);
+    await actualizarRachaMaximaSiCorresponde(parejaActual.id, rachaActual);
   }
 
   const protectoresUsadosEsteMes = await contarProtectoresDelMes(
-    pareja.id,
+    parejaActual.id,
     obtenerMesActual(hoy)
   );
 
@@ -373,10 +429,10 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   }
 
   return {
-    parejaId: pareja.id,
+    parejaId: parejaActual.id,
     tieneParejaActiva: true,
     esperandoAceptacion: false,
-    correoInvitado: pareja.correo_invitado,
+    correoInvitado: parejaActual.correo_invitado,
     nombrePareja,
     rachaActual,
     rachaMaxima,

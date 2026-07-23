@@ -12,8 +12,6 @@ import {
 } from "@/lib/supabase/racha";
 import type { EstadoRachaPareja } from "@/models/racha";
 
-type EstadoRachaParejaConReceptor = EstadoRachaPareja & { esReceptor?: boolean };
-
 const DIAS_ABBR = ["D", "L", "M", "X", "J", "V", "S"];
 const AVATAR_DEFAULT =
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80";
@@ -24,7 +22,7 @@ export default function RachaPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [estado, setEstado] = useState<EstadoRachaParejaConReceptor | null>(null);
+  const [estado, setEstado] = useState<EstadoRachaPareja | null>(null);
 
   const [correoInvitacion, setCorreoInvitacion] = useState("");
   const [enviandoInvitacion, setEnviandoInvitacion] = useState(false);
@@ -66,7 +64,7 @@ export default function RachaPage() {
     setMensajeExito(null);
     setEnviandoInvitacion(true);
 
-    // Validar con la función de backend
+    // Validar sintaxis y reglas
     const resValidacion = await validarInvitacion(userEmail, correoInvitacion);
     if (!resValidacion.ok) {
       setEnviandoInvitacion(false);
@@ -74,7 +72,7 @@ export default function RachaPage() {
       return;
     }
 
-    // Enviar invitación usando la función de Supabase
+    // Enviar invitación
     const { error: err } = await invitarPareja(userId, correoInvitacion.trim().toLowerCase());
 
     setEnviandoInvitacion(false);
@@ -124,26 +122,58 @@ export default function RachaPage() {
   };
 
   const manejarCancelar = async () => {
-    if (!userId || !estado?.parejaId) return;
-
-    setCancelando(true);
-    setError(null);
-
-    const { error: err } = await supabase
-      .from("parejas")
-      .delete()
-      .eq("id", estado.parejaId);
-
-    setCancelando(false);
-
-    if (err) {
-      setError("No se pudo cancelar la invitación pendiente.");
+    if (!userId || !estado?.parejaId) {
+      console.log("Sin userId o parejaId", { userId, parejaId: estado?.parejaId });
+      setError("No hay invitación para cancelar");
       return;
     }
 
-    setMensajeExito("Invitación cancelada correctamente.");
+    setCancelando(true);
+    setError(null);
+    setMensajeExito(null);
+
+    const parejaId = estado.parejaId;
+    console.log("🔍 DEBUG - Intentando cancelar pareja con ID:", parejaId);
+
+    const { error } = await supabase
+      .from("parejas")
+      .delete()
+      .eq("id", parejaId)
+      .select();
+
+    console.log("🔍 DEBUG - Respuesta del delete:", { error });
+
+    if (error) {
+      console.error("❌ Error al cancelar:", error);
+      setCancelando(false);
+      setError("No se pudo cancelar la invitación: " + error.message);
+      return;
+    }
+
+    console.log("✅ Pareja eliminada correctamente");
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    setMensajeExito("¡Invitación cancelada correctamente!");
+    setCancelando(false);
+
+    console.log("🔍 DEBUG - Recargando estado del usuario:", userId);
     await cargarEstado(userId);
+    console.log("🔍 DEBUG - Estado recargado:", estado);
   };
+
+  const invitacionRecibida = !!(
+    estado?.esperandoAceptacion &&
+    !estado?.tieneParejaActiva &&
+    userEmail &&
+    estado.correoInvitado === userEmail
+  );
+
+  const invitacionPendienteEnviada = !!(
+    estado?.esperandoAceptacion &&
+    userEmail &&
+    estado.correoInvitado !== userEmail
+  );
 
   if (cargando) {
     return (
@@ -160,7 +190,7 @@ export default function RachaPage() {
     <div className="min-h-screen bg-[#F8FAFC] flex justify-center p-0 sm:p-4">
       <div className="w-full max-w-md bg-[#F8FAFC] min-h-screen sm:min-h-[850px] sm:max-h-[900px] shadow-2xl sm:rounded-[40px] border border-slate-100 flex flex-col overflow-y-auto">
         
-        {/* Encabezado Principal con Flecha Estilizada */}
+        {/* Encabezado Principal */}
         <header className="bg-white px-6 pt-6 pb-5 border-b border-slate-100 flex items-center gap-3.5 sticky top-0 z-10 backdrop-blur-md bg-white/90">
           <button
             onClick={() => router.push("/home")}
@@ -190,7 +220,7 @@ export default function RachaPage() {
 
         <div className="p-6 space-y-6">
 
-          {/* Banner de Mensajes de Feedback */}
+          {/* Banner de Errores y Exito */}
           {error && (
             <div className="p-3.5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-2xl flex items-center gap-2">
               <span>⚠️</span>
@@ -204,7 +234,7 @@ export default function RachaPage() {
             </div>
           )}
 
-          {/* SECCIÓN 1: 🔥 Racha con Amigos */}
+          {/* SECCIÓN 1: 🔥 Racha Activa o Estado Inicial */}
           <section className="space-y-3">
             {estado?.tieneParejaActiva ? (
               <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[32px] p-6 text-white shadow-lg space-y-5">
@@ -299,7 +329,7 @@ export default function RachaPage() {
                   <div className="relative w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100">
                     <Image
                       src={AVATAR_DEFAULT}
-                      alt={estado.nombrePareja || "Amigo"}
+                      alt="Avatar por defecto"
                       fill
                       className="object-cover"
                     />
@@ -334,7 +364,7 @@ export default function RachaPage() {
             <div className="space-y-2">
               <span className="text-[11px] font-semibold text-slate-400 px-1">Recibidas</span>
 
-              {!estado?.tieneParejaActiva && estado?.esperandoAceptacion && estado?.esReceptor ? (
+              {invitacionRecibida ? (
                 <div className="bg-white rounded-[28px] p-4 border border-orange-100 shadow-sm space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-slate-100">
@@ -370,11 +400,11 @@ export default function RachaPage() {
               )}
             </div>
 
-            {/* Invitaciones Pendientes (Enviadas) con opción de Cancelar */}
+            {/* Invitaciones Pendientes (Enviadas) */}
             <div className="space-y-2">
               <span className="text-[11px] font-semibold text-slate-400 px-1">Invitaciones pendientes</span>
 
-              {estado?.esperandoAceptacion && !estado?.esReceptor ? (
+              {invitacionPendienteEnviada ? (
                 <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 text-sm font-bold flex-shrink-0">
@@ -392,8 +422,7 @@ export default function RachaPage() {
                     <button
                       onClick={manejarCancelar}
                       disabled={cancelando}
-                      className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
-                      title="Cancelar invitación"
+                      className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 active:scale-95"
                     >
                       {cancelando ? "..." : "Cancelar"}
                     </button>
@@ -408,7 +437,7 @@ export default function RachaPage() {
             </div>
           </section>
 
-          {/* SECCIÓN 4: ➕ Invitar amigo */}
+          {/* SECCIÓN 4: ➕ Invitar Amigo */}
           <section className="pt-2">
             <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm space-y-4">
               <div className="flex items-center gap-3">
