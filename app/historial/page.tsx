@@ -197,9 +197,32 @@ export default function HistorialPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <span className="text-sm font-bold text-[#2A3B50] capitalize">
-                  {NOMBRES_MESES[fechaCalendario.getMonth()]} {fechaCalendario.getFullYear()}
-                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-[#2A3B50] capitalize">
+                    {NOMBRES_MESES[fechaCalendario.getMonth()]}
+                  </span>
+                  <select
+                    value={fechaCalendario.getFullYear()}
+                    onChange={(e) => setFechaCalendario(new Date(Number(e.target.value), fechaCalendario.getMonth(), 1))}
+                    className="text-sm font-bold text-[#2A3B50] bg-transparent border-none outline-none cursor-pointer appearance-none pr-4"
+                    style={{
+                      backgroundImage:
+                        "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%232A3B50'><path fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/></svg>\")",
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right center',
+                      backgroundSize: '12px',
+                    }}
+                  >
+                    {Array.from({ length: 8 }).map((_, i) => {
+                      const anio = new Date().getFullYear() - 5 + i;
+                      return (
+                        <option key={anio} value={anio}>{anio}</option>
+                      );
+                    })}
+                  </select>
+                </div>
+
                 <button
                   onClick={() => setFechaCalendario(new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() + 1, 1))}
                   className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
