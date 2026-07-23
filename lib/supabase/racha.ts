@@ -67,7 +67,7 @@ export async function aceptarInvitacionPareja(parejaId: string): Promise<{ error
 
   const { error } = await supabase
     .from('parejas')
-    .update({ estado: 'activa', fecha_inicio: new Date().toISOString() })
+    .update({ estado: 'activa' })
     .eq('id', parejaId)
     .eq('user_id_2', user.id)
     .eq('estado', 'pendiente');
@@ -156,8 +156,8 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     .gte('dia', fechaInicio7)
     .order('dia', { ascending: true });
 
-  const fechaInicioPareja = pareja.fecha_inicio
-    ? new Date(pareja.fecha_inicio).toISOString().split('T')[0]
+  const fechaInicioPareja = pareja.creado_at
+    ? new Date(pareja.creado_at).toISOString().split('T')[0]
     : null;
 
   const historialDias: CheckinDia[] = [];
