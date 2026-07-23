@@ -270,10 +270,22 @@ export default function EvaluacionFlujoPage() {
 
                 <div className="my-6 flex justify-center">
                   <div className="relative w-40 h-40 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm border border-purple-100/60">
-                    <svg viewBox="0 0 200 200" className="w-32 h-32 text-indigo-400" fill="currentColor">
-                      <circle cx="100" cy="90" r="32" className="text-purple-300" />
-                      <path d="M50 160c0-35 25-50 50-50s50 15 50 50v10H50v-10z" className="text-purple-400" />
-                      <path d="M90 95l10 12 10-12" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" />
+                    <svg viewBox="0 0 200 200" className="w-28 h-28">
+                      {/* Arco de fondo del medidor */}
+                      <path
+                        d="M 40 140 A 70 70 0 0 1 160 140"
+                        fill="none"
+                        stroke="#EDE9FE"
+                        strokeWidth="14"
+                        strokeLinecap="round"
+                      />
+                      {/* Arco de color: verde -> amarillo -> rojo */}
+                      <path d="M 40 140 A 70 70 0 0 1 78 76" fill="none" stroke="#34D399" strokeWidth="14" strokeLinecap="round" />
+                      <path d="M 82 73 A 70 70 0 0 1 118 73" fill="none" stroke="#FBBF24" strokeWidth="14" strokeLinecap="round" />
+                      <path d="M 122 76 A 70 70 0 0 1 160 140" fill="none" stroke="#FB7185" strokeWidth="14" strokeLinecap="round" />
+                      {/* Aguja apuntando a nivel moderado */}
+                      <line x1="100" y1="140" x2="128" y2="95" stroke="#4C1D95" strokeWidth="5" strokeLinecap="round" />
+                      <circle cx="100" cy="140" r="9" fill="#4C1D95" />
                     </svg>
                     <span className="absolute top-4 right-6 text-purple-300 text-lg">✦</span>
                     <span className="absolute bottom-6 left-4 text-purple-400 text-xl">✦</span>
