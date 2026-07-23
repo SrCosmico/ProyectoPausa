@@ -640,47 +640,6 @@ export default function HomePage() {
                   "
                 >
 
-                  {calcularEstadoRachaPareja !== null && (
-                    <button
-                      onClick={() =>
-                        router.push("/racha")
-                      }
-                      className={`
-                        flex
-                        items-center
-                        gap-1
-                        px-3
-                        py-2
-                        rounded-full
-                        shadow-sm
-                        active:scale-95
-                        transition-all
-                        border
-                        ${
-                          estadoRacha?.tieneParejaActiva
-                            ? "bg-gradient-to-br from-orange-50 to-amber-50 border-orange-100 text-orange-600"
-                            : "bg-slate-50 border-slate-100 text-slate-400"
-                        }
-                      `}
-                    >
-
-                      <span className="text-base">
-                        🔥
-                      </span>
-
-                      <span
-                        className="
-                          text-xs
-                          font-extrabold
-                          tabular-nums
-                        "
-                      >
-                        {rachaDias}
-                      </span>
-
-                    </button>
-                  )}
-
                   <button
                     onClick={handleLogout}
                     disabled={loadingLogout}
