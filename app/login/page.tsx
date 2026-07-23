@@ -54,7 +54,7 @@ export default function LoginView() {
             src="/images/onda_del_medio.png"
             alt=""
             aria-hidden="true"
-            className="absolute top-[8%] left-1/2 -translate-x-1/2 w-[130%] max-w-none h-auto opacity-40 select-none"
+            className="absolute top-[42%] left-1/2 -translate-x-1/2 w-[130%] max-w-none h-auto opacity-40 select-none"
           />
           <img
             src="/images/ramita_izquierda.png"
@@ -91,11 +91,11 @@ export default function LoginView() {
           </button>
 
           {/* LOGO */}
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center -mb-6">
             <img
               src="/images/logo.png"
               alt="Pausa"
-              className="w-[360px] h-[360px] object-contain select-none"
+              className="w-[420px] h-[420px] object-contain select-none"
             />
           </div>
 
