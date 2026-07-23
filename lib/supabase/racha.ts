@@ -22,18 +22,25 @@ export async function validarInvitacion(
     return { ok: false, mensaje: 'No encontramos ningún usuario registrado con ese correo en Pausa.' };
   }
 
-  // Solo verificar que EL EMISOR no tenga pareja activa o pendiente
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, mensaje: 'No autenticado.' };
 
-  const { data: parejaEmisor } = await supabase
+  // Solo verificar si YA EXISTE una pareja activa o pendiente con ESA MISMA persona
+  const { data: parejaExistente } = await supabase
     .from('parejas')
-    .select('id')
-    .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`)
+    .select('id, estado')
+    .or(
+      `and(user_id_1.eq.${user.id},user_id_2.eq.${usuarioId}),and(user_id_1.eq.${usuarioId},user_id_2.eq.${user.id})`
+    )
     .in('estado', ['activa', 'pendiente'])
     .maybeSingle();
 
-  if (parejaEmisor) return { ok: false, mensaje: 'Ya tienes una racha activa o una invitación pendiente.' };
+  if (parejaExistente) {
+    const msg = parejaExistente.estado === 'activa'
+      ? 'Ya tienes una racha activa con esta persona.'
+      : 'Ya tienes una invitación pendiente con esta persona.';
+    return { ok: false, mensaje: msg };
+  }
 
   return { ok: true };
 }
