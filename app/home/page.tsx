@@ -332,12 +332,11 @@ export default function HomePage() {
       const meta = user.user_metadata;
 
       if (meta?.onboarding_completado) {
-        setHerramientas(
-          personalizarOrden(
-            accesoRapidoData,
-            meta.motivos_principales ?? []
-          )
-        );
+        // NOTA: se desactivó personalizarOrden() para mantener siempre
+        // el orden fijo definido en accesoRapidoData (Cronograma, Evaluación,
+        // Monitoreo, Meditación, Diario, Racha, Crisis).
+        // Antes, esta función movía "Meditación" al frente si el usuario
+        // había elegido "dormir" como motivo en el onboarding.
 
         ajustarUmbralCrisis(
           meta.frecuencia_estres ?? ""
