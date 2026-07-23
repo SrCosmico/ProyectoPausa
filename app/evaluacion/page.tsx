@@ -527,7 +527,7 @@ export default function EvaluacionFlujoPage() {
                   {guardando ? 'Guardando...' : exitoGuardado ? 'Guardado ✓' : 'Guardar resultado'}
                 </button>
                 <button 
-                  onClick={() => cambiarPasoSeguro(0)}
+                  onClick={() => router.push('/home')}
                   disabled={guardando}
                   className="w-full bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-500 hover:text-slate-700 font-semibold py-3.5 rounded-2xl text-xs disabled:opacity-50"
                 >
