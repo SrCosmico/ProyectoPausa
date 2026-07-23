@@ -73,18 +73,23 @@ export const emojiEstadosData: EmojiEstado[] = [
   { estado: "Muy bien", emoji: "🤩" },
 ];
 
+// Orden solicitado:
+// Fila 1 → Cronograma | Evaluación rápida
+// Fila 2 → Monitoreo emocional | Meditación
+// Fila 3 → Diario | Racha
+// Abajo (grande, aparte) → Modo crisis
 export const accesoRapidoData: AccesoRapido[] = [
+  {
+    id: "cronograma",
+    titulo: "Cronograma académico",
+    descripcion: "Organiza tu semana",
+    ruta: "/cronograma.2",
+  },
   {
     id: "evaluacion",
     titulo: "Evaluación rápida",
     descripcion: "Conoce tu bienestar",
     ruta: "/evaluacion.2",
-  },
-  {
-    id: "meditacion",
-    titulo: "Meditación y respiración",
-    descripcion: "Encuentra tu calma",
-    ruta: "/meditacion.2",
   },
   {
     id: "antistres",
@@ -93,10 +98,10 @@ export const accesoRapidoData: AccesoRapido[] = [
     ruta: "/monitoreo.2",
   },
   {
-    id: "cronograma",
-    titulo: "Cronograma académico",
-    descripcion: "Organiza tu semana",
-    ruta: "/cronograma.2",
+    id: "meditacion",
+    titulo: "Meditación y respiración",
+    descripcion: "Encuentra tu calma",
+    ruta: "/meditacion.2",
   },
   {
     id: "diario",
