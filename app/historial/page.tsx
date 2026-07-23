@@ -214,8 +214,8 @@ export default function HistorialPage() {
                       backgroundSize: '12px',
                     }}
                   >
-                    {Array.from({ length: 8 }).map((_, i) => {
-                      const anio = new Date().getFullYear() - 5 + i;
+                    {Array.from({ length: 41 }).map((_, i) => {
+                      const anio = new Date().getFullYear() - 30 + i;
                       return (
                         <option key={anio} value={anio}>{anio}</option>
                       );
