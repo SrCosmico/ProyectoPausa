@@ -73,13 +73,12 @@ function obtenerFechaISO(d: Date): string {
   return new Date(d.getTime() - offset).toISOString().split('T')[0];
 }
 
-function generarDiasVisibles() {
+function generarDiasVisibles(fechaBase: Date = new Date()) {
   const abreviaturas = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const hoy = new Date();
   const dias = [];
   for (let i = -2; i <= 2; i++) {
-    const d = new Date(hoy);
-    d.setDate(hoy.getDate() + i);
+    const d = new Date(fechaBase);
+    d.setDate(fechaBase.getDate() + i);
     dias.push({
       iso: obtenerFechaISO(d),
       abbr: abreviaturas[d.getDay()],
@@ -115,8 +114,10 @@ export default function CronogramaPage() {
   const [actividadesGuardadas, setActividadesGuardadas] = useState<ActividadCronogramaGuardada[]>([]);
   const [cargandoActividades, setCargandoActividades] = useState(false);
   const [guardandoAjustes, setGuardandoAjustes] = useState(false);
+  const [errorAjustes, setErrorAjustes] = useState<string | null>(null);
 
   const [fechaSeleccionadaVista, setFechaSeleccionadaVista] = useState<string>(obtenerFechaISO(new Date()));
+  const [centroVistaDia, setCentroVistaDia] = useState<Date>(new Date());
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
   const [bloqueSeleccionado, setBloqueSeleccionado] = useState<ActividadCronogramaGuardada | null>(null);
 
@@ -331,19 +332,14 @@ export default function CronogramaPage() {
   const procesarGuardadoConfiguracion = async () => {
     if (!userId) return;
 
-    // Si venimos de la pantalla de Ajustes, aplicamos el borrador al estado real primero
     const nombreFinal = draftAjustes?.nombre ?? nombreCronograma;
     const colorFinal = draftAjustes?.color ?? colorCronograma;
     const diasFinal = draftAjustes?.dias ?? diasSeleccionados;
 
-    if (draftAjustes) {
-      setNombreCronograma(draftAjustes.nombre);
-      setColorCronograma(draftAjustes.color);
-      setDiasSeleccionados(draftAjustes.dias);
-    }
-
     setGuardandoAjustes(true);
-    await guardarConfiguracionCronograma(userId, {
+    setErrorAjustes(null);
+
+    const resultado = await guardarConfiguracionCronograma(userId, {
       nombre: nombreFinal,
       color: colorFinal,
       dias: diasFinal,
@@ -352,7 +348,21 @@ export default function CronogramaPage() {
       actividades: actividadesPreferidas,
       recordatorios: recordatorios
     });
+
     setGuardandoAjustes(false);
+
+    if (resultado?.error) {
+      console.error('Error al guardar configuración del cronograma:', resultado.error);
+      setErrorAjustes('No se pudo guardar. Verifica tu conexión o los permisos de la base de datos.');
+      return; // No aplicamos el borrador ni cambiamos de vista si falló
+    }
+
+    if (draftAjustes) {
+      setNombreCronograma(draftAjustes.nombre);
+      setColorCronograma(draftAjustes.color);
+      setDiasSeleccionados(draftAjustes.dias);
+    }
+
     setDraftAjustes(null);
     setVista('vistaSemanal');
   };
@@ -568,20 +578,38 @@ export default function CronogramaPage() {
 
               {subVista === 'dia' && (
                 <>
-                  <div className="px-6 py-3 flex justify-between border-b border-slate-100 bg-white">
-                    {generarDiasVisibles().map((day) => {
-                      const esDiaActivo = fechaSeleccionadaVista === day.iso;
-                      const tieneActividad = actividadesGuardadas.some(a => a.fecha === day.iso);
-                      return (
-                        <button key={day.iso} onClick={() => setFechaSeleccionadaVista(day.iso)} className={`relative flex flex-col items-center p-2 rounded-xl w-12 transition-all pb-3.5 ${esDiaActivo ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50'}`}>
-                          <span className="text-[10px] font-bold">{day.abbr}</span>
-                          <span className="text-xs font-black mt-0.5">{day.num}</span>
-                          {tieneActividad && (
-                            <span className={`w-1 h-1 rounded-full absolute bottom-1 ${esDiaActivo ? 'bg-white' : estilosActuales.bg}`} />
-                          )}
-                        </button>
-                      );
-                    })}
+                  <div className="px-6 py-3 flex items-center gap-1 border-b border-slate-100 bg-white">
+                    <button
+                      onClick={() => setCentroVistaDia(new Date(centroVistaDia.getFullYear(), centroVistaDia.getMonth(), centroVistaDia.getDate() - 5))}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <div className="flex justify-between flex-1">
+                      {generarDiasVisibles(centroVistaDia).map((day) => {
+                        const esDiaActivo = fechaSeleccionadaVista === day.iso;
+                        const tieneActividad = actividadesGuardadas.some(a => a.fecha === day.iso);
+                        return (
+                          <button key={day.iso} onClick={() => setFechaSeleccionadaVista(day.iso)} className={`relative flex flex-col items-center p-2 rounded-xl w-12 transition-all pb-3.5 ${esDiaActivo ? `${estilosActuales.bg} text-white shadow-md scale-105` : 'text-slate-600 hover:bg-slate-50'}`}>
+                            <span className="text-[10px] font-bold">{day.abbr}</span>
+                            <span className="text-xs font-black mt-0.5">{day.num}</span>
+                            {tieneActividad && (
+                              <span className={`w-1 h-1 rounded-full absolute bottom-1 ${esDiaActivo ? 'bg-white' : estilosActuales.bg}`} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setCentroVistaDia(new Date(centroVistaDia.getFullYear(), centroVistaDia.getMonth(), centroVistaDia.getDate() + 5))}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
                   </div>
 
                   <div className="p-6 space-y-4 relative">
@@ -650,9 +678,22 @@ export default function CronogramaPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <span className="text-sm font-bold text-[#2A3B50] capitalize">
-                      {nombresMeses[fechaCalendario.getMonth()]} {fechaCalendario.getFullYear()}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-[#2A3B50] capitalize">
+                        {nombresMeses[fechaCalendario.getMonth()]}
+                      </span>
+                      <input
+                        type="number"
+                        value={fechaCalendario.getFullYear()}
+                        onChange={(e) => {
+                          const anio = Number(e.target.value);
+                          if (!isNaN(anio) && e.target.value.length <= 5) {
+                            setFechaCalendario(new Date(anio, fechaCalendario.getMonth(), 1));
+                          }
+                        }}
+                        className="text-sm font-bold text-[#2A3B50] bg-transparent border-none outline-none w-16 text-center [appearance:textfield]"
+                      />
+                    </div>
                     <button 
                       onClick={() => setFechaCalendario(new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth() + 1, 1))} 
                       className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
@@ -864,6 +905,12 @@ export default function CronogramaPage() {
                   ⚠️ Recuerda presionar "Confirmar cambios" al final. Si sales con la flecha de regreso sin confirmar, tus cambios no se guardarán.
                 </p>
               </div>
+
+              {errorAjustes && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl">
+                  <p className="text-[11px] font-semibold text-rose-600">❌ {errorAjustes}</p>
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div className="space-y-1.5">

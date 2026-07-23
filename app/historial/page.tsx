@@ -202,25 +202,17 @@ export default function HistorialPage() {
                   <span className="text-sm font-bold text-[#2A3B50] capitalize">
                     {NOMBRES_MESES[fechaCalendario.getMonth()]}
                   </span>
-                  <select
+                  <input
+                    type="number"
                     value={fechaCalendario.getFullYear()}
-                    onChange={(e) => setFechaCalendario(new Date(Number(e.target.value), fechaCalendario.getMonth(), 1))}
-                    className="text-sm font-bold text-[#2A3B50] bg-transparent border-none outline-none cursor-pointer appearance-none pr-4"
-                    style={{
-                      backgroundImage:
-                        "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%232A3B50'><path fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/></svg>\")",
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right center',
-                      backgroundSize: '12px',
+                    onChange={(e) => {
+                      const anio = Number(e.target.value);
+                      if (!isNaN(anio) && e.target.value.length <= 5) {
+                        setFechaCalendario(new Date(anio, fechaCalendario.getMonth(), 1));
+                      }
                     }}
-                  >
-                    {Array.from({ length: 41 }).map((_, i) => {
-                      const anio = new Date().getFullYear() - 30 + i;
-                      return (
-                        <option key={anio} value={anio}>{anio}</option>
-                      );
-                    })}
-                  </select>
+                    className="text-sm font-bold text-[#2A3B50] bg-transparent border-none outline-none w-16 text-center [appearance:textfield]"
+                  />
                 </div>
 
                 <button
