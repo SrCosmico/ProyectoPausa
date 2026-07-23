@@ -401,7 +401,7 @@ export default function RachaPage() {
                 />
                 <button
                   onClick={manejarInvitar}
-                  disabled={enviandoInvitacion || !correoInvitacion.trim() || !!estado?.tieneParejaActiva}
+                  disabled={enviandoInvitacion || !correoInvitacion.trim()}
                   className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-white rounded-2xl font-bold text-xs transition-all shadow-md shadow-orange-500/10 disabled:shadow-none disabled:text-slate-400"
                 >
                   {enviandoInvitacion ? "Enviando..." : "Enviar invitación"}
