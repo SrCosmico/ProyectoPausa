@@ -228,31 +228,37 @@ export default function RachaPage() {
     <div className="min-h-screen bg-[#F8FAFC] flex justify-center p-0 sm:p-4">
       <div className="relative w-full max-w-md bg-[#F8FAFC] min-h-screen sm:min-h-[850px] shadow-2xl sm:rounded-[40px] border border-slate-100 flex flex-col overflow-hidden">
 
-        {/* FONDO DECORATIVO — ramitas grandes repartidas por toda la pantalla */}
+        {/* FONDO DECORATIVO — ramitas repartidas por toda la pantalla */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <img
             src="/images/ramita_izquierda.png"
             alt=""
             aria-hidden="true"
-            className="absolute -top-4 -left-16 w-64 sm:w-72 h-auto opacity-80 select-none -rotate-12"
+            className="absolute top-[2%] -left-8 w-36 sm:w-40 h-auto opacity-60 select-none -rotate-12"
           />
           <img
             src="/images/ramita_derecha.png"
             alt=""
             aria-hidden="true"
-            className="absolute top-[24%] -right-20 w-64 sm:w-72 h-auto opacity-70 select-none rotate-6"
+            className="absolute top-[20%] -right-10 w-36 sm:w-40 h-auto opacity-55 select-none rotate-6"
           />
           <img
             src="/images/ramita_izquierda.png"
             alt=""
             aria-hidden="true"
-            className="absolute top-[55%] -left-20 w-60 sm:w-64 h-auto opacity-70 select-none rotate-[20deg] scale-x-[-1]"
+            className="absolute top-[42%] -left-10 w-32 sm:w-36 h-auto opacity-50 select-none rotate-[15deg] scale-x-[-1]"
           />
           <img
             src="/images/ramita_derecha.png"
             alt=""
             aria-hidden="true"
-            className="absolute bottom-[2%] -right-16 w-72 sm:w-80 h-auto opacity-80 select-none -rotate-[10deg]"
+            className="absolute top-[65%] -right-8 w-32 sm:w-36 h-auto opacity-50 select-none -rotate-[8deg]"
+          />
+          <img
+            src="/images/ramita_izquierda.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute bottom-[2%] -left-8 w-36 sm:w-40 h-auto opacity-60 select-none rotate-[25deg]"
           />
         </div>
 
