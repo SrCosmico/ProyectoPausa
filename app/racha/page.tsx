@@ -226,182 +226,208 @@ export default function RachaPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex justify-center p-0 sm:p-4">
-      <div className="w-full max-w-md bg-[#F8FAFC] min-h-screen sm:min-h-[850px] shadow-2xl sm:rounded-[40px] border border-slate-100 flex flex-col overflow-y-auto">
+      <div className="relative w-full max-w-md bg-[#F8FAFC] min-h-screen sm:min-h-[850px] shadow-2xl sm:rounded-[40px] border border-slate-100 flex flex-col overflow-hidden">
 
-        {/* Header */}
-        <header className="bg-white px-6 pt-6 pb-5 border-b border-slate-100 flex items-center gap-3.5 sticky top-0 z-10">
-          <button onClick={() => router.push("/home")} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 border border-slate-200/60 flex items-center justify-center transition-all flex-shrink-0">
-            <svg className="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-            </svg>
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">🔥 Racha con amigos</h1>
-            <p className="text-xs text-slate-400 font-medium">Fortaleciendo su bienestar juntos</p>
-          </div>
-        </header>
+        {/* FONDO DECORATIVO — ramitas */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <img
+            src="/images/ramita_izquierda.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-[10%] -left-6 w-28 sm:w-32 h-auto opacity-60 select-none -rotate-6"
+          />
+          <img
+            src="/images/ramita_derecha.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute top-[46%] -right-8 w-32 sm:w-36 h-auto opacity-50 select-none rotate-3"
+          />
+          <img
+            src="/images/ramita_izquierda.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute bottom-[6%] -left-10 w-36 sm:w-40 h-auto opacity-40 select-none rotate-12 scale-x-[-1]"
+          />
+        </div>
 
-        <div className="p-6 space-y-6">
+        {/* CONTENIDO */}
+        <div className="relative z-10 flex flex-col h-full overflow-y-auto">
 
-          {/* Banners */}
-          {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-2xl flex items-center gap-2">
-              <span>⚠️</span><p>{error}</p>
+          {/* Header */}
+          <header className="bg-white/95 backdrop-blur-sm px-6 pt-6 pb-5 border-b border-slate-100 flex items-center gap-3.5 sticky top-0 z-10">
+            <button onClick={() => router.push("/home")} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 border border-slate-200/60 flex items-center justify-center transition-all flex-shrink-0">
+              <svg className="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800">🔥 Racha con amigos</h1>
+              <p className="text-xs text-slate-400 font-medium">Fortaleciendo su bienestar juntos</p>
             </div>
-          )}
-          {mensajeExito && (
-            <div className="p-3.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold rounded-2xl flex items-center gap-2">
-              <span>✅</span><p>{mensajeExito}</p>
-            </div>
-          )}
+          </header>
 
-          {/* RACHAS ACTIVAS */}
-          <section className="space-y-3">
-            {estado?.parejasActivas && estado.parejasActivas.length > 0 ? (
-              estado.parejasActivas.map(pareja => (
-                <TarjetaRacha
-                  key={pareja.parejaId}
-                  pareja={pareja}
-                  onUsarProtector={manejarUsarProtector}
-                  usandoProtector={usandoProtectorId === pareja.parejaId}
+          <div className="p-6 space-y-6">
+
+            {/* Banners */}
+            {error && (
+              <div className="p-3.5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-2xl flex items-center gap-2">
+                <span>⚠️</span><p>{error}</p>
+              </div>
+            )}
+            {mensajeExito && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold rounded-2xl flex items-center gap-2">
+                <span>✅</span><p>{mensajeExito}</p>
+              </div>
+            )}
+
+            {/* RACHAS ACTIVAS */}
+            <section className="space-y-3">
+              {estado?.parejasActivas && estado.parejasActivas.length > 0 ? (
+                estado.parejasActivas.map(pareja => (
+                  <TarjetaRacha
+                    key={pareja.parejaId}
+                    pareja={pareja}
+                    onUsarProtector={manejarUsarProtector}
+                    usandoProtector={usandoProtectorId === pareja.parejaId}
+                  />
+                ))
+              ) : (
+                <div className="bg-white/95 backdrop-blur-sm rounded-[32px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
+                  <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-xl mx-auto">🔥</div>
+                  <h3 className="text-sm font-bold text-slate-800">Aún no tienes una racha activa</h3>
+                  <p className="text-xs text-slate-400 max-w-[240px] mx-auto">¡Invita a un amigo para empezar juntos!</p>
+                </div>
+              )}
+            </section>
+
+            {/* MIS AMIGOS */}
+            <section className="space-y-3">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">👥 Mis amigos</h2>
+              {estado?.parejasActivas && estado.parejasActivas.length > 0 ? (
+                estado.parejasActivas.map(pareja => (
+                  <div key={pareja.parejaId} className="bg-white/95 backdrop-blur-sm rounded-[28px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3.5">
+                      <AvatarIcono nombre={pareja.nombrePareja} avatar={pareja.avatarPareja} size="md" />
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-800">{pareja.nombrePareja}</h3>
+                        <span className="text-xs text-slate-400">🔥 {pareja.rachaActual} días de racha</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[11px] font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      🟢 Activo
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="bg-white/95 backdrop-blur-sm rounded-[28px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
+                  <span className="text-2xl">👥</span>
+                  <p className="text-xs font-medium text-slate-600">Todavía no tienes amigos agregados</p>
+                </div>
+              )}
+            </section>
+
+            {/* INVITACIONES */}
+            <section className="space-y-4">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">📩 Invitaciones</h2>
+
+              {/* Recibidas */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-semibold text-slate-400 px-1">Recibidas</span>
+                {recibidas.length > 0 ? recibidas.map(p => (
+                  <div key={p.parejaId} className="bg-white/95 backdrop-blur-sm rounded-[28px] p-4 border border-orange-100 shadow-sm space-y-3">
+                    <div className="flex items-center gap-3">
+                      <AvatarIcono nombre="?" size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-bold text-slate-800">Tu amigo te ha invitado</h4>
+                        <p className="text-[11px] text-slate-400 truncate">{p.correoInvitado}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => manejarAceptar(p.parejaId)}
+                        disabled={aceptandoId === p.parejaId}
+                        className="py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs disabled:opacity-50"
+                      >
+                        {aceptandoId === p.parejaId ? "Aceptando..." : "Aceptar"}
+                      </button>
+                      <button
+                        onClick={() => manejarRechazar(p.parejaId)}
+                        disabled={rechazandoId === p.parejaId}
+                        className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs disabled:opacity-50"
+                      >
+                        {rechazandoId === p.parejaId ? "..." : "Rechazar"}
+                      </button>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="bg-white/95 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
+                    <span className="text-lg">📬</span>
+                    <p className="text-xs text-slate-400">Aún no has recibido invitaciones.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Enviadas */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-semibold text-slate-400 px-1">Invitaciones pendientes</span>
+                {enviadas.length > 0 ? enviadas.map(p => (
+                  <div key={p.parejaId} className="bg-white/95 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 text-sm font-bold flex-shrink-0">⏳</div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-700 truncate">{p.correoInvitado}</p>
+                        <span className="text-[10px] text-slate-400">Pendiente de aceptación</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-[10px] bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full">Pendiente</span>
+                      <button
+                        onClick={() => manejarCancelar(p.parejaId)}
+                        disabled={cancelandoId === p.parejaId}
+                        className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold disabled:opacity-50"
+                      >
+                        {cancelandoId === p.parejaId ? "..." : "Cancelar"}
+                      </button>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="bg-white/95 backdrop-blur-sm rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
+                    <span className="text-lg">📭</span>
+                    <p className="text-xs text-slate-400">No tienes invitaciones pendientes.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* INVITAR */}
+            <section className="pt-2">
+              <div className="bg-white/95 backdrop-blur-sm rounded-[32px] p-6 border border-slate-100 shadow-sm space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-500 text-lg">➕</div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Invitar amigo</h3>
+                    <p className="text-xs text-slate-400">Escribe su correo para iniciar su racha juntos</p>
+                  </div>
+                </div>
+                <input
+                  type="email"
+                  value={correoInvitacion}
+                  onChange={(e) => setCorreoInvitacion(e.target.value)}
+                  placeholder="correo@ejemplo.com"
+                  className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-all"
                 />
-              ))
-            ) : (
-              <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
-                <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-xl mx-auto">🔥</div>
-                <h3 className="text-sm font-bold text-slate-800">Aún no tienes una racha activa</h3>
-                <p className="text-xs text-slate-400 max-w-[240px] mx-auto">¡Invita a un amigo para empezar juntos!</p>
+                <button
+                  onClick={manejarInvitar}
+                  disabled={enviandoInvitacion || !correoInvitacion.trim()}
+                  className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-white rounded-2xl font-bold text-xs transition-all disabled:text-slate-400"
+                >
+                  {enviandoInvitacion ? "Enviando..." : "Enviar invitación"}
+                </button>
               </div>
-            )}
-          </section>
+            </section>
 
-          {/* MIS AMIGOS */}
-          <section className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">👥 Mis amigos</h2>
-            {estado?.parejasActivas && estado.parejasActivas.length > 0 ? (
-              estado.parejasActivas.map(pareja => (
-                <div key={pareja.parejaId} className="bg-white rounded-[28px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
-                  <div className="flex items-center gap-3.5">
-                    <AvatarIcono nombre={pareja.nombrePareja} avatar={pareja.avatarPareja} size="md" />
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-800">{pareja.nombrePareja}</h3>
-                      <span className="text-xs text-slate-400">🔥 {pareja.rachaActual} días de racha</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[11px] font-bold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    🟢 Activo
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm text-center space-y-2">
-                <span className="text-2xl">👥</span>
-                <p className="text-xs font-medium text-slate-600">Todavía no tienes amigos agregados</p>
-              </div>
-            )}
-          </section>
-
-          {/* INVITACIONES */}
-          <section className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">📩 Invitaciones</h2>
-
-            {/* Recibidas */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-semibold text-slate-400 px-1">Recibidas</span>
-              {recibidas.length > 0 ? recibidas.map(p => (
-                <div key={p.parejaId} className="bg-white rounded-[28px] p-4 border border-orange-100 shadow-sm space-y-3">
-                  <div className="flex items-center gap-3">
-                    <AvatarIcono nombre="?" size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-slate-800">Tu amigo te ha invitado</h4>
-                      <p className="text-[11px] text-slate-400 truncate">{p.correoInvitado}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => manejarAceptar(p.parejaId)}
-                      disabled={aceptandoId === p.parejaId}
-                      className="py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs disabled:opacity-50"
-                    >
-                      {aceptandoId === p.parejaId ? "Aceptando..." : "Aceptar"}
-                    </button>
-                    <button
-                      onClick={() => manejarRechazar(p.parejaId)}
-                      disabled={rechazandoId === p.parejaId}
-                      className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs disabled:opacity-50"
-                    >
-                      {rechazandoId === p.parejaId ? "..." : "Rechazar"}
-                    </button>
-                  </div>
-                </div>
-              )) : (
-                <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
-                  <span className="text-lg">📬</span>
-                  <p className="text-xs text-slate-400">Aún no has recibido invitaciones.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Enviadas */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-semibold text-slate-400 px-1">Invitaciones pendientes</span>
-              {enviadas.length > 0 ? enviadas.map(p => (
-                <div key={p.parejaId} className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 text-sm font-bold flex-shrink-0">⏳</div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-700 truncate">{p.correoInvitado}</p>
-                      <span className="text-[10px] text-slate-400">Pendiente de aceptación</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full">Pendiente</span>
-                    <button
-                      onClick={() => manejarCancelar(p.parejaId)}
-                      disabled={cancelandoId === p.parejaId}
-                      className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold disabled:opacity-50"
-                    >
-                      {cancelandoId === p.parejaId ? "..." : "Cancelar"}
-                    </button>
-                  </div>
-                </div>
-              )) : (
-                <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm flex items-center gap-3">
-                  <span className="text-lg">📭</span>
-                  <p className="text-xs text-slate-400">No tienes invitaciones pendientes.</p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* INVITAR */}
-          <section className="pt-2">
-            <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-500 text-lg">➕</div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800">Invitar amigo</h3>
-                  <p className="text-xs text-slate-400">Escribe su correo para iniciar su racha juntos</p>
-                </div>
-              </div>
-              <input
-                type="email"
-                value={correoInvitacion}
-                onChange={(e) => setCorreoInvitacion(e.target.value)}
-                placeholder="correo@ejemplo.com"
-                className="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-all"
-              />
-              <button
-                onClick={manejarInvitar}
-                disabled={enviandoInvitacion || !correoInvitacion.trim()}
-                className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-white rounded-2xl font-bold text-xs transition-all disabled:text-slate-400"
-              >
-                {enviandoInvitacion ? "Enviando..." : "Enviar invitación"}
-              </button>
-            </div>
-          </section>
-
+          </div>
         </div>
       </div>
     </div>
