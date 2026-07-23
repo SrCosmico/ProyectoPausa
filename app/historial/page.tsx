@@ -26,10 +26,41 @@ const COLOR_POR_NIVEL: Record<number, string> = {
   5: 'bg-emerald-400',
 };
 
-const COLOR_NIVEL_ESTRES: Record<string, { bg: string; text: string }> = {
-  Bajo: { bg: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-700' },
-  Moderado: { bg: 'bg-amber-50 border-amber-100', text: 'text-amber-700' },
-  Alto: { bg: 'bg-rose-50 border-rose-100', text: 'text-rose-700' },
+const COLOR_NIVEL_ESTRES: Record<string, { bg: string; text: string; barra: string; mensaje: string }> = {
+  Bajo: {
+    bg: 'bg-emerald-50 border-emerald-100',
+    text: 'text-emerald-700',
+    barra: '15%',
+    mensaje: 'Ese día tenías un nivel bajo de estrés percibido. Te sentías con control de tus actividades.',
+  },
+  Moderado: {
+    bg: 'bg-amber-50 border-amber-100',
+    text: 'text-amber-700',
+    barra: '52%',
+    mensaje: 'Ese día tenías un nivel moderado de estrés. Es normal sentirse así ocasionalmente.',
+  },
+  Alto: {
+    bg: 'bg-rose-50 border-rose-100',
+    text: 'text-rose-700',
+    barra: '88%',
+    mensaje: 'Ese día tus niveles de estrés percibido eran elevados.',
+  },
+};
+
+// Preguntas y opciones del PSS-4, usadas solo para mostrar el detalle de una evaluación pasada
+const PREGUNTAS_PSS4: { id: string; enunciado: string }[] = [
+  { id: 'p1', enunciado: '¿Sentías que no podías controlar las cosas importantes de tu vida?' },
+  { id: 'p2', enunciado: '¿Te sentías seguro de tu capacidad para manejar tus problemas personales?' },
+  { id: 'p3', enunciado: '¿Sentías que las cosas salían como tú querías?' },
+  { id: 'p4', enunciado: '¿Sentías que las dificultades se acumulaban tanto que no podías superarlas?' },
+];
+
+const OPCIONES_PSS4: Record<number, string> = {
+  0: 'Nunca',
+  1: 'Casi nunca',
+  2: 'A veces',
+  3: 'A menudo',
+  4: 'Muy a menudo',
 };
 
 export default function HistorialPage() {
@@ -43,6 +74,7 @@ export default function HistorialPage() {
 
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
   const [diaSeleccionado, setDiaSeleccionado] = useState<RegistroEmocional | null>(null);
+  const [evaluacionSeleccionada, setEvaluacionSeleccionada] = useState<ResultadoEvaluacionDB | null>(null);
 
   const cargarDatos = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -216,9 +248,10 @@ export default function HistorialPage() {
                 evaluaciones.map((ev) => {
                   const estilo = COLOR_NIVEL_ESTRES[ev.nivel_estres] ?? COLOR_NIVEL_ESTRES.Moderado;
                   return (
-                    <div
+                    <button
                       key={ev.id}
-                      className={`p-4 rounded-2xl border shadow-sm ${estilo.bg}`}
+                      onClick={() => setEvaluacionSeleccionada(ev)}
+                      className={`w-full text-left p-4 rounded-2xl border shadow-sm hover:shadow-md active:scale-[0.99] transition-all ${estilo.bg}`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -233,7 +266,7 @@ export default function HistorialPage() {
                           {ev.puntaje_total} / 16
                         </span>
                       </div>
-                    </div>
+                    </button>
                   );
                 })
               )}
@@ -283,6 +316,78 @@ export default function HistorialPage() {
             </div>
           </div>
         )}
+
+        {/* MODAL DETALLE DE LA EVALUACIÓN */}
+        {evaluacionSeleccionada && (() => {
+          const estilo = COLOR_NIVEL_ESTRES[evaluacionSeleccionada.nivel_estres] ?? COLOR_NIVEL_ESTRES.Moderado;
+          const respuestas = evaluacionSeleccionada.respuestas ?? {};
+
+          return (
+            <div
+              className="absolute inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
+              onClick={() => setEvaluacionSeleccionada(null)}
+            >
+              <div
+                className="bg-white w-full sm:max-w-sm rounded-t-[30px] sm:rounded-[30px] p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {formatearFechaEvaluacion(evaluacionSeleccionada.creado_at)}
+                  </p>
+                  <button onClick={() => setEvaluacionSeleccionada(null)} className="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">&times;</button>
+                </div>
+
+                <div className={`p-4 rounded-2xl border flex items-center justify-between ${estilo.bg}`}>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nivel de estrés</p>
+                    <p className={`text-xl font-extrabold mt-0.5 ${estilo.text}`}>{evaluacionSeleccionada.nivel_estres}</p>
+                  </div>
+                  <span className={`text-sm font-black px-3 py-1.5 rounded-xl bg-white/80 ${estilo.text}`}>
+                    {evaluacionSeleccionada.puntaje_total} / 16
+                  </span>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                  <div className="relative w-full h-3 bg-slate-100 rounded-full">
+                    <div className="absolute inset-0 flex rounded-full overflow-hidden">
+                      <div className="w-[31%] h-full bg-emerald-400/80" />
+                      <div className="w-[44%] h-full bg-amber-400/80 border-x border-white" />
+                      <div className="w-[25%] h-full bg-rose-400/80" />
+                    </div>
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-indigo-900 rounded-full border-2 border-white shadow"
+                      style={{ left: estilo.barra }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 text-[10px] font-bold text-slate-400 mt-2 text-center">
+                    <div>Bajo <span className="block font-medium">0-5</span></div>
+                    <div className="border-x border-slate-100">Moderado <span className="block font-medium">6-12</span></div>
+                    <div>Alto <span className="block font-medium">13-16</span></div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-600 font-medium leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  {estilo.mensaje}
+                </p>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tus respuestas</p>
+                  {PREGUNTAS_PSS4.map((p) => {
+                    const valor = respuestas[p.id];
+                    if (valor === undefined) return null;
+                    return (
+                      <div key={p.id} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                        <p className="text-[11px] font-semibold text-slate-600">{p.enunciado}</p>
+                        <p className="text-xs font-bold text-[#4A72A6] mt-1">{OPCIONES_PSS4[valor] ?? valor}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
