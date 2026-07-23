@@ -77,12 +77,12 @@ export default function LoginView() {
         </div>
 
         {/* CONTENIDO */}
-        <div className="relative z-10 flex-1 flex flex-col px-6 pt-8 pb-10 w-full">
+        <div className="relative z-10 flex-1 flex flex-col justify-center px-6 pt-2 pb-10 w-full">
 
           {/* BOTÓN REGRESAR */}
           <button 
             onClick={() => router.back()} 
-            className="mb-6 p-2.5 -ml-2 w-fit rounded-full bg-white/80 backdrop-blur-sm shadow-sm text-slate-700 disabled:opacity-50 active:scale-95 transition-all"
+            className="absolute top-4 left-4 p-2.5 w-fit rounded-full bg-white/80 backdrop-blur-sm shadow-sm text-slate-700 disabled:opacity-50 active:scale-95 transition-all"
             disabled={loading}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -91,7 +91,7 @@ export default function LoginView() {
           </button>
 
           {/* LOGO */}
-          <div className="flex justify-center -mb-20">
+          <div className="flex justify-center -mb-32">
             <img
               src="/images/logo.png"
               alt="Pausa"
@@ -100,7 +100,7 @@ export default function LoginView() {
           </div>
 
           {/* ENCABEZADO */}
-          <div className="text-center mb-8 -mt-2">
+          <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-[#1E293B] mb-2">Bienvenido de nuevo</h1>
             <p className="text-sm text-gray-500">Nos alegra verte otra vez</p>
           </div>
