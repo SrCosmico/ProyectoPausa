@@ -38,6 +38,8 @@ const opcionesEstado = [
 
 export default function DiarioPage() {
   const router = useRouter();
+  const imagenInputRef = React.useRef<HTMLInputElement>(null);
+  const editorRef = React.useRef<HTMLDivElement>(null);
 
   const [userId,      setUserId]      = useState<string>('');
   const [vista,       setVista]       = useState<VistaDiario>('bienvenida');
@@ -193,6 +195,33 @@ export default function DiarioPage() {
     setPatronTemporal(null);
     setErrorPatron(null);
     setModoBloqueo('crear_dibujar');
+  };
+
+  // ── NUEVO: insertar imagen como base64 dentro del editor enriquecido ─────
+  const manejarInsertarImagen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('La imagen no puede superar los 3 MB.');
+      if (imagenInputRef.current) imagenInputRef.current.value = '';
+      return;
+    }
+
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    editorRef.current?.focus();
+    document.execCommand('insertImage', false, base64);
+
+    // Sincronizamos el estado con lo que quedó en el editor tras insertar la imagen
+    if (editorRef.current) setContenido(editorRef.current.innerHTML);
+
+    if (imagenInputRef.current) imagenInputRef.current.value = '';
   };
 
   // ── Guardar nota nueva en Supabase ───────────────────────────────────────
@@ -435,7 +464,7 @@ export default function DiarioPage() {
               </div>
               <p className="text-[10px] text-slate-400">{formatearFechaNota(notaActiva.fecha)} · {notaActiva.label_dia ?? ''}</p>
               <div
-                className="text-xs text-slate-600 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1"
+                className="text-xs text-slate-600 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2"
                 dangerouslySetInnerHTML={{ __html: notaActiva.contenido }}
               />
               <button
@@ -508,15 +537,33 @@ export default function DiarioPage() {
                     title="Color de texto"
                   />
                 ))}
+                <span className="w-px h-5 bg-slate-200 mx-1" />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => imagenInputRef.current?.click()}
+                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-sm flex items-center justify-center transition-colors"
+                  title="Insertar imagen"
+                >
+                  🖼️
+                </button>
+                <input
+                  ref={imagenInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={manejarInsertarImagen}
+                />
               </div>
 
               <div
                 key={editorKey}
+                ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setContenido((e.target as HTMLDivElement).innerHTML)}
                 data-placeholder="¿Qué tienes en mente hoy?"
-                className="w-full flex-1 p-2 text-xs text-slate-600 focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
+                className="w-full flex-1 p-2 text-xs text-slate-600 focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2"
               />
 
               <button
