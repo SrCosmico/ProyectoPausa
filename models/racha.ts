@@ -33,6 +33,7 @@ export interface EstadoRachaPareja {
   activadaHoy: boolean;
   historialDias: CheckinDia[];
   mensajeMotivador: string | null;
+  soyReceptor?: boolean; // ✅ true = me invitaron, false = yo invité
 }
 
 export const MAX_PROTECTORES_MES = 4;

@@ -1,14 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { EstadoRachaPareja } from '@/models/racha';
-
-type DiaRacha = {
-  fecha: string;
-  completo: boolean;
-  protegido: boolean;
-  antesDePareja: boolean;
-  yoRegistre: boolean;
-  parejaRegistro: boolean;
-};
+import type { EstadoRachaPareja, CheckinDia } from '@/models/racha';
 
 const supabase = createClient();
 
@@ -41,20 +32,21 @@ export async function validarInvitacion(
     };
   }
 
-  // Verificar que no tenga ya una pareja activa o invitación pendiente
-  const { data: parejaExistente } = await supabase
+  // Verificar que el EMISOR no tenga ya una pareja activa o invitación pendiente
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, mensaje: 'No autenticado.' };
+
+  const { data: parejaEmisor } = await supabase
     .from('parejas')
     .select('id, estado')
-    .or(
-      `user_id_1.eq.${usuarioId},user_id_2.eq.${usuarioId}`
-    )
+    .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`)
     .in('estado', ['activa', 'pendiente'])
     .maybeSingle();
 
-  if (parejaExistente) {
+  if (parejaEmisor) {
     return {
       ok: false,
-      mensaje: 'Ese usuario ya tiene una racha activa o una invitación pendiente.',
+      mensaje: 'Ya tienes una racha activa o una invitación pendiente.',
     };
   }
 
@@ -124,18 +116,19 @@ export async function calcularEstadoRachaPareja(
     tieneParejaActiva: false,
     esperandoAceptacion: false,
     parejaId: null,
-    correoInvitado: '',
-    nombrePareja: '',
+    correoInvitado: null,
+    nombrePareja: null,
     rachaActual: 0,
     rachaMaxima: 0,
     protectoresDisponibles: 0,
     protectoresUsadosEsteMes: 0,
     activadaHoy: false,
     historialDias: [],
-    mensajeMotivador: '',
+    mensajeMotivador: null,
+    soyReceptor: false,
   };
 
-  // Buscar pareja activa o pendiente
+  // Buscar pareja activa o pendiente donde el usuario es emisor O receptor
   const { data: pareja, error: errPareja } = await supabase
     .from('parejas')
     .select('*')
@@ -145,13 +138,15 @@ export async function calcularEstadoRachaPareja(
 
   if (errPareja || !pareja) return estadoVacio;
 
-  // Pareja pendiente
+  // Pareja pendiente — distinguir si soy el emisor o el receptor
   if (pareja.estado === 'pendiente') {
+    const soyReceptor = pareja.user_id_2 === userId;
     return {
       ...estadoVacio,
       esperandoAceptacion: true,
       parejaId: pareja.id,
       correoInvitado: pareja.correo_invitado,
+      soyReceptor, // true = me invitaron a mí, false = yo invité
     };
   }
 
@@ -178,13 +173,13 @@ export async function calcularEstadoRachaPareja(
 
   const { data: historial } = await supabase
     .from('historial_emociones')
-    .select('dia, user_id')
+    .select('dia')
     .in('user_id', [userId, otroUserId])
     .gte('dia', fechaInicio)
     .order('dia', { ascending: true });
 
   // Construir historial de 7 días
-  const historialDias: DiaRacha[] = [];
+  const historialDias: CheckinDia[] = [];
   const fechaInicioPareja = pareja.fecha_inicio
     ? new Date(pareja.fecha_inicio).toISOString().split('T')[0]
     : null;
@@ -196,17 +191,15 @@ export async function calcularEstadoRachaPareja(
 
     const antesDePareja = fechaInicioPareja ? fechaStr < fechaInicioPareja : false;
     const registrosDelDia = historial?.filter(h => h.dia === fechaStr) ?? [];
-    const yoRegistre = registrosDelDia.some(h => h.user_id === userId);
-    const parejaRegistro = registrosDelDia.some(h => h.user_id === otroUserId);
-    const ambosRegistraron = yoRegistre && parejaRegistro;
+    const ambosRegistraron = registrosDelDia.length >= 2;
 
     historialDias.push({
       fecha: fechaStr,
+      yoRegistre: registrosDelDia.some((h: any) => h.user_id === userId),
+      parejaRegistro: registrosDelDia.some((h: any) => h.user_id === otroUserId),
       completo: ambosRegistraron,
       protegido: false,
       antesDePareja,
-      yoRegistre,
-      parejaRegistro,
     });
   }
 
@@ -237,7 +230,7 @@ export async function calcularEstadoRachaPareja(
     rachaMaxima,
     protectoresDisponibles: protectores?.length ?? 0,
     protectoresUsadosEsteMes: 0,
-    activadaHoy: false,
+    activadaHoy: fechaInicioPareja === new Date().toISOString().split('T')[0],
     historialDias,
     mensajeMotivador,
   };

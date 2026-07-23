@@ -151,14 +151,12 @@ export default function RachaPage() {
   const invitacionRecibida = !!(
     estado?.esperandoAceptacion &&
     !estado?.tieneParejaActiva &&
-    userEmail &&
-    estado.correoInvitado === userEmail
+    estado?.soyReceptor
   );
 
   const invitacionPendienteEnviada = !!(
     estado?.esperandoAceptacion &&
-    userEmail &&
-    estado.correoInvitado !== userEmail
+    !estado?.soyReceptor
   );
 
   if (cargando) {
