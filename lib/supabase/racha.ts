@@ -104,7 +104,7 @@ async function calcularRachaPareja(
     .from('protectores_racha')
     .select('usado_en_fecha')
     .eq('pareja_id', parejaId)
-    .eq('usado', true)
+    .not('usado_por', 'is', null)
     .not('usado_en_fecha', 'is', null);
 
   const fechasProtegidas = new Set((diasProtegidos ?? []).map(d => d.usado_en_fecha));
@@ -145,9 +145,17 @@ export async function otorgarProtectorMensualSiCorresponde(parejaId: string): Pr
 
   if ((count ?? 0) >= MAX_PROTECTORES_MES) return;
 
+  const hoy = new Date().toISOString().split('T')[0];
+
   await supabase
     .from('protectores_racha')
-    .insert({ pareja_id: parejaId, otorgado_mes: mesActual, usado: false })
+    .insert({
+      pareja_id: parejaId,
+      fecha: hoy,          // placeholder: fecha en que se otorgó (obligatoria en el esquema)
+      otorgado_mes: mesActual,
+      usado_por: null,
+      usado_en_fecha: null,
+    })
     .select()
     .maybeSingle();
 }
@@ -158,11 +166,14 @@ export async function usarProtector(
   parejaId: string,
   fechaAProteger: string
 ): Promise<{ ok: boolean; mensaje?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, mensaje: 'No autenticado.' };
+
   const { data: protector, error: errBusqueda } = await supabase
     .from('protectores_racha')
     .select('id')
     .eq('pareja_id', parejaId)
-    .eq('usado', false)
+    .is('usado_por', null)
     .limit(1)
     .maybeSingle();
 
@@ -172,9 +183,9 @@ export async function usarProtector(
 
   const { error: errUpdate } = await supabase
     .from('protectores_racha')
-    .update({ usado: true, usado_en_fecha: fechaAProteger })
+    .update({ usado_por: user.id, usado_en_fecha: fechaAProteger })
     .eq('id', protector.id)
-    .eq('usado', false);
+    .is('usado_por', null);
 
   if (errUpdate) return { ok: false, mensaje: 'No se pudo activar el protector.' };
 
@@ -219,7 +230,6 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
   const parejasActivas = await Promise.all(activas.map(async (pareja) => {
     const otroUserId = pareja.user_id_1 === userId ? pareja.user_id_2 : pareja.user_id_1;
 
-    // Otorga el protector del mes si corresponde
     await otorgarProtectorMensualSiCorresponde(pareja.id);
 
     const { data: perfil } = await supabase
@@ -244,7 +254,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       .from('protectores_racha')
       .select('usado_en_fecha')
       .eq('pareja_id', pareja.id)
-      .eq('usado', true);
+      .not('usado_por', 'is', null);
 
     const fechasProtegidas = new Set((protegidosSet ?? []).map(p => p.usado_en_fecha));
 
@@ -264,7 +274,6 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       });
     }
 
-    // Récord de racha: se actualiza si la racha actual lo supera
     const { data: rachaData } = await supabase
       .from('rachas_parejas')
       .select('racha_maxima')
@@ -284,7 +293,7 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
       .from('protectores_racha')
       .select('id')
       .eq('pareja_id', pareja.id)
-      .eq('usado', false);
+      .is('usado_por', null);
 
     let mensajeMotivador = '';
     if (rachaActual >= 30) mensajeMotivador = '¡Un mes juntos! Son increíbles 🏆';
@@ -313,7 +322,6 @@ export async function calcularEstadoRachaPareja(userId: string): Promise<EstadoR
     soyReceptor: p.user_id_2 === userId,
   }));
 
-  // Compatibilidad con campos de la primera pareja activa
   const primera = parejasActivas[0];
   const primeraPendiente = parejasPendientes.find(p => !p.soyReceptor);
   const primeraRecibida = parejasPendientes.find(p => p.soyReceptor);
