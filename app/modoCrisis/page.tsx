@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 // ==========================================
 // FUENTE ÚNICA DE VERDAD: CONTACTOS
 // ==========================================
+//
+// NOTA SOBRE VERACIDAD DE LOS DATOS:
+// Los teléfonos marcados como verificados fueron corroborados contra
+// fuentes públicas (directorio telefónico oficial de la UCV y directorios
+// de líneas de ayuda psicológica de Venezuela). Los que NO pudieron
+// verificarse quedan marcados con `verificado: false` y un aviso visible
+// en la tarjeta, en vez de inventar un número.
 
 type CategoriaContacto = "ucv" | "emergencia";
 
@@ -19,6 +26,7 @@ interface ContactoEmergencia {
   telefono?: string;
   email?: string;
   esEmergencia?: boolean;
+  verificado: boolean;
   // Datos para el mapa
   lat?: number;
   lng?: number;
@@ -29,13 +37,13 @@ interface ContactoEmergencia {
 const CONTACTOS: ContactoEmergencia[] = [
   {
     id: "dbe",
-    nombre: "División de Bienestar Estudiantil (DBE)",
-    descripcion: "Servicio de orientación y acompañamiento psicológico gratuito para estudiantes de pregrado.",
+    nombre: "Organización de Bienestar Estudiantil (OBE)",
+    descripcion: "Dirección de la UCV encargada del bienestar integral del estudiantado, incluyendo orientación y acompañamiento.",
     categoria: "ucv",
-    ubicacion: "Ciudad Universitaria, Edificio de Rectorado, Piso 1",
-    horario: "Lun–Vie, 8:00 a.m. – 12:00 p.m. y 1:00 p.m. – 5:00 p.m.",
-    telefono: "(0212) 605-4111",
-    email: "bienestar@ucv.edu.ve",
+    ubicacion: "Ciudad Universitaria, Edificio de Rectorado",
+    horario: "Lun–Vie, horario de oficina",
+    telefono: "(0212) 605-4751 / 605-4731",
+    verificado: true,
     lat: 10.4880,
     lng: -66.8902,
     color: "#4A72A6",
@@ -44,11 +52,11 @@ const CONTACTOS: ContactoEmergencia[] = [
   {
     id: "esc_psico",
     nombre: "Clínica Psicológica — Escuela de Psicología",
-    descripcion: "Atención clínica supervisada por profesionales. Solicita cita con antelación.",
+    descripcion: "Atención clínica supervisada por profesionales, adscrita a la Escuela de Psicología. Solicita cita con antelación.",
     categoria: "ucv",
     ubicacion: "Facultad de Humanidades y Educación, Escuela de Psicología",
-    horario: "Lun–Vie, 8:00 a.m. – 12:00 p.m.",
-    telefono: "(0212) 605-2711",
+    horario: "Lun–Vie (confirmar horario vigente con la escuela)",
+    verificado: false,
     lat: 10.4872,
     lng: -66.8915,
     color: "#7C3AED",
@@ -57,11 +65,11 @@ const CONTACTOS: ContactoEmergencia[] = [
   {
     id: "sap_psicologia",
     nombre: "S.A.P. — Servicio de Asesoramiento Psicológico",
-    descripcion: "Programa de la Escuela de Psicología orientado al asesoramiento y apoyo psicológico preventivo para la comunidad universitaria. Confirma disponibilidad y horario vigente con la coordinación antes de asistir.",
+    descripcion: "Programa de la Escuela de Psicología orientado al asesoramiento y apoyo psicológico preventivo para la comunidad universitaria.",
     categoria: "ucv",
     ubicacion: "Facultad de Humanidades y Educación, Escuela de Psicología",
-    horario: "Lun–Vie (horario sujeto a disponibilidad de la coordinación)",
-    telefono: "(0212) 605-2988",
+    horario: "Lun–Vie (confirmar horario vigente con la coordinación)",
+    verificado: false,
     lat: 10.4874,
     lng: -66.8913,
     color: "#0891B2",
@@ -74,6 +82,7 @@ const CONTACTOS: ContactoEmergencia[] = [
     categoria: "ucv",
     ubicacion: "Presente en cada Facultad de la Ciudad Universitaria",
     horario: "Según horario de atención de cada facultad",
+    verificado: false,
     lat: 10.4885,
     lng: -66.8930,
     color: "#0D9488",
@@ -84,23 +93,24 @@ const CONTACTOS: ContactoEmergencia[] = [
     nombre: "Departamento de Psiquiatría — Facultad de Medicina",
     descripcion: "Consulta médica especializada para situaciones de salud mental que requieran evaluación clínica.",
     categoria: "ucv",
-    ubicacion: "Ciudad Universitaria, Facultad de Medicina, Piso 3",
-    horario: "Lun–Vie, 9:00 a.m. – 1:00 p.m.",
-    telefono: "(0212) 605-3822",
+    ubicacion: "Ciudad Universitaria, Facultad de Medicina",
+    horario: "Lun–Vie (confirmar horario vigente con el departamento)",
+    verificado: false,
     lat: 10.4865,
     lng: -66.8888,
     color: "#059669",
     icono: "🏥",
   },
   {
-    id: "inpsasel",
-    nombre: "INPSASEL — Línea de Salud Mental",
-    descripcion: "Atención psicológica de emergencia disponible las 24 horas del día.",
+    id: "lapsi",
+    nombre: "LAPSI — Línea de Ayuda Psicológica",
+    descripcion: "Línea de la Federación de Psicólogos de Venezuela. Asistencia gratuita, anónima y confidencial, accesible desde cualquier teléfono.",
     categoria: "emergencia",
-    ubicacion: "Av. José Félix Sosa, Caracas (sede central)",
-    horario: "24 horas, 7 días a la semana",
-    telefono: "0800-SALUD-00 (0800-72583-00)",
+    ubicacion: "Atención telefónica a nivel nacional (Venezuela)",
+    horario: "Cobertura casi continua: desde el viernes 8:00 a.m. hasta el miércoles 8:00 a.m.",
+    telefono: "(0212) 416-3116 / 416-3118",
     esEmergencia: true,
+    verificado: true,
     lat: 10.4915,
     lng: -66.8860,
     color: "#EA580C",
@@ -108,13 +118,14 @@ const CONTACTOS: ContactoEmergencia[] = [
   },
   {
     id: "bomberos",
-    nombre: "Cuerpo de Bomberos Universitarios UCV",
+    nombre: "Cuerpo de Bomberos Voluntarios Universitarios UCV",
     descripcion: "Primeros auxilios y emergencias médicas dentro del campus universitario.",
     categoria: "emergencia",
-    ubicacion: "Ciudad Universitaria, Portón principal",
-    horario: "24 horas, 7 días a la semana",
-    telefono: "(0212) 605-4444",
+    ubicacion: "Sótano del Gimnasio Cubierto, Ciudad Universitaria de Caracas",
+    horario: "24 horas, 365 días al año",
+    telefono: "(0212) 605-2222 (central) / 605-4930 al 33",
     esEmergencia: true,
+    verificado: true,
     lat: 10.4893,
     lng: -66.8875,
     color: "#E11D48",
@@ -122,13 +133,14 @@ const CONTACTOS: ContactoEmergencia[] = [
   },
   {
     id: "emergencias_nacionales",
-    nombre: "Emergencias Nacionales",
+    nombre: "Emergencias Nacionales (VEN 911)",
     descripcion: "Número único de emergencias para situaciones de riesgo vital inmediato.",
     categoria: "emergencia",
     ubicacion: "Nacional (Venezuela)",
     horario: "24 horas, 7 días a la semana",
     telefono: "911",
     esEmergencia: true,
+    verificado: true,
     color: "#E11D48",
     icono: "🚨",
   },
@@ -376,36 +388,36 @@ function MapaUCV() {
                   <p className="text-[11px] text-slate-600 font-medium">{puntoSeleccionado.email}</p>
                 </div>
               )}
+              {puntoSeleccionado.telefono && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs flex-shrink-0">📞</span>
+                  <p className="text-[11px] text-slate-600 font-medium">{puntoSeleccionado.telefono}</p>
+                </div>
+              )}
+              {!puntoSeleccionado.verificado && (
+                <div className="flex items-start gap-2 pt-1">
+                  <span className="text-xs flex-shrink-0">ℹ️</span>
+                  <p className="text-[10px] text-amber-600 font-medium leading-snug">
+                    Dato por confirmar directamente con la institución.
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-2">
-              {puntoSeleccionado.telefono && (
-                <a
-                  href={`tel:${puntoSeleccionado.telefono.replace(/\D/g, '')}`}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold text-white transition-colors"
-                  style={{ backgroundColor: puntoSeleccionado.color }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.338c0-1.36 1.22-2.337 2.57-2.096l1.77.32A2.25 2.25 0 0 1 8.33 6.44l.51 2.55a2.25 2.25 0 0 1-1.29 2.49l-.99.44a1.04 1.04 0 0 0-.57 1.17c.53 2.58 2.47 4.73 5.05 5.78l.45.18a1.04 1.04 0 0 0 1.23-.41l.44-.66a2.25 2.25 0 0 1 2.58-.92l2.53.84a2.25 2.25 0 0 1 1.55 2.25v1.44c0 1.36-1.22 2.34-2.57 2.09C7.62 22.78 1.5 15.5 1.5 6.75c0-.15.02-.3.05-.45l.69-.001.01.034Z" />
-                  </svg>
-                  Llamar ahora
-                </a>
-              )}
-              {puntoSeleccionado.lat && puntoSeleccionado.lng && (
-                <a
-                  href={`https://maps.google.com/?q=${puntoSeleccionado.lat},${puntoSeleccionado.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                  </svg>
-                  Ir a ubicación
-                </a>
-              )}
-            </div>
+            {puntoSeleccionado.lat && puntoSeleccionado.lng && (
+              <a
+                href={`https://maps.google.com/?q=${puntoSeleccionado.lat},${puntoSeleccionado.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                </svg>
+                Ir a ubicación
+              </a>
+            )}
           </div>
         </div>
       )}
@@ -475,19 +487,16 @@ function AccordionItem({ punto }: { punto: ContactoEmergencia }) {
               </div>
             )}
             {punto.telefono && (
-              <a
-                href={`tel:${punto.telefono.replace(/\D/g, "")}`}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold transition-all active:scale-[0.99] ${
-                  punto.esEmergencia
-                    ? "bg-rose-500 text-white hover:bg-rose-600"
-                    : "bg-[#4A72A6] text-white hover:bg-[#3B5E8C]"
-                }`}
-              >
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold ${
+                punto.esEmergencia
+                  ? "bg-rose-50 text-rose-700 border border-rose-100"
+                  : "bg-[#4A72A6]/10 text-[#3B5E8C] border border-[#4A72A6]/20"
+              }`}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.338c0-1.36 1.22-2.337 2.57-2.096l1.77.32A2.25 2.25 0 0 1 8.33 6.44l.51 2.55a2.25 2.25 0 0 1-1.29 2.49l-.99.44a1.04 1.04 0 0 0-.57 1.17c.53 2.58 2.47 4.73 5.05 5.78l.45.18a1.04 1.04 0 0 0 1.23-.41l.44-.66a2.25 2.25 0 0 1 2.58-.92l2.53.84a2.25 2.25 0 0 1 1.55 2.25v1.44c0 1.36-1.22 2.34-2.57 2.09C7.62 22.78 1.5 15.5 1.5 6.75c0-.15.02-.3.05-.45l.69-.001.01.034Z" />
                 </svg>
-                Llamar: {punto.telefono}
-              </a>
+                {punto.telefono}
+              </div>
             )}
             {punto.email && (
               <a
@@ -499,6 +508,14 @@ function AccordionItem({ punto }: { punto: ContactoEmergencia }) {
                 </svg>
                 {punto.email}
               </a>
+            )}
+            {!punto.verificado && (
+              <div className="flex items-start gap-2 pt-1">
+                <span className="text-[10px] text-amber-500 flex-shrink-0 mt-0.5">ℹ️</span>
+                <span className="text-[10px] text-amber-600 font-medium leading-snug">
+                  No se encontró un teléfono público confirmado para este servicio. Te recomendamos contactar directamente a la facultad correspondiente.
+                </span>
+              </div>
             )}
           </div>
         </div>
