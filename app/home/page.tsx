@@ -83,25 +83,25 @@ export const accesoRapidoData: AccesoRapido[] = [
     id: "cronograma",
     titulo: "Cronograma académico",
     descripcion: "Organiza tu semana",
-    ruta: "/cronograma.2",
+    ruta: "/cronograma",
   },
   {
     id: "evaluacion",
     titulo: "Evaluación rápida",
     descripcion: "Conoce tu bienestar",
-    ruta: "/evaluacion.2",
+    ruta: "/evaluacion",
   },
   {
     id: "antistres",
     titulo: "Monitoreo emocional",
     descripcion: "Revisa tu progreso y tus registros",
-    ruta: "/monitoreo.2",
+    ruta: "/monitoreo",
   },
   {
     id: "meditacion",
     titulo: "Meditación y respiración",
     descripcion: "Encuentra tu calma",
-    ruta: "/meditacion.2",
+    ruta: "/meditacion",
   },
   {
     id: "diario",
@@ -119,7 +119,7 @@ export const accesoRapidoData: AccesoRapido[] = [
     id: "crisis",
     titulo: "Modo crisis",
     descripcion: "Ayuda inmediata y contención",
-    ruta: "/modoCrisis.2",
+    ruta: "/modoCrisis",
   },
 ];
 
@@ -950,7 +950,7 @@ export default function HomePage() {
 
               <button
                 onClick={() =>
-                  router.push("/modoCrisis.2")
+                  router.push("/modoCrisis")
                 }
                 className="
                   w-full
