@@ -27,6 +27,7 @@ type VistaDiario = 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verN
 type ModoBloqueo = 'cargando' | 'crear_dibujar' | 'crear_confirmar' | 'verificar';
 
 const MIN_PUNTOS_PATRON = 3;
+const FILTRO_SIN_ETIQUETA = 'SIN_ETIQUETA';
 
 const opcionesEstado = [
   { emoji: '💜', label: 'Productivo', color: '#8B5CF6' },
@@ -34,6 +35,8 @@ const opcionesEstado = [
   { emoji: '💙', label: 'Tranquilo',  color: '#3B82F6' },
   { emoji: '💚', label: 'Aprendizaje',color: '#10B981' },
 ];
+
+const claveVisitado = (uid: string) => `pausa_diario_visitado_${uid}`;
 
 export default function DiarioPage() {
   const router = useRouter();
@@ -45,6 +48,11 @@ export default function DiarioPage() {
   const [listaNotas,  setListaNotas]  = useState<NotaDiario[]>([]);
   const [notaActiva,  setNotaActiva]  = useState<NotaDiario | null>(null);
   const [cargando,    setCargando]    = useState<boolean>(false);
+
+  // Indica si esta es la primera vez que el usuario usa el diario (no ha
+  // pasado antes por la pantalla de bienvenida). Se usa para decidir a dónde
+  // lo manda la flecha de "atrás" desde la pantalla de patrón.
+  const [esPrimeraVez, setEsPrimeraVez] = useState<boolean>(true);
 
   const [filtroEtiqueta, setFiltroEtiqueta] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -155,11 +163,22 @@ export default function DiarioPage() {
       setUserId(user.id);
       await cargarNotas(user.id);
 
-      // Si el usuario ya tiene un patrón guardado, no es su primera vez:
-      // saltamos la pantalla de bienvenida y vamos directo al bloqueo.
-      const hash = await obtenerPatronGuardado(user.id);
-      if (hash) {
+      // ¿Ya visitó el diario antes? Usamos localStorage porque es la señal
+      // más confiable de "ya pasó por la bienvenida" (no depende de si
+      // decidió crear o no un patrón, ni de fallas de red al consultarlo).
+      let visitado = false;
+      try {
+        visitado = typeof window !== 'undefined' && !!localStorage.getItem(claveVisitado(user.id));
+      } catch {
+        visitado = false;
+      }
+
+      if (visitado) {
+        setEsPrimeraVez(false);
         setVista('bloqueo');
+      } else {
+        setEsPrimeraVez(true);
+        setVista('bienvenida');
       }
     };
     init();
@@ -181,6 +200,21 @@ export default function DiarioPage() {
 
     cargarPatron();
   }, [vista, userId]);
+
+  const marcarComoVisitado = () => {
+    if (!userId) return;
+    try {
+      localStorage.setItem(claveVisitado(userId), '1');
+    } catch {
+      // Si localStorage no está disponible simplemente lo ignoramos;
+      // en el peor caso volverá a ver la bienvenida la próxima vez.
+    }
+  };
+
+  const irABloqueoDesdeBienvenida = () => {
+    marcarComoVisitado();
+    setVista('bloqueo');
+  };
 
   const limpiarSeleccion = () => {
     reiniciarPuntos();
@@ -233,6 +267,7 @@ export default function DiarioPage() {
         return;
       }
 
+      marcarComoVisitado();
       setVista('listaNotas');
       return;
     }
@@ -243,6 +278,7 @@ export default function DiarioPage() {
       setVerificandoPatron(false);
 
       if (hashIntento === patronHashGuardado) {
+        marcarComoVisitado();
         setVista('listaNotas');
       } else {
         dispararError('Patrón incorrecto. Intenta de nuevo.');
@@ -355,6 +391,16 @@ export default function DiarioPage() {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
+  // ── Comandos del editor: siempre se enfoca el editor ANTES de ejecutar
+  // el comando. Sin esto, si el foco quedó en otro elemento (por ejemplo
+  // el campo de título), document.execCommand se aplica al elemento
+  // equivocado (o a ninguno), lo que causaba el bug de listas.
+  const ejecutarComandoEditor = (comando: string, valor?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(comando, false, valor);
+    if (editorRef.current) setContenido(editorRef.current.innerHTML);
+  };
+
   const guardarNota = async () => {
     if (!userId) return;
     setCargando(true);
@@ -439,8 +485,15 @@ export default function DiarioPage() {
   };
 
   const manejarAtras = () => {
-    if (vista === 'bienvenida')  router.push('/home');
-    else if (vista === 'bloqueo')      setVista('bienvenida');
+    if (vista === 'bienvenida') {
+      router.push('/home');
+    } else if (vista === 'bloqueo') {
+      // Primera vez: la flecha regresa a la bienvenida.
+      // No es primera vez: la bienvenida ya no existe en el flujo del
+      // usuario, así que la flecha lo manda directo al home.
+      if (esPrimeraVez) setVista('bienvenida');
+      else router.push('/home');
+    }
     else if (vista === 'listaNotas')   setVista('bloqueo');
     else if (vista === 'crearNota')    { setNotaEditandoId(null); setVista('listaNotas'); }
     else if (vista === 'verNota')      setVista('listaNotas');
@@ -448,7 +501,11 @@ export default function DiarioPage() {
   };
 
   const notasFiltradas = listaNotas
-    .filter((n) => (filtroEtiqueta ? n.label_dia === filtroEtiqueta : true))
+    .filter((n) => {
+      if (filtroEtiqueta === null) return true;
+      if (filtroEtiqueta === FILTRO_SIN_ETIQUETA) return !n.label_dia;
+      return n.label_dia === filtroEtiqueta;
+    })
     .filter((n) =>
       busqueda.trim()
         ? n.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -530,7 +587,7 @@ export default function DiarioPage() {
                 ))}
               </div>
 
-              <button onClick={() => setVista('bloqueo')} className="w-full py-4 bg-[#6B66B2] text-white rounded-2xl font-bold text-sm shadow-md shadow-purple-100 hover:bg-[#5a5596] transition-colors">
+              <button onClick={irABloqueoDesdeBienvenida} className="w-full py-4 bg-[#6B66B2] text-white rounded-2xl font-bold text-sm shadow-md shadow-purple-100 hover:bg-[#5a5596] transition-colors">
                 Abrir mi diario
               </button>
             </div>
@@ -659,6 +716,15 @@ export default function DiarioPage() {
                     <span>{op.emoji}</span><span>{op.label}</span>
                   </button>
                 ))}
+                <button
+                  onClick={() => setFiltroEtiqueta(FILTRO_SIN_ETIQUETA)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                    filtroEtiqueta === FILTRO_SIN_ETIQUETA ? 'bg-[#6B66B2] text-white border-[#6B66B2]' : 'bg-white text-slate-500 border-slate-200'
+                  }`}
+                  title="Notas sin etiqueta"
+                >
+                  <span>🤍</span><span>Sin etiqueta</span>
+                </button>
               </div>
 
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pt-1">Notas recientes</p>
@@ -683,7 +749,7 @@ export default function DiarioPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] text-slate-400 font-semibold">{formatearFechaNota(nota.fecha)}</p>
-                      <span className="text-base flex-shrink-0">{nota.emoji_dia ?? ''}</span>
+                      <span className="text-base flex-shrink-0">{nota.emoji_dia ?? '🤍'}</span>
                     </div>
                     <p className="text-xs font-bold text-[#2A3B50] mt-0.5">{nota.titulo}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">{extraerTextoPlano(nota.contenido)}</p>
@@ -706,7 +772,7 @@ export default function DiarioPage() {
             <div className="pt-4 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] text-slate-400 font-semibold">{formatearFechaNota(notaActiva.fecha)}</p>
-                <span className="text-2xl">{notaActiva.emoji_dia ?? ''}</span>
+                <span className="text-2xl">{notaActiva.emoji_dia ?? '🤍'}</span>
               </div>
               <h2 className="text-lg font-bold text-[#2A3B50]">{notaActiva.titulo}</h2>
 
@@ -780,7 +846,7 @@ export default function DiarioPage() {
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => document.execCommand('bold')}
+                  onClick={() => ejecutarComandoEditor('bold')}
                   className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-white transition-colors"
                 >
                   <span className="text-sm font-black text-slate-600">Aa</span>
@@ -798,7 +864,7 @@ export default function DiarioPage() {
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => document.execCommand('insertUnorderedList')}
+                  onClick={() => ejecutarComandoEditor('insertUnorderedList')}
                   className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-white transition-colors"
                 >
                   <span className="text-sm text-slate-600">•≡</span>
@@ -861,6 +927,18 @@ export default function DiarioPage() {
                     <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: op.color }} />
                   </div>
                 ))}
+                <div className="flex items-center gap-3 p-3.5 bg-white/90 border border-slate-100 rounded-2xl shadow-sm">
+                  <span className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 bg-slate-100">
+                    🤍
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-[#2A3B50]">Sin etiqueta</p>
+                    <p className="text-[10px] text-slate-400">
+                      {listaNotas.filter((n) => !n.label_dia).length} notas sin etiquetar
+                    </p>
+                  </div>
+                  <span className="w-4 h-4 rounded-full flex-shrink-0 bg-slate-300" />
+                </div>
               </div>
 
               <div className="pt-2">
