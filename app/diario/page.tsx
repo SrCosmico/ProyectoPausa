@@ -232,8 +232,6 @@ export default function DiarioPage() {
     if (imagenInputRef.current) imagenInputRef.current.value = '';
   };
 
-
-
   // ── NUEVO: grabar audio y adjuntarlo a la nota como reproductor embebido ──
   const iniciarGrabacion = async () => {
     try {
@@ -268,7 +266,7 @@ export default function DiarioPage() {
         document.execCommand(
           'insertHTML',
           false,
-          `<audio controls src="${base64}" class="w-full my-2"></audio><br>`
+          `<span contenteditable="false" style="position:relative;display:block;" class="my-2"><audio controls src="${base64}" style="width:100%;display:block;"></audio><button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:9999px;background:#ef4444;color:white;border:none;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;">×</button></span><br>`
         );
         if (editorRef.current) setContenido(editorRef.current.innerHTML);
       };
@@ -543,8 +541,10 @@ export default function DiarioPage() {
               </div>
               <p className="text-[10px] text-slate-400">{formatearFechaNota(notaActiva.fecha)} · {notaActiva.label_dia ?? ''}</p>
               <div
-                className="text-xs text-slate-600 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2"
-                dangerouslySetInnerHTML={{ __html: notaActiva.contenido }}
+                className="text-xs text-slate-600 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_audio]:w-full [&_audio]:my-2"
+                dangerouslySetInnerHTML={{
+                  __html: notaActiva.contenido.replace(/<button[^>]*>×<\/button>/g, ''),
+                }}
               />
               <button
                 onClick={() => eliminarNota(notaActiva.id)}
@@ -561,17 +561,17 @@ export default function DiarioPage() {
               <input
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Título"
-                className="w-full text-xs font-bold p-2 focus:outline-none border-b border-slate-100 mb-2"
+                placeholder="Título de tu nota"
+                className="w-full text-sm font-bold p-3 focus:outline-none bg-slate-50 rounded-2xl mb-3 placeholder:text-slate-300"
               />
 
               {/* Barra de herramientas del editor */}
-              <div className="flex items-center gap-1.5 flex-wrap py-2 border-b border-slate-100 mb-2">
+              <div className="flex items-center gap-1.5 p-2 bg-slate-50 rounded-2xl mb-3">
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => document.execCommand('bold')}
-                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-black flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-xs font-black flex items-center justify-center transition-colors shadow-sm"
                   title="Negrita"
                 >
                   B
@@ -580,17 +580,16 @@ export default function DiarioPage() {
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => document.execCommand('italic')}
-                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs italic flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-xs italic flex items-center justify-center transition-colors shadow-sm"
                   title="Cursiva"
                 >
                   I
                 </button>
-                <span className="w-px h-5 bg-slate-200 mx-1" />
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => document.execCommand('insertUnorderedList')}
-                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-sm flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-sm flex items-center justify-center transition-colors shadow-sm"
                   title="Lista con viñetas"
                 >
                   •≡
@@ -599,29 +598,19 @@ export default function DiarioPage() {
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => document.execCommand('insertOrderedList')}
-                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm"
                   title="Lista numerada"
                 >
                   1≡
                 </button>
-                <span className="w-px h-5 bg-slate-200 mx-1" />
-                {['#1E293B', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'].map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => document.execCommand('foreColor', false, color)}
-                    className="w-5 h-5 rounded-full border border-slate-200 flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                    title="Color de texto"
-                  />
-                ))}
-                <span className="w-px h-5 bg-slate-200 mx-1" />
+
+                <span className="w-px h-6 bg-slate-200 mx-0.5" />
+
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => imagenInputRef.current?.click()}
-                  className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-sm flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-sm flex items-center justify-center transition-colors shadow-sm"
                   title="Insertar imagen"
                 >
                   🖼️
@@ -637,8 +626,8 @@ export default function DiarioPage() {
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => (grabando ? detenerGrabacion() : iniciarGrabacion())}
-                  className={`h-7 rounded-lg flex items-center justify-center transition-colors px-2 gap-1.5 ${
-                    grabando ? 'bg-rose-500 text-white' : 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+                  className={`h-8 rounded-xl flex items-center justify-center transition-colors px-2.5 gap-1.5 shadow-sm ${
+                    grabando ? 'bg-rose-500 text-white' : 'bg-white hover:bg-[#6B66B2]/10 text-slate-600'
                   }`}
                   title={grabando ? 'Detener grabación' : 'Grabar audio'}
                 >
@@ -655,13 +644,17 @@ export default function DiarioPage() {
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setContenido((e.target as HTMLDivElement).innerHTML)}
+                onClick={() => {
+                  // Sincroniza el estado si se eliminó una imagen/audio con el botón "×"
+                  if (editorRef.current) setContenido(editorRef.current.innerHTML);
+                }}
                 data-placeholder="¿Qué tienes en mente hoy?"
-                className="w-full flex-1 p-2 text-xs text-slate-600 focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2"
+                className="w-full flex-1 p-3 text-xs text-slate-600 focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_audio]:w-full [&_audio]:my-2"
               />
 
               <button
                 onClick={() => setPanelAbierto(true)}
-                className="mb-4 mt-3 p-4 rounded-xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full"
+                className="mb-4 mt-3 p-4 rounded-2xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full hover:bg-purple-100/70 transition-colors"
               >
                 <span className="text-xs font-bold text-purple-700">{estadoDia ? `Día ${estadoDia.label}` : 'Definir mi día'}</span>
                 <span className="text-xl">{estadoDia?.emoji ?? '💜'}</span>
@@ -670,7 +663,7 @@ export default function DiarioPage() {
               <button
                 onClick={guardarNota}
                 disabled={cargando || !contenido.trim()}
-                className="w-full py-3 bg-[#6B66B2] disabled:bg-slate-300 text-white rounded-xl font-bold text-xs shadow-md mb-6 hover:bg-[#5a5596] transition-colors"
+                className="w-full py-3.5 bg-[#6B66B2] disabled:bg-slate-300 text-white rounded-2xl font-bold text-xs shadow-md mb-6 hover:bg-[#5a5596] transition-colors"
               >
                 {cargando ? 'Guardando...' : 'Guardar nota'}
               </button>
