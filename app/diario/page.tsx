@@ -26,7 +26,7 @@ interface NotaDiario {
 type VistaDiario = 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verNota' | 'configuracion';
 type ModoBloqueo = 'cargando' | 'crear_dibujar' | 'crear_confirmar' | 'verificar';
 
-const MIN_PUNTOS_PATRON = 4;
+const MIN_PUNTOS_PATRON = 3;
 
 const opcionesEstado = [
   { emoji: '💜', label: 'Productivo', color: '#8B5CF6' },
@@ -66,6 +66,69 @@ export default function DiarioPage() {
   const [shake, setShake] = useState(false);
   const [verificandoPatron, setVerificandoPatron] = useState(false);
 
+  // NUEVO: patrón tipo celular — se dibuja arrastrando, con líneas conectando los puntos
+  const puntosRef = React.useRef<number[]>([]);
+  const [arrastrando, setArrastrando] = useState(false);
+  const [posicionPuntero, setPosicionPuntero] = useState<{ x: number; y: number } | null>(null);
+  const gridContainerRef = React.useRef<HTMLDivElement>(null);
+  const dotRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+
+  const centroDelPunto = (idx: number) => {
+    const el = dotRefs.current[idx];
+    const cont = gridContainerRef.current;
+    if (!el || !cont) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    const c = cont.getBoundingClientRect();
+    return { x: r.left - c.left + r.width / 2, y: r.top - c.top + r.height / 2 };
+  };
+
+  const posicionRelativa = (clientX: number, clientY: number) => {
+    const cont = gridContainerRef.current;
+    if (!cont) return { x: 0, y: 0 };
+    const c = cont.getBoundingClientRect();
+    return { x: clientX - c.left, y: clientY - c.top };
+  };
+
+  const agregarPunto = (idx: number) => {
+    if (puntosRef.current.includes(idx)) return;
+    puntosRef.current = [...puntosRef.current, idx];
+    setPuntosSeleccionados(puntosRef.current);
+  };
+
+  const reiniciarPuntos = () => {
+    puntosRef.current = [];
+    setPuntosSeleccionados([]);
+  };
+
+  const manejarPointerDown = (idx: number) => {
+    if (modoBloqueo === 'cargando' || verificandoPatron) return;
+    setErrorPatron(null);
+    reiniciarPuntos();
+    setArrastrando(true);
+    agregarPunto(idx);
+    setPosicionPuntero(centroDelPunto(idx));
+  };
+
+  const manejarPointerMove = (e: React.PointerEvent) => {
+    if (!arrastrando) return;
+    const pos = posicionRelativa(e.clientX, e.clientY);
+    setPosicionPuntero(pos);
+
+    dotRefs.current.forEach((el, idx) => {
+      if (!el || puntosRef.current.includes(idx)) return;
+      const centro = centroDelPunto(idx);
+      const dist = Math.hypot(pos.x - centro.x, pos.y - centro.y);
+      if (dist < 26) agregarPunto(idx);
+    });
+  };
+
+  const manejarPointerUp = () => {
+    if (!arrastrando) return;
+    setArrastrando(false);
+    setPosicionPuntero(null);
+    confirmarPatron();
+  };
+
   const [titulo,       setTitulo]       = useState('');
   const [contenido,    setContenido]    = useState('');
   const [estadoDia,    setEstadoDia]    = useState<{ emoji: string; label: string } | null>(null);
@@ -99,7 +162,7 @@ export default function DiarioPage() {
 
     const cargarPatron = async () => {
       setModoBloqueo('cargando');
-      setPuntosSeleccionados([]);
+      reiniciarPuntos();
       setPatronTemporal(null);
       setErrorPatron(null);
 
@@ -111,14 +174,8 @@ export default function DiarioPage() {
     cargarPatron();
   }, [vista, userId]);
 
-  const alternarPunto = (idx: number) => {
-    if (verificandoPatron) return;
-    setErrorPatron(null);
-    setPuntosSeleccionados((prev) => (prev.includes(idx) ? prev : [...prev, idx]));
-  };
-
   const limpiarSeleccion = () => {
-    setPuntosSeleccionados([]);
+    reiniciarPuntos();
     setErrorPatron(null);
   };
 
@@ -130,15 +187,17 @@ export default function DiarioPage() {
 
   const confirmarPatron = async () => {
     if (verificandoPatron) return;
+    const puntosActuales = puntosRef.current;
 
-    if (puntosSeleccionados.length < MIN_PUNTOS_PATRON) {
+    if (puntosActuales.length < MIN_PUNTOS_PATRON) {
       setErrorPatron(`Tu patrón debe tener al menos ${MIN_PUNTOS_PATRON} puntos.`);
+      reiniciarPuntos();
       return;
     }
 
     if (modoBloqueo === 'crear_dibujar') {
-      setPatronTemporal(puntosSeleccionados);
-      setPuntosSeleccionados([]);
+      setPatronTemporal(puntosActuales);
+      reiniciarPuntos();
       setModoBloqueo('crear_confirmar');
       return;
     }
@@ -146,18 +205,18 @@ export default function DiarioPage() {
     if (modoBloqueo === 'crear_confirmar') {
       const coincide =
         patronTemporal !== null &&
-        JSON.stringify(patronTemporal) === JSON.stringify(puntosSeleccionados);
+        JSON.stringify(patronTemporal) === JSON.stringify(puntosActuales);
 
       if (!coincide) {
         dispararError('Los patrones no coinciden. Vuelve a intentarlo.');
-        setPuntosSeleccionados([]);
+        reiniciarPuntos();
         setPatronTemporal(null);
         setModoBloqueo('crear_dibujar');
         return;
       }
 
       setVerificandoPatron(true);
-      const hash = await hashPatron(puntosSeleccionados);
+      const hash = await hashPatron(puntosActuales);
       const { error } = await guardarPatronUsuario(userId, hash);
       setVerificandoPatron(false);
 
@@ -172,14 +231,14 @@ export default function DiarioPage() {
 
     if (modoBloqueo === 'verificar') {
       setVerificandoPatron(true);
-      const hashIntento = await hashPatron(puntosSeleccionados);
+      const hashIntento = await hashPatron(puntosActuales);
       setVerificandoPatron(false);
 
       if (hashIntento === patronHashGuardado) {
         setVista('listaNotas');
       } else {
         dispararError('Patrón incorrecto. Intenta de nuevo.');
-        setPuntosSeleccionados([]);
+        reiniciarPuntos();
       }
     }
   };
@@ -188,7 +247,7 @@ export default function DiarioPage() {
     if (!confirm('Esto eliminará tu patrón actual y podrás crear uno nuevo. ¿Continuar?')) return;
     await eliminarPatronUsuario(userId);
     setPatronHashGuardado(null);
-    setPuntosSeleccionados([]);
+    reiniciarPuntos();
     setPatronTemporal(null);
     setErrorPatron(null);
     setModoBloqueo('crear_dibujar');
@@ -436,30 +495,61 @@ export default function DiarioPage() {
                 {modoBloqueo === 'cargando' && 'Cargando...'}
               </h2>
               <p className="text-xs text-slate-400 text-center max-w-xs">
-                {modoBloqueo === 'crear_dibujar' && `Dibuja tu patrón para acceder. Toca al menos ${MIN_PUNTOS_PATRON} puntos.`}
-                {modoBloqueo === 'crear_confirmar' && 'Vuelve a tocar los mismos puntos en el mismo orden para confirmar.'}
+                {modoBloqueo === 'crear_dibujar' && `Desliza tu dedo o mouse para conectar al menos ${MIN_PUNTOS_PATRON} puntos.`}
+                {modoBloqueo === 'crear_confirmar' && 'Vuelve a dibujar el mismo patrón para confirmar.'}
                 {modoBloqueo === 'verificar' && 'Dibuja tu patrón para acceder.'}
               </p>
 
-              <div className={`grid grid-cols-3 gap-8 p-4 ${shake ? 'animate-shake' : ''}`}>
-                {[...Array(9)].map((_, i) => {
-                  const seleccionado = puntosSeleccionados.includes(i);
-                  const orden = puntosSeleccionados.indexOf(i);
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => alternarPunto(i)}
-                      disabled={modoBloqueo === 'cargando' || verificandoPatron}
-                      className={`relative w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all duration-150 ${
-                        seleccionado
-                          ? 'border-[#6B66B2] bg-[#6B66B2] text-white scale-110 shadow-md'
-                          : 'border-slate-300 hover:border-[#6B66B2] disabled:opacity-50'
-                      }`}
-                    >
-                      {seleccionado && <span className="text-xs font-bold">{orden + 1}</span>}
-                    </button>
-                  );
-                })}
+              <div
+                ref={gridContainerRef}
+                className={`relative select-none touch-none ${shake ? 'animate-shake' : ''}`}
+                style={{ width: 232, height: 232 }}
+                onPointerMove={manejarPointerMove}
+                onPointerUp={manejarPointerUp}
+                onPointerLeave={manejarPointerUp}
+              >
+                {/* Líneas conectando los puntos ya seleccionados + línea viva hacia el puntero */}
+                <svg className="absolute inset-0 pointer-events-none" width={232} height={232}>
+                  {puntosSeleccionados.slice(1).map((idx, i) => {
+                    const desde = centroDelPunto(puntosSeleccionados[i]);
+                    const hasta = centroDelPunto(idx);
+                    return (
+                      <line
+                        key={idx}
+                        x1={desde.x} y1={desde.y} x2={hasta.x} y2={hasta.y}
+                        stroke="#6B66B2" strokeWidth={4} strokeLinecap="round"
+                      />
+                    );
+                  })}
+                  {arrastrando && posicionPuntero && puntosSeleccionados.length > 0 && (
+                    <line
+                      x1={centroDelPunto(puntosSeleccionados[puntosSeleccionados.length - 1]).x}
+                      y1={centroDelPunto(puntosSeleccionados[puntosSeleccionados.length - 1]).y}
+                      x2={posicionPuntero.x} y2={posicionPuntero.y}
+                      stroke="#6B66B2" strokeWidth={4} strokeLinecap="round" opacity={0.5}
+                    />
+                  )}
+                </svg>
+
+                <div className="grid grid-cols-3 gap-8 relative z-10">
+                  {[...Array(9)].map((_, i) => {
+                    const seleccionado = puntosSeleccionados.includes(i);
+                    return (
+                      <div
+                        key={i}
+                        ref={(el) => { dotRefs.current[i] = el; }}
+                        onPointerDown={() => manejarPointerDown(i)}
+                        className={`w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all duration-100 cursor-pointer ${
+                          seleccionado
+                            ? 'border-[#6B66B2] bg-[#6B66B2] scale-110 shadow-md'
+                            : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full transition-colors ${seleccionado ? 'bg-white' : 'bg-slate-300'}`} />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {errorPatron && (
@@ -468,22 +558,13 @@ export default function DiarioPage() {
                 </p>
               )}
 
-              <div className="flex gap-3 w-full max-w-xs">
-                <button
-                  onClick={limpiarSeleccion}
-                  disabled={verificandoPatron}
-                  className="flex-1 py-3 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Borrar
-                </button>
-                <button
-                  onClick={confirmarPatron}
-                  disabled={modoBloqueo === 'cargando' || verificandoPatron}
-                  className="flex-1 py-3 bg-[#6B66B2] hover:bg-[#5a5596] text-white rounded-xl text-xs font-bold disabled:opacity-60"
-                >
-                  {verificandoPatron ? 'Verificando...' : 'Confirmar'}
-                </button>
-              </div>
+              <button
+                onClick={limpiarSeleccion}
+                disabled={verificandoPatron}
+                className="text-xs font-bold text-slate-500 hover:text-slate-700 disabled:opacity-50"
+              >
+                Borrar e intentar de nuevo
+              </button>
 
               {modoBloqueo === 'verificar' && (
                 <button onClick={manejarRestablecerPatron} className="text-[11px] text-slate-400 underline hover:text-slate-600">
