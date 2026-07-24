@@ -44,8 +44,8 @@ const CONTACTOS: ContactoEmergencia[] = [
     horario: "Lun–Vie, horario de oficina",
     telefono: "(0212) 605-4751 / 605-4731",
     verificado: true,
-    lat: 10.4880,
-    lng: -66.8902,
+    lat: 10.4886,
+    lng: -66.8895,
     color: "#4A72A6",
     icono: "🏛️",
   },
@@ -57,8 +57,8 @@ const CONTACTOS: ContactoEmergencia[] = [
     ubicacion: "Facultad de Humanidades y Educación, Escuela de Psicología",
     horario: "Lun–Vie (confirmar horario vigente con la escuela)",
     verificado: false,
-    lat: 10.4872,
-    lng: -66.8915,
+    lat: 10.4855,
+    lng: -66.8930,
     color: "#7C3AED",
     icono: "🧠",
   },
@@ -71,8 +71,8 @@ const CONTACTOS: ContactoEmergencia[] = [
     horario: "Lun–Vie (confirmar horario vigente con la coordinación)",
     telefono: "(0212) 605-5914 / 605-2913",
     verificado: true,
-    lat: 10.4874,
-    lng: -66.8913,
+    lat: 10.4862,
+    lng: -66.8945,
     color: "#0891B2",
     icono: "🗣️",
   },
@@ -84,8 +84,8 @@ const CONTACTOS: ContactoEmergencia[] = [
     ubicacion: "Presente en cada Facultad de la Ciudad Universitaria",
     horario: "Según horario de atención de cada facultad",
     verificado: false,
-    lat: 10.4885,
-    lng: -66.8930,
+    lat: 10.4905,
+    lng: -66.8935,
     color: "#0D9488",
     icono: "🧭",
   },
@@ -97,8 +97,8 @@ const CONTACTOS: ContactoEmergencia[] = [
     ubicacion: "Ciudad Universitaria, Facultad de Medicina",
     horario: "Lun–Vie (confirmar horario vigente con el departamento)",
     verificado: false,
-    lat: 10.4865,
-    lng: -66.8888,
+    lat: 10.4840,
+    lng: -66.8870,
     color: "#059669",
     icono: "🏥",
   },
@@ -113,8 +113,8 @@ const CONTACTOS: ContactoEmergencia[] = [
     email: "seapsi@fpv.org.ve",
     esEmergencia: false,
     verificado: true,
-    lat: 10.4900,
-    lng: -66.8905,
+    lat: 10.4930,
+    lng: -66.8880,
     color: "#9333EA",
     icono: "💬",
   },
@@ -266,8 +266,8 @@ function MapaUCV() {
         if (cancelado || !mapRef.current || mapInstanceRef.current) return;
 
         const map = L.map(mapRef.current, {
-          center:          [10.4878, -66.8895],
-          zoom:            16,
+          center:          [10.4880, -66.8905],
+          zoom:            15,
           zoomControl:     true,
           scrollWheelZoom: true,
           tap:             false,
@@ -376,7 +376,7 @@ function MapaUCV() {
                 <div>
                   <p className="text-sm font-bold text-[#2A3B50] leading-snug">{puntoSeleccionado.nombre}</p>
                   <p className="text-[10px] font-medium mt-0.5" style={{ color: puntoSeleccionado.color }}>
-                    {puntoSeleccionado.esEmergencia ? '🔴 Línea de crisis' : '📍 ' + puntoSeleccionado.ubicacion}
+                    {puntoSeleccionado.esEmergencia ? '📞 Línea de crisis 24/7' : '📍 ' + puntoSeleccionado.ubicacion}
                   </p>
                 </div>
               </div>
@@ -450,8 +450,8 @@ function AccordionItem({ punto }: { punto: ContactoEmergencia }) {
   const [abierto, setAbierto] = useState(false);
 
   return (
-    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${
-      punto.esEmergencia ? "border-rose-200 bg-white" : "border-slate-100 bg-white"
+    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 bg-white ${
+      punto.esEmergencia ? "border-rose-200" : "border-slate-100"
     }`}>
       <button
         onClick={() => setAbierto(!abierto)}
@@ -460,10 +460,15 @@ function AccordionItem({ punto }: { punto: ContactoEmergencia }) {
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <span
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0"
+            className="relative w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0"
             style={{ backgroundColor: punto.color + '18' }}
           >
-            {punto.esEmergencia ? '🔴' : punto.icono}
+            {punto.icono}
+            {punto.esEmergencia && (
+              <span className="absolute -top-1.5 -right-1.5 text-[7px] font-black text-white bg-rose-500 rounded-full px-1 py-[1px] leading-none shadow-sm">
+                24/7
+              </span>
+            )}
           </span>
           <span className={`text-xs font-bold leading-snug ${
             punto.esEmergencia ? "text-rose-800" : "text-slate-800"
@@ -564,11 +569,12 @@ export default function ModoCrisisPage() {
         className="w-full max-w-md h-screen sm:h-[850px] shadow-2xl flex flex-col relative sm:rounded-[40px] border border-gray-100 overflow-hidden"
         style={{ background: 'linear-gradient(180deg, #F5F3FF 0%, #FDF2F8 38%, #FFFFFF 62%)' }}
       >
-        {/* Decoración de fondo */}
+        {/* Decoración de fondo con las imágenes del proyecto */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-24 -right-20 w-64 h-64 rounded-full opacity-40 blur-2xl" style={{ background: 'radial-gradient(circle, #F9A8D4 0%, transparent 70%)' }} />
-          <div className="absolute top-40 -left-24 w-56 h-56 rounded-full opacity-30 blur-2xl" style={{ background: 'radial-gradient(circle, #C4B5FD 0%, transparent 70%)' }} />
-          <div className="absolute bottom-0 -right-16 w-48 h-48 rounded-full opacity-30 blur-2xl" style={{ background: 'radial-gradient(circle, #99F6E4 0%, transparent 70%)' }} />
+          <img src="/images/forma_grande.png" alt="" aria-hidden="true" className="absolute -top-16 -right-20 w-72 h-auto opacity-25 select-none rotate-12" />
+          <img src="/images/onda_del_medio.png" alt="" aria-hidden="true" className="absolute top-1/3 -left-16 w-52 h-auto opacity-20 select-none" />
+          <img src="/images/forma_verde.png" alt="" aria-hidden="true" className="absolute bottom-16 -right-14 w-40 h-auto opacity-25 select-none -rotate-12" />
+          <img src="/images/ramita_izquierda.png" alt="" aria-hidden="true" className="absolute bottom-0 left-0 w-28 h-auto opacity-30 select-none" />
         </div>
 
         {/* HEADER */}
