@@ -7,6 +7,7 @@ import {
   calcularEstadoRachaPareja,
   invitarPareja,
   aceptarInvitacionPareja,
+  rechazarInvitacionPareja,
   validarInvitacion,
   cancelarInvitacion,
   usarProtector,
@@ -178,10 +179,9 @@ export default function RachaPage() {
   const manejarRechazar = async (parejaId: string) => {
     if (!userId) return;
     setRechazandoId(parejaId); setError(null);
-    const { error: err } = await supabase.from('parejas').delete().eq('id', parejaId);
+    const { error: err } = await rechazarInvitacionPareja();
     setRechazandoId(null);
-    if (err) { setError("No se pudo rechazar."); return; }
-    setEstado(null);
+    if (err) { setError("No se pudo rechazar la invitación."); return; }
     await cargarEstado(userId);
   };
 
