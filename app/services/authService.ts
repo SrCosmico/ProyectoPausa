@@ -25,7 +25,17 @@ export const iniciarSesion = async (email: string, password: string) => {
 };
 
 // 3. CERRAR SESIÓN
+// `scope: 'local'` borra la sesión del navegador (cookies/local storage)
+// de inmediato, sin esperar un viaje de ida y vuelta al servidor de
+// Supabase para revocar la sesión en TODOS los dispositivos (eso es lo
+// que hacía el modo por defecto, y es lo que hacía sentir el botón lento
+// — el spinner se quedaba esperando esa respuesta de red).
+// Trade-off consciente: el token de este dispositivo técnicamente sigue
+// siendo válido en el servidor hasta que expire de forma natural (normal-
+// mente ~1 hora), en vez de invalidarse al instante. Para esta app no es
+// un problema de seguridad relevante, y a cambio el cierre de sesión se
+// siente instantáneo.
 export const cerrarSesion = async () => {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
   return { error };
 };
