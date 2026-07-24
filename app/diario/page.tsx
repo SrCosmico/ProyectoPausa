@@ -133,6 +133,7 @@ export default function DiarioPage() {
   const [contenido,    setContenido]    = useState('');
   const [estadoDia,    setEstadoDia]    = useState<{ emoji: string; label: string } | null>(null);
   const [panelAbierto, setPanelAbierto] = useState(false);
+  const [notaEditandoId, setNotaEditandoId] = useState<string | null>(null);
 
   const cargarNotas = useCallback(async (uid: string) => {
     if (!uid) return;
@@ -351,25 +352,63 @@ export default function DiarioPage() {
     if (!userId) return;
     setCargando(true);
 
-    const { error } = await insertarNotaDiario(
-      userId,
-      titulo || 'Sin título',
-      contenido,
-      estadoDia?.emoji  ?? null,
-      estadoDia?.label  ?? null
-    );
+    let error: any;
+
+    if (notaEditandoId) {
+      const resultado = await actualizarEntradaDiario(
+        notaEditandoId,
+        contenido,
+        titulo || 'Sin título'
+      );
+      error = (resultado as any)?.error;
+    } else {
+      const resultado = await insertarNotaDiario(
+        userId,
+        titulo || 'Sin título',
+        contenido,
+        estadoDia?.emoji  ?? null,
+        estadoDia?.label  ?? null
+      );
+      error = resultado?.error;
+    }
 
     if (!error) {
       setTitulo('');
       setContenido('');
       setEstadoDia(null);
+      setNotaEditandoId(null);
       setEditorKey((k) => k + 1);
       await cargarNotas(userId);
       setVista('listaNotas');
     } else {
       console.error('Error al guardar nota:', error);
+      alert('No se pudo guardar la nota. Intenta de nuevo.');
     }
     setCargando(false);
+  };
+
+  // ── NUEVO: iniciar edición de una nota existente ─────────────────────────
+  const iniciarEdicionNota = (nota: NotaDiario) => {
+    setNotaEditandoId(nota.id);
+    setTitulo(nota.titulo);
+    setContenido(nota.contenido);
+    setEstadoDia(
+      nota.label_dia && nota.emoji_dia
+        ? { emoji: nota.emoji_dia, label: nota.label_dia }
+        : null
+    );
+    setEditorKey((k) => k + 1);
+    setVista('crearNota');
+  };
+
+  // ── Empezar una nota nueva desde cero (limpia cualquier edición previa) ──
+  const iniciarNotaNueva = () => {
+    setNotaEditandoId(null);
+    setTitulo('');
+    setContenido('');
+    setEstadoDia(null);
+    setEditorKey((k) => k + 1);
+    setVista('crearNota');
   };
 
   const eliminarNota = async (notaId: string) => {
@@ -396,7 +435,7 @@ export default function DiarioPage() {
     if (vista === 'bienvenida')  router.push('/home');
     else if (vista === 'bloqueo')      setVista('bienvenida');
     else if (vista === 'listaNotas')   setVista('bloqueo');
-    else if (vista === 'crearNota')    setVista('listaNotas');
+    else if (vista === 'crearNota')    { setNotaEditandoId(null); setVista('listaNotas'); }
     else if (vista === 'verNota')      setVista('listaNotas');
     else if (vista === 'configuracion') setVista('listaNotas');
   };
@@ -433,7 +472,7 @@ export default function DiarioPage() {
             </svg>
           </button>
           <h3 className="text-sm font-bold">
-            {vista === 'crearNota' ? 'Nueva nota' : vista === 'verNota' ? 'Detalle' : vista === 'configuracion' ? 'Configuración del diario' : vista === 'listaNotas' ? 'Mis notas' : 'Diario emocional'}
+            {vista === 'crearNota' ? (notaEditandoId ? 'Editar nota' : 'Nueva nota') : vista === 'verNota' ? 'Detalle' : vista === 'configuracion' ? 'Configuración del diario' : vista === 'listaNotas' ? 'Mis notas' : 'Diario emocional'}
           </h3>
           {vista === 'listaNotas' ? (
             <button onClick={() => setVista('configuracion')} className="p-2 -mr-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors" title="Configuración">
@@ -676,12 +715,20 @@ export default function DiarioPage() {
                 </div>
               )}
 
-              <button
-                onClick={() => eliminarNota(notaActiva.id)}
-                className="mt-4 w-full py-3 border border-rose-100 bg-rose-50 text-rose-600 rounded-2xl text-xs font-bold hover:bg-rose-100 transition-colors"
-              >
-                Eliminar nota
-              </button>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <button
+                  onClick={() => iniciarEdicionNota(notaActiva)}
+                  className="py-3 border border-[#6B66B2]/20 bg-[#6B66B2]/10 text-[#6B66B2] rounded-2xl text-xs font-bold hover:bg-[#6B66B2]/20 transition-colors"
+                >
+                  ✏️ Editar nota
+                </button>
+                <button
+                  onClick={() => eliminarNota(notaActiva.id)}
+                  className="py-3 border border-rose-100 bg-rose-50 text-rose-600 rounded-2xl text-xs font-bold hover:bg-rose-100 transition-colors"
+                >
+                  Eliminar nota
+                </button>
+              </div>
             </div>
           )}
 
@@ -703,10 +750,11 @@ export default function DiarioPage() {
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
+                dangerouslySetInnerHTML={{ __html: contenido }}
                 onInput={(e) => setContenido((e.target as HTMLDivElement).innerHTML)}
                 onClick={() => { if (editorRef.current) setContenido(editorRef.current.innerHTML); }}
                 data-placeholder="¿Qué está en tu mente hoy?"
-                className="w-full flex-1 p-3 mt-1 text-xs text-slate-600 bg-slate-50 rounded-2xl focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_audio]:w-full [&_audio]:my-2"
+                className="w-full flex-1 p-3 mt-1 text-xs text-slate-600 bg-slate-50 rounded-2xl focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_audio]:w-full [&_audio]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1"
               />
 
               {grabando && (
@@ -841,7 +889,7 @@ export default function DiarioPage() {
 
         {vista === 'listaNotas' && (
           <button
-            onClick={() => setVista('crearNota')}
+            onClick={iniciarNotaNueva}
             className="absolute bottom-8 right-8 w-14 h-14 bg-[#6B66B2] text-white rounded-full shadow-xl flex items-center justify-center text-2xl z-20 hover:bg-[#5a5596]"
           >
             +
