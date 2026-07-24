@@ -78,11 +78,21 @@ export default function HistorialPage() {
 
   // ── NUEVO: desplegable de año con scroll infinito ────────────────────────
   const [anioDesplegableAbierto, setAnioDesplegableAbierto] = useState(false);
+  const [posicionDesplegable, setPosicionDesplegable] = useState({ top: 0, left: 0 });
+  const botonAnioRef = React.useRef<HTMLButtonElement>(null);
   const [aniosDisponibles, setAniosDisponibles] = useState<number[]>(() => {
     const actual = new Date().getFullYear();
     return Array.from({ length: 21 }, (_, i) => actual - 10 + i);
   });
   const scrollAniosRef = React.useRef<HTMLDivElement>(null);
+
+  const abrirDesplegableAnio = () => {
+    const rect = botonAnioRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPosicionDesplegable({ top: rect.bottom + 4, left: rect.left + rect.width / 2 });
+    }
+    setAnioDesplegableAbierto((v) => !v);
+  };
 
   const manejarScrollAnios = () => {
     const el = scrollAniosRef.current;
@@ -225,7 +235,8 @@ export default function HistorialPage() {
                     {NOMBRES_MESES[fechaCalendario.getMonth()]}
                   </span>
                   <button
-                    onClick={() => setAnioDesplegableAbierto((v) => !v)}
+                    ref={botonAnioRef}
+                    onClick={abrirDesplegableAnio}
                     className="text-sm font-bold text-[#2A3B50] flex items-center gap-1"
                   >
                     {fechaCalendario.getFullYear()}
@@ -240,7 +251,8 @@ export default function HistorialPage() {
                       <div
                         ref={scrollAniosRef}
                         onScroll={manejarScrollAnios}
-                        className="absolute top-7 left-1/2 -translate-x-1/2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg w-24 max-h-48 overflow-y-auto py-1"
+                        style={{ top: posicionDesplegable.top, left: posicionDesplegable.left, transform: 'translateX(-50%)' }}
+                        className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-lg w-24 max-h-48 overflow-y-auto py-1"
                       >
                         {aniosDisponibles.map((anio) => (
                           <button
