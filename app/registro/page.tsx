@@ -47,7 +47,7 @@ export default function RegisterView() {
       setError('Las contraseñas no coinciden.');
       return;
     }
-    if (formData.clave.length < 6) {
+    if (formData.clave.trim().length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
@@ -60,7 +60,7 @@ export default function RegisterView() {
 
     const { data, error: registroError } = await registrarUsuario(
       formData.correo.trim(),
-      formData.clave,
+      formData.clave.trim(),
       formData.nombre.trim(),
       formData.facultad
     );
