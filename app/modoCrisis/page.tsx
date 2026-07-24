@@ -569,13 +569,48 @@ export default function ModoCrisisPage() {
         className="w-full max-w-md h-screen sm:h-[850px] shadow-2xl flex flex-col relative sm:rounded-[40px] border border-gray-100 overflow-hidden"
         style={{ background: 'linear-gradient(180deg, #F5F3FF 0%, #FDF2F8 38%, #FFFFFF 62%)' }}
       >
-        {/* Decoración de fondo con las imágenes del proyecto */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          <img src="/images/forma_grande.png" alt="" aria-hidden="true" className="absolute -top-16 -right-20 w-72 h-auto opacity-25 select-none rotate-12" />
-          <img src="/images/onda_del_medio.png" alt="" aria-hidden="true" className="absolute top-1/3 -left-16 w-52 h-auto opacity-20 select-none" />
-          <img src="/images/forma_verde.png" alt="" aria-hidden="true" className="absolute bottom-16 -right-14 w-40 h-auto opacity-25 select-none -rotate-12" />
-          <img src="/images/ramita_izquierda.png" alt="" aria-hidden="true" className="absolute bottom-0 left-0 w-28 h-auto opacity-30 select-none" />
-        </div>
+        {/* ── IMÁGENES DECORATIVAS (mismo patrón que la pantalla de bienvenida) ── */}
+
+        {/* Forma morada: esquina superior izquierda */}
+        <img
+          src="/images/forma_morada.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute -top-2 -left-2 w-[55%] max-w-[240px] object-contain pointer-events-none select-none z-0 opacity-70"
+        />
+
+        {/* Forma verde: esquina inferior derecha */}
+        <img
+          src="/images/forma_verde.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute -bottom-2 -right-2 w-[55%] max-w-[240px] object-contain pointer-events-none select-none z-0 opacity-70"
+        />
+
+        {/* Onda del medio: lateral izquierdo */}
+        <img
+          src="/images/onda_del_medio.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute top-1/2 h-[55%] w-auto object-contain pointer-events-none select-none z-0 opacity-20"
+          style={{ transform: 'translateY(-50%) rotate(90deg)', left: '-18%' }}
+        />
+
+        {/* Ramita izquierda */}
+        <img
+          src="/images/ramita_izquierda.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute top-[46%] -left-3 w-28 sm:w-32 object-contain pointer-events-none select-none z-0 opacity-70"
+        />
+
+        {/* Ramita derecha */}
+        <img
+          src="/images/ramita_derecha.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute top-[38%] -right-3 w-20 sm:w-24 object-contain pointer-events-none select-none z-0 opacity-70"
+        />
 
         {/* HEADER */}
         <div className="relative z-10 px-6 pt-6 pb-5">
