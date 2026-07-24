@@ -69,7 +69,8 @@ const CONTACTOS: ContactoEmergencia[] = [
     categoria: "ucv",
     ubicacion: "Facultad de Humanidades y Educación, Escuela de Psicología",
     horario: "Lun–Vie (confirmar horario vigente con la coordinación)",
-    verificado: false,
+    telefono: "(0212) 605-5914 / 605-2913",
+    verificado: true,
     lat: 10.4874,
     lng: -66.8913,
     color: "#0891B2",
@@ -100,6 +101,22 @@ const CONTACTOS: ContactoEmergencia[] = [
     lng: -66.8888,
     color: "#059669",
     icono: "🏥",
+  },
+  {
+    id: "seapsi",
+    nombre: "SEAPSI — Servicio de Atención Psicológica Integral",
+    descripcion: "Programa de la Federación de Psicólogos de Venezuela (FPV) que ofrece atención y terapia psicológica gratuita o a bajo costo, incluyendo la modalidad de telepsicología.",
+    categoria: "emergencia",
+    ubicacion: "Atención telefónica y por telepsicología a nivel nacional (Venezuela)",
+    horario: "Contactar por teléfono o correo para coordinar una cita (no es una línea de emergencia 24/7)",
+    telefono: "0414-321-9575",
+    email: "seapsi@fpv.org.ve",
+    esEmergencia: false,
+    verificado: true,
+    lat: 10.4900,
+    lng: -66.8905,
+    color: "#9333EA",
+    icono: "💬",
   },
   {
     id: "lapsi",
@@ -158,7 +175,7 @@ const SECCIONES_APOYO = [
   },
   {
     id: "emergencia",
-    titulo: "Líneas de crisis (24/7)",
+    titulo: "Líneas de apoyo y crisis",
     icono: "🚨",
     color: "text-rose-700",
     colorBg: "bg-rose-50 border-rose-100",
@@ -359,7 +376,7 @@ function MapaUCV() {
                 <div>
                   <p className="text-sm font-bold text-[#2A3B50] leading-snug">{puntoSeleccionado.nombre}</p>
                   <p className="text-[10px] font-medium mt-0.5" style={{ color: puntoSeleccionado.color }}>
-                    {puntoSeleccionado.esEmergencia ? '🔴 Emergencias 24/7' : '📍 ' + puntoSeleccionado.ubicacion}
+                    {puntoSeleccionado.esEmergencia ? '🔴 Línea de crisis' : '📍 ' + puntoSeleccionado.ubicacion}
                   </p>
                 </div>
               </div>
