@@ -61,6 +61,12 @@ export default function DiarioPage() {
   const [busqueda, setBusqueda] = useState('');
 
   const [editorKey, setEditorKey] = useState(0);
+  // Guarda el HTML con el que debe arrancar el editor cada vez que se
+  // remonta (nota nueva / nota a editar). NO se usa para re-renderizar el
+  // editor mientras el usuario escribe: eso es justamente lo que causaba
+  // que el cursor "saltara" detrás del texto en vez de quedarse donde
+  // estaba escribiendo (particularmente notorio con listas).
+  const contenidoInicialRef = React.useRef('');
 
   const [grabando, setGrabando] = useState(false);
   const [tiempoGrabacion, setTiempoGrabacion] = useState(0);
@@ -460,6 +466,7 @@ export default function DiarioPage() {
     setNotaEditandoId(nota.id);
     setTitulo(nota.titulo);
     setContenido(nota.contenido);
+    contenidoInicialRef.current = nota.contenido;
     setEstadoDia(
       nota.label_dia && nota.emoji_dia
         ? { emoji: nota.emoji_dia, label: nota.label_dia }
@@ -474,6 +481,7 @@ export default function DiarioPage() {
     setNotaEditandoId(null);
     setTitulo('');
     setContenido('');
+    contenidoInicialRef.current = '';
     setEstadoDia(null);
     setEditorKey((k) => k + 1);
     setVista('crearNota');
@@ -498,6 +506,18 @@ export default function DiarioPage() {
     setNotaActiva(nota);
     setVista('verNota');
   };
+
+  // ── Inicializa el contenido del editor SOLO cuando cambia editorKey
+  // (es decir, cuando se abre una nota nueva o se entra a editar una
+  // existente). El div deja de estar "controlado" por React en cada
+  // tecla — así el cursor se comporta como en cualquier bloc de notas,
+  // en vez de reiniciarse al principio del texto al escribir listas.
+  useEffect(() => {
+    if (vista === 'crearNota' && editorRef.current) {
+      editorRef.current.innerHTML = contenidoInicialRef.current;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorKey, vista]);
 
   const manejarAtras = () => {
     if (vista === 'bienvenida') {
@@ -854,7 +874,6 @@ export default function DiarioPage() {
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
-                dangerouslySetInnerHTML={{ __html: contenido }}
                 onInput={(e) => setContenido((e.target as HTMLDivElement).innerHTML)}
                 onClick={() => { if (editorRef.current) setContenido(editorRef.current.innerHTML); }}
                 data-placeholder="¿Qué está en tu mente hoy?"
