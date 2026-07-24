@@ -163,17 +163,35 @@ export default function DiarioPage() {
       setUserId(user.id);
       await cargarNotas(user.id);
 
-      // ¿Ya visitó el diario antes? Usamos localStorage porque es la señal
-      // más confiable de "ya pasó por la bienvenida" (no depende de si
-      // decidió crear o no un patrón, ni de fallas de red al consultarlo).
-      let visitado = false;
+      // ¿Ya visitó el diario antes? Combinamos DOS señales para que sea
+      // robusto ante cualquiera de los dos fallando por separado:
+      //   1) localStorage: rápido, pero se puede perder (incógnito, caché
+      //      borrada, otro navegador/dispositivo).
+      //   2) Patrón guardado en la base de datos: persiste siempre, pero
+      //      requiere una consulta de red.
+      // Si CUALQUIERA de las dos indica que ya usó el diario, saltamos
+      // la bienvenida.
+      let visitadoLocal = false;
       try {
-        visitado = typeof window !== 'undefined' && !!localStorage.getItem(claveVisitado(user.id));
+        visitadoLocal = typeof window !== 'undefined' && !!localStorage.getItem(claveVisitado(user.id));
       } catch {
-        visitado = false;
+        visitadoLocal = false;
       }
 
-      if (visitado) {
+      let tienePatron = false;
+      try {
+        const hash = await obtenerPatronGuardado(user.id);
+        tienePatron = !!hash;
+      } catch {
+        tienePatron = false;
+      }
+
+      const yaVisito = visitadoLocal || tienePatron;
+
+      if (yaVisito) {
+        // Aprovechamos para sincronizar localStorage si estaba desfasado
+        // (por ejemplo, el usuario entró desde otro dispositivo).
+        try { localStorage.setItem(claveVisitado(user.id), '1'); } catch {}
         setEsPrimeraVez(false);
         setVista('bloqueo');
       } else {
@@ -206,8 +224,8 @@ export default function DiarioPage() {
     try {
       localStorage.setItem(claveVisitado(userId), '1');
     } catch {
-      // Si localStorage no está disponible simplemente lo ignoramos;
-      // en el peor caso volverá a ver la bienvenida la próxima vez.
+      // Si localStorage no está disponible lo ignoramos; el chequeo por
+      // patrón guardado en la base de datos sigue funcionando como respaldo.
     }
   };
 
