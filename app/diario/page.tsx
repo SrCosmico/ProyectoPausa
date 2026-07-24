@@ -23,7 +23,10 @@ interface NotaDiario {
   label_dia?: string | null;
 }
 
-type VistaDiario = 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verNota' | 'configuracion';
+// 'cargando' es una vista "neutra" mientras se determina si el usuario ya
+// visitó el diario antes. Esto evita que la bienvenida aparezca por un
+// instante (parpadeo) mientras se resuelven las consultas async.
+type VistaDiario = 'cargando' | 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verNota' | 'configuracion';
 type ModoBloqueo = 'cargando' | 'crear_dibujar' | 'crear_confirmar' | 'verificar';
 
 const MIN_PUNTOS_PATRON = 3;
@@ -44,7 +47,7 @@ export default function DiarioPage() {
   const editorRef = React.useRef<HTMLDivElement>(null);
 
   const [userId,      setUserId]      = useState<string>('');
-  const [vista,       setVista]       = useState<VistaDiario>('bienvenida');
+  const [vista,       setVista]       = useState<VistaDiario>('cargando');
   const [listaNotas,  setListaNotas]  = useState<NotaDiario[]>([]);
   const [notaActiva,  setNotaActiva]  = useState<NotaDiario | null>(null);
   const [cargando,    setCargando]    = useState<boolean>(false);
@@ -145,7 +148,6 @@ export default function DiarioPage() {
 
   const cargarNotas = useCallback(async (uid: string) => {
     if (!uid) return;
-    setCargando(true);
     const { data, error } = await supabase
       .from('notas_diario')
       .select('*')
@@ -153,7 +155,6 @@ export default function DiarioPage() {
       .order('fecha', { ascending: false });
 
     if (!error && data) setListaNotas(data as NotaDiario[]);
-    setCargando(false);
   }, []);
 
   useEffect(() => {
@@ -161,16 +162,16 @@ export default function DiarioPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
       setUserId(user.id);
-      await cargarNotas(user.id);
 
-      // ¿Ya visitó el diario antes? Combinamos DOS señales para que sea
-      // robusto ante cualquiera de los dos fallando por separado:
+      // ¿Ya visitó el diario antes? Combinamos DOS señales, resueltas en
+      // paralelo para minimizar el tiempo mostrando la pantalla de carga:
       //   1) localStorage: rápido, pero se puede perder (incógnito, caché
       //      borrada, otro navegador/dispositivo).
       //   2) Patrón guardado en la base de datos: persiste siempre, pero
       //      requiere una consulta de red.
       // Si CUALQUIERA de las dos indica que ya usó el diario, saltamos
-      // la bienvenida.
+      // la bienvenida. Las notas se cargan en paralelo también, sin
+      // bloquear la decisión de qué vista mostrar.
       let visitadoLocal = false;
       try {
         visitadoLocal = typeof window !== 'undefined' && !!localStorage.getItem(claveVisitado(user.id));
@@ -178,19 +179,15 @@ export default function DiarioPage() {
         visitadoLocal = false;
       }
 
-      let tienePatron = false;
-      try {
-        const hash = await obtenerPatronGuardado(user.id);
-        tienePatron = !!hash;
-      } catch {
-        tienePatron = false;
-      }
+      const [hashResultado] = await Promise.allSettled([
+        obtenerPatronGuardado(user.id),
+        cargarNotas(user.id),
+      ]);
 
+      const tienePatron = hashResultado.status === 'fulfilled' && !!hashResultado.value;
       const yaVisito = visitadoLocal || tienePatron;
 
       if (yaVisito) {
-        // Aprovechamos para sincronizar localStorage si estaba desfasado
-        // (por ejemplo, el usuario entró desde otro dispositivo).
         try { localStorage.setItem(claveVisitado(user.id), '1'); } catch {}
         setEsPrimeraVez(false);
         setVista('bloqueo');
@@ -537,6 +534,18 @@ export default function DiarioPage() {
   const extraerTextoPlano = (html: string) =>
     html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
+  // ── Vista de carga inicial: se muestra mientras se determina si es
+  // primera vez o no, para que NUNCA se vea la bienvenida "de paso".
+  if (vista === 'cargando') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-0 sm:p-4 font-sans">
+        <div className="relative w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col items-center justify-center sm:rounded-[40px] overflow-hidden border border-slate-100">
+          <div className="w-10 h-10 border-4 border-[#6B66B2] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-0 sm:p-4 font-sans text-slate-800">
       <div className="relative w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col sm:rounded-[40px] overflow-hidden border border-slate-100">
@@ -747,8 +756,7 @@ export default function DiarioPage() {
 
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pt-1">Notas recientes</p>
 
-              {cargando && <p className="text-xs text-slate-400 text-center py-6 animate-pulse">Cargando notas...</p>}
-              {!cargando && notasFiltradas.length === 0 && (
+              {!notasFiltradas.length && (
                 <p className="text-xs text-slate-400 text-center py-6">
                   {listaNotas.length === 0 ? 'Aún no tienes notas. ¡Crea la primera!' : 'No se encontraron notas.'}
                 </p>
