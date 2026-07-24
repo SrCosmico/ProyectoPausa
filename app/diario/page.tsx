@@ -152,16 +152,49 @@ export default function DiarioPage() {
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [notaEditandoId, setNotaEditandoId] = useState<string | null>(null);
 
+  // IMPORTANTE (rendimiento): esta consulta ya NO trae `contenido` completo.
+  // Si una nota tiene imágenes o audio insertados, ese HTML incluye datos
+  // en base64 que pueden pesar varios MB — traerlos para TODAS las notas
+  // solo para mostrar una lista de títulos es lo que hacía lento el abrir
+  // y el guardar. Ahora la lista solo pide un extracto de texto plano
+  // (250 caracteres) mediante la función `resumen_nota_diario`, y el
+  // contenido completo se pide aparte, solo para la nota que se abre o
+  // edita (ver `obtenerNotaCompleta`).
   const cargarNotas = useCallback(async (uid: string) => {
     if (!uid) return;
     const { data, error } = await supabase
+      .rpc('listar_notas_diario_resumen', { p_user_id: uid });
+
+    if (!error && data) {
+      setListaNotas(data as NotaDiario[]);
+      return;
+    }
+
+    // Respaldo: si la función RPC no existe todavía en la base de datos
+    // (por ejemplo, no has corrido la migración), cae de vuelta a la
+    // consulta completa para que la app siga funcionando mientras la
+    // agregas — pero sin el beneficio de velocidad.
+    const { data: dataCompleta, error: errorCompleto } = await supabase
       .from('notas_diario')
       .select('*')
       .eq('user_id', uid)
       .order('fecha', { ascending: false });
 
-    if (!error && data) setListaNotas(data as NotaDiario[]);
+    if (!errorCompleto && dataCompleta) setListaNotas(dataCompleta as NotaDiario[]);
   }, []);
+
+  // Trae el contenido COMPLETO de una sola nota (con imágenes/audio si los
+  // tiene). Se usa solo al abrir o editar esa nota puntual, nunca para
+  // la lista.
+  const obtenerNotaCompleta = async (id: string): Promise<NotaDiario | null> => {
+    const { data, error } = await supabase
+      .from('notas_diario')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error || !data) return null;
+    return data as NotaDiario;
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -452,8 +485,12 @@ export default function DiarioPage() {
       setEstadoDia(null);
       setNotaEditandoId(null);
       setEditorKey((k) => k + 1);
-      await cargarNotas(userId);
       setVista('listaNotas');
+      setCargando(false);
+      // La lista ahora es liviana (extracto, no contenido completo), así
+      // que refrescarla en segundo plano no bloquea la vuelta a la lista.
+      cargarNotas(userId);
+      return;
     } else {
       console.error('Error al guardar nota:', error);
       alert('No se pudo guardar la nota. Intenta de nuevo.');
@@ -462,16 +499,23 @@ export default function DiarioPage() {
   };
 
   // ── Iniciar edición de una nota existente ─────────────────────────
-  const iniciarEdicionNota = (nota: NotaDiario) => {
+  // Recibe la versión "resumen" (de la lista) y pide el contenido
+  // completo antes de abrir el editor, para no perder imágenes/audio.
+  const iniciarEdicionNota = async (nota: NotaDiario) => {
+    setCargando(true);
+    const completa = await obtenerNotaCompleta(nota.id);
+    const contenidoCompleto = completa?.contenido ?? nota.contenido;
+
     setNotaEditandoId(nota.id);
-    setTitulo(nota.titulo);
-    setContenido(nota.contenido);
-    contenidoInicialRef.current = nota.contenido;
+    setTitulo(completa?.titulo ?? nota.titulo);
+    setContenido(contenidoCompleto);
+    contenidoInicialRef.current = contenidoCompleto;
     setEstadoDia(
       nota.label_dia && nota.emoji_dia
         ? { emoji: nota.emoji_dia, label: nota.label_dia }
         : null
     );
+    setCargando(false);
     setEditorKey((k) => k + 1);
     setVista('crearNota');
   };
@@ -502,9 +546,15 @@ export default function DiarioPage() {
     }
   };
 
+  // Abre una nota mostrando primero la versión resumida (instantáneo) y
+  // reemplazándola por el contenido completo apenas llega, en vez de
+  // bloquear la pantalla esperando la respuesta.
   const abrirNota = (nota: NotaDiario) => {
     setNotaActiva(nota);
     setVista('verNota');
+    obtenerNotaCompleta(nota.id).then((completa) => {
+      if (completa) setNotaActiva(completa);
+    });
   };
 
   // ── Inicializa el contenido del editor SOLO cuando cambia editorKey
