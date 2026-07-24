@@ -55,6 +55,31 @@ const CONTACTOS: ContactoEmergencia[] = [
     icono: "🧠",
   },
   {
+    id: "sap_psicologia",
+    nombre: "S.A.P. — Servicio de Asesoramiento Psicológico",
+    descripcion: "Programa de la Escuela de Psicología orientado al asesoramiento y apoyo psicológico preventivo para la comunidad universitaria. Confirma disponibilidad y horario vigente con la coordinación antes de asistir.",
+    categoria: "ucv",
+    ubicacion: "Facultad de Humanidades y Educación, Escuela de Psicología",
+    horario: "Lun–Vie (horario sujeto a disponibilidad de la coordinación)",
+    telefono: "(0212) 605-2988",
+    lat: 10.4874,
+    lng: -66.8913,
+    color: "#0891B2",
+    icono: "🗣️",
+  },
+  {
+    id: "orientacion_facultades",
+    nombre: "Servicio de Orientación de tu Facultad",
+    descripcion: "Cada facultad de la UCV cuenta con su propio Servicio de Orientación, que atiende a estudiantes en el área social, académica, vocacional y psicológica. Es un buen primer punto de contacto si no sabes a quién acudir.",
+    categoria: "ucv",
+    ubicacion: "Presente en cada Facultad de la Ciudad Universitaria",
+    horario: "Según horario de atención de cada facultad",
+    lat: 10.4885,
+    lng: -66.8930,
+    color: "#0D9488",
+    icono: "🧭",
+  },
+  {
     id: "esc_medicina",
     nombre: "Departamento de Psiquiatría — Facultad de Medicina",
     descripcion: "Consulta médica especializada para situaciones de salud mental que requieran evaluación clínica.",
@@ -405,9 +430,12 @@ function AccordionItem({ punto }: { punto: ContactoEmergencia }) {
         aria-expanded={abierto}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          {punto.esEmergencia && (
-            <span className="text-rose-500 text-base flex-shrink-0">🔴</span>
-          )}
+          <span
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0"
+            style={{ backgroundColor: punto.color + '18' }}
+          >
+            {punto.esEmergencia ? '🔴' : punto.icono}
+          </span>
           <span className={`text-xs font-bold leading-snug ${
             punto.esEmergencia ? "text-rose-800" : "text-slate-800"
           } line-clamp-2`}>
@@ -498,18 +526,23 @@ export default function ModoCrisisPage() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4 font-sans">
-      <div className="w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col relative sm:rounded-[40px] border border-gray-100 overflow-hidden">
+      <div
+        className="w-full max-w-md h-screen sm:h-[850px] shadow-2xl flex flex-col relative sm:rounded-[40px] border border-gray-100 overflow-hidden"
+        style={{ background: 'linear-gradient(180deg, #F5F3FF 0%, #FDF2F8 38%, #FFFFFF 62%)' }}
+      >
+        {/* Decoración de fondo */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-24 -right-20 w-64 h-64 rounded-full opacity-40 blur-2xl" style={{ background: 'radial-gradient(circle, #F9A8D4 0%, transparent 70%)' }} />
+          <div className="absolute top-40 -left-24 w-56 h-56 rounded-full opacity-30 blur-2xl" style={{ background: 'radial-gradient(circle, #C4B5FD 0%, transparent 70%)' }} />
+          <div className="absolute bottom-0 -right-16 w-48 h-48 rounded-full opacity-30 blur-2xl" style={{ background: 'radial-gradient(circle, #99F6E4 0%, transparent 70%)' }} />
+        </div>
 
         {/* HEADER */}
-        <div className={`px-6 pt-6 pb-5 ${
-          desencadenadoAutomaticamente
-            ? "bg-gradient-to-b from-rose-50 to-white border-b border-rose-100"
-            : "bg-white border-b border-slate-100"
-        }`}>
+        <div className="relative z-10 px-6 pt-6 pb-5">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/home")}
-              className="p-2 -ml-2 text-slate-600 hover:text-slate-800 transition-colors rounded-full hover:bg-slate-100 active:scale-95 flex-shrink-0"
+              className="p-2 -ml-2 text-slate-600 hover:text-slate-800 transition-colors rounded-full hover:bg-white/70 active:scale-95 flex-shrink-0"
               aria-label="Volver al inicio"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
@@ -519,33 +552,40 @@ export default function ModoCrisisPage() {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🚨</span>
-                <h2 className="text-base font-extrabold text-[#2A3B50] tracking-tight">
-                  Modo crisis
-                </h2>
+                <span
+                  className="w-9 h-9 rounded-2xl flex items-center justify-center text-lg flex-shrink-0 shadow-sm"
+                  style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F43F5E 100%)' }}
+                >
+                  🚨
+                </span>
+                <div>
+                  <h2 className="text-base font-extrabold text-[#2A3B50] tracking-tight leading-tight">
+                    Modo crisis
+                  </h2>
+                  <p className="text-[11px] text-slate-500 font-medium leading-snug">
+                    Ayuda inmediata y contención
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
-                Ayuda inmediata y contención
-              </p>
             </div>
           </div>
 
           {desencadenadoAutomaticamente ? (
-            <div className="mt-4 p-3.5 bg-rose-500 text-white rounded-2xl flex items-start gap-3">
+            <div className="mt-4 p-4 rounded-3xl flex items-start gap-3 shadow-md shadow-rose-200/60" style={{ background: 'linear-gradient(135deg, #FB7185 0%, #E11D48 100%)' }}>
               <span className="text-lg flex-shrink-0 mt-0.5">💙</span>
               <div>
-                <p className="text-xs font-bold leading-snug">{mensajePrincipal}</p>
+                <p className="text-xs font-bold text-white leading-snug">{mensajePrincipal}</p>
                 {promedioBienestar !== undefined && (
-                  <p className="text-[10px] font-medium mt-1 opacity-90">
+                  <p className="text-[10px] font-medium mt-1 text-rose-50">
                     Tu bienestar promedio esta semana: {promedioBienestar.toFixed(1)}
                   </p>
                 )}
               </div>
             </div>
           ) : (
-            <div className="mt-4 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex items-start gap-3">
+            <div className="mt-4 p-4 bg-white/80 backdrop-blur-sm border border-purple-100/70 rounded-3xl flex items-start gap-3 shadow-sm">
               <span className="text-lg flex-shrink-0 mt-0.5">💜</span>
-              <p className="text-xs font-medium text-slate-600 leading-snug">
+              <p className="text-xs font-medium text-slate-600 leading-relaxed">
                 {mensajePrincipal}
               </p>
             </div>
@@ -553,11 +593,11 @@ export default function ModoCrisisPage() {
         </div>
 
         {/* CONTENIDO SCROLLABLE */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="relative z-10 flex-1 overflow-y-auto px-6 py-2 space-y-4">
           {SECCIONES_APOYO.map((seccion) => {
             const estaAbierta = seccionAbierta === seccion.id;
             return (
-              <div key={seccion.id} className={`rounded-3xl border overflow-hidden ${seccion.colorBg}`}>
+              <div key={seccion.id} className={`rounded-3xl border overflow-hidden shadow-sm backdrop-blur-sm ${seccion.colorBg}`}>
                 <button
                   onClick={() => setSeccionAbierta(estaAbierta ? null : seccion.id)}
                   className="w-full flex items-center justify-between px-5 py-4 focus:outline-none"
@@ -567,6 +607,9 @@ export default function ModoCrisisPage() {
                     <span className="text-xl">{seccion.icono}</span>
                     <span className={`text-xs font-extrabold uppercase tracking-wide ${seccion.color}`}>
                       {seccion.titulo}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 bg-white/70 px-2 py-0.5 rounded-full">
+                      {seccion.puntos.length}
                     </span>
                   </div>
                   <svg
@@ -596,21 +639,22 @@ export default function ModoCrisisPage() {
 
           <button
             onClick={() => setMapaFullscreen(true)}
-            className="w-full rounded-3xl border border-teal-100 bg-teal-50 px-5 py-4 flex items-center justify-between focus:outline-none hover:bg-teal-100 transition-colors"
+            className="w-full rounded-3xl border border-teal-100 px-5 py-4 flex items-center justify-between focus:outline-none hover:brightness-95 transition-all shadow-sm"
+            style={{ background: 'linear-gradient(135deg, #CCFBF1 0%, #99F6E4 100%)' }}
           >
             <div className="flex items-center gap-3">
-              <span className="text-xl">🗺️</span>
+              <span className="w-10 h-10 rounded-2xl bg-white/70 flex items-center justify-center text-xl flex-shrink-0">🗺️</span>
               <div className="text-left">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-teal-700">Puntos de apoyo en el campus</p>
-                <p className="text-[10px] text-teal-500 font-medium mt-0.5">Ver mapa interactivo</p>
+                <p className="text-xs font-extrabold uppercase tracking-wide text-teal-800">Puntos de apoyo en el campus</p>
+                <p className="text-[10px] text-teal-600 font-medium mt-0.5">Ver mapa interactivo</p>
               </div>
             </div>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-teal-400 flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-teal-600 flex-shrink-0">
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
           </button>
 
-          <div className="p-4 bg-purple-50 border border-purple-100 rounded-3xl flex items-start gap-3 mb-4">
+          <div className="p-4 rounded-3xl flex items-start gap-3 mb-4 shadow-sm border border-purple-100/70" style={{ background: 'linear-gradient(135deg, #F5F3FF 0%, #FAE8FF 100%)' }}>
             <span className="text-xl flex-shrink-0">✨</span>
             <div>
               <p className="text-xs font-bold text-purple-900">Recuerda</p>
