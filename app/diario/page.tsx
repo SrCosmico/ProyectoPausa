@@ -13,7 +13,6 @@ import {
   eliminarPatronUsuario,
 } from '@/lib/supabase/contrasena';
 
-// Interfaz local compatible con notas_diario (id es UUID string de Supabase)
 interface NotaDiario {
   id: string;
   user_id: string;
@@ -24,16 +23,16 @@ interface NotaDiario {
   label_dia?: string | null;
 }
 
-type VistaDiario = 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verNota';
+type VistaDiario = 'bienvenida' | 'bloqueo' | 'listaNotas' | 'crearNota' | 'verNota' | 'configuracion';
 type ModoBloqueo = 'cargando' | 'crear_dibujar' | 'crear_confirmar' | 'verificar';
 
 const MIN_PUNTOS_PATRON = 4;
 
 const opcionesEstado = [
-  { emoji: '💜', label: 'Productivo' },
-  { emoji: '💛', label: 'Cansado'    },
-  { emoji: '💙', label: 'Tranquilo'  },
-  { emoji: '💚', label: 'Aprendizaje'},
+  { emoji: '💜', label: 'Productivo', color: '#8B5CF6' },
+  { emoji: '💛', label: 'Cansado',    color: '#F59E0B' },
+  { emoji: '💙', label: 'Tranquilo',  color: '#3B82F6' },
+  { emoji: '💚', label: 'Aprendizaje',color: '#10B981' },
 ];
 
 export default function DiarioPage() {
@@ -47,13 +46,11 @@ export default function DiarioPage() {
   const [notaActiva,  setNotaActiva]  = useState<NotaDiario | null>(null);
   const [cargando,    setCargando]    = useState<boolean>(false);
 
-  // ── NUEVO: filtro de notas por etiqueta/emoji ────────────────────────────
-  const [filtroEtiqueta, setFiltroEtiqueta] = useState<string | null>(null); // null = "Todas"
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
 
-  // NUEVO: fuerza que el editor enriquecido se vacíe visualmente al abrir una nota nueva
   const [editorKey, setEditorKey] = useState(0);
 
-  // ── NUEVO: grabación de audio ─────────────────────────────────────────────
   const [grabando, setGrabando] = useState(false);
   const [tiempoGrabacion, setTiempoGrabacion] = useState(0);
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
@@ -61,7 +58,6 @@ export default function DiarioPage() {
   const timerGrabacionRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const MAX_SEGUNDOS_AUDIO = 120;
 
-  // ── Estado del patrón de bloqueo ─────────────────────────────────────────
   const [modoBloqueo, setModoBloqueo] = useState<ModoBloqueo>('cargando');
   const [patronHashGuardado, setPatronHashGuardado] = useState<string | null>(null);
   const [puntosSeleccionados, setPuntosSeleccionados] = useState<number[]>([]);
@@ -70,13 +66,11 @@ export default function DiarioPage() {
   const [shake, setShake] = useState(false);
   const [verificandoPatron, setVerificandoPatron] = useState(false);
 
-  // Estados del formulario de creación
   const [titulo,       setTitulo]       = useState('');
   const [contenido,    setContenido]    = useState('');
   const [estadoDia,    setEstadoDia]    = useState<{ emoji: string; label: string } | null>(null);
   const [panelAbierto, setPanelAbierto] = useState(false);
 
-  // ── Fetch de notas desde Supabase ────────────────────────────────────────
   const cargarNotas = useCallback(async (uid: string) => {
     if (!uid) return;
     setCargando(true);
@@ -100,7 +94,6 @@ export default function DiarioPage() {
     init();
   }, [router, cargarNotas]);
 
-  // ── Cargar estado del patrón cada vez que entramos a la pantalla de bloqueo ──
   useEffect(() => {
     if (vista !== 'bloqueo' || !userId) return;
 
@@ -118,7 +111,6 @@ export default function DiarioPage() {
     cargarPatron();
   }, [vista, userId]);
 
-  // ── Interacción con los puntos del patrón ────────────────────────────────
   const alternarPunto = (idx: number) => {
     if (verificandoPatron) return;
     setErrorPatron(null);
@@ -144,7 +136,6 @@ export default function DiarioPage() {
       return;
     }
 
-    // Paso 1 de creación: guardamos el dibujo temporal y pedimos confirmarlo
     if (modoBloqueo === 'crear_dibujar') {
       setPatronTemporal(puntosSeleccionados);
       setPuntosSeleccionados([]);
@@ -152,7 +143,6 @@ export default function DiarioPage() {
       return;
     }
 
-    // Paso 2 de creación: comparamos con el dibujo temporal
     if (modoBloqueo === 'crear_confirmar') {
       const coincide =
         patronTemporal !== null &&
@@ -180,7 +170,6 @@ export default function DiarioPage() {
       return;
     }
 
-    // Verificación de patrón existente
     if (modoBloqueo === 'verificar') {
       setVerificandoPatron(true);
       const hashIntento = await hashPatron(puntosSeleccionados);
@@ -203,9 +192,9 @@ export default function DiarioPage() {
     setPatronTemporal(null);
     setErrorPatron(null);
     setModoBloqueo('crear_dibujar');
+    setVista('bloqueo');
   };
 
-  // ── NUEVO: insertar imagen como base64 dentro del editor enriquecido ─────
   const manejarInsertarImagen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -224,15 +213,15 @@ export default function DiarioPage() {
     });
 
     editorRef.current?.focus();
-    document.execCommand('insertImage', false, base64);
-
-    // Sincronizamos el estado con lo que quedó en el editor tras insertar la imagen
+    document.execCommand(
+      'insertHTML',
+      false,
+      `<span contenteditable="false" style="position:relative;display:inline-block;max-width:100%;" class="my-2"><img src="${base64}" style="max-width:100%;border-radius:14px;display:block;" /><button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:9999px;background:#ef4444;color:white;border:2px solid white;font-size:13px;font-weight:bold;cursor:pointer;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.25);">×</button></span><br>`
+    );
     if (editorRef.current) setContenido(editorRef.current.innerHTML);
-
     if (imagenInputRef.current) imagenInputRef.current.value = '';
   };
 
-  // ── NUEVO: grabar audio y adjuntarlo a la nota como reproductor embebido ──
   const iniciarGrabacion = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -266,7 +255,7 @@ export default function DiarioPage() {
         document.execCommand(
           'insertHTML',
           false,
-          `<span contenteditable="false" style="position:relative;display:block;" class="my-2"><audio controls src="${base64}" style="width:100%;display:block;"></audio><button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:9999px;background:#ef4444;color:white;border:none;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;">×</button></span><br>`
+          `<span contenteditable="false" style="position:relative;display:block;" class="my-2"><audio controls src="${base64}" style="width:100%;display:block;"></audio><button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:9999px;background:#ef4444;color:white;border:2px solid white;font-size:13px;font-weight:bold;cursor:pointer;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.25);">×</button></span><br>`
         );
         if (editorRef.current) setContenido(editorRef.current.innerHTML);
       };
@@ -279,9 +268,7 @@ export default function DiarioPage() {
       timerGrabacionRef.current = setInterval(() => {
         segundos += 1;
         setTiempoGrabacion(segundos);
-        if (segundos >= MAX_SEGUNDOS_AUDIO) {
-          detenerGrabacion();
-        }
+        if (segundos >= MAX_SEGUNDOS_AUDIO) detenerGrabacion();
       }, 1000);
 
     } catch (err) {
@@ -301,7 +288,6 @@ export default function DiarioPage() {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  // ── Guardar nota nueva en Supabase ───────────────────────────────────────
   const guardarNota = async () => {
     if (!userId) return;
     setCargando(true);
@@ -327,7 +313,6 @@ export default function DiarioPage() {
     setCargando(false);
   };
 
-  // ── Eliminar nota en Supabase ─────────────────────────────────────────────
   const eliminarNota = async (notaId: string) => {
     const { error } = await supabase
       .from('notas_diario')
@@ -354,48 +339,96 @@ export default function DiarioPage() {
     else if (vista === 'listaNotas')   setVista('bloqueo');
     else if (vista === 'crearNota')    setVista('listaNotas');
     else if (vista === 'verNota')      setVista('listaNotas');
+    else if (vista === 'configuracion') setVista('listaNotas');
   };
 
-  // ── NUEVO: notas filtradas según la etiqueta elegida ─────────────────────
-  const notasFiltradas = filtroEtiqueta
-    ? listaNotas.filter((n) => n.label_dia === filtroEtiqueta)
-    : listaNotas;
+  const notasFiltradas = listaNotas
+    .filter((n) => (filtroEtiqueta ? n.label_dia === filtroEtiqueta : true))
+    .filter((n) =>
+      busqueda.trim()
+        ? n.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
+          n.contenido.toLowerCase().includes(busqueda.toLowerCase())
+        : true
+    );
+
+  const colorDeEtiqueta = (label?: string | null) =>
+    opcionesEstado.find((o) => o.label === label)?.color ?? '#94A3B8';
+
+  const extraerTextoPlano = (html: string) =>
+    html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-0 sm:p-4 font-sans text-slate-800">
-      <div className="w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col relative sm:rounded-[40px] overflow-hidden border border-slate-100">
+      <div className="relative w-full max-w-md h-screen sm:h-[850px] bg-white shadow-2xl flex flex-col sm:rounded-[40px] overflow-hidden border border-slate-100">
 
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4 flex items-center justify-between z-10 bg-white">
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <img src="/images/forma_morada.png" alt="" aria-hidden="true" className="absolute -top-14 -right-16 w-60 h-auto opacity-30 select-none rotate-12" />
+          <img src="/images/ramita_izquierda.png" alt="" aria-hidden="true" className="absolute top-[40%] -left-10 w-28 h-auto opacity-35 select-none rotate-[16deg]" />
+          <img src="/images/ramita_derecha.png" alt="" aria-hidden="true" className="absolute bottom-[6%] -right-10 w-32 h-auto opacity-35 select-none -rotate-12" />
+        </div>
+
+        <div className="relative z-10 px-6 pt-6 pb-4 flex items-center justify-between bg-white/95 backdrop-blur-sm">
           <button onClick={manejarAtras} className="p-2 -ml-2 text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
             </svg>
           </button>
           <h3 className="text-sm font-bold">
-            {vista === 'crearNota' ? 'Nueva nota' : vista === 'verNota' ? 'Detalle' : 'Diario emocional'}
+            {vista === 'crearNota' ? 'Nueva nota' : vista === 'verNota' ? 'Detalle' : vista === 'configuracion' ? 'Configuración del diario' : vista === 'listaNotas' ? 'Mis notas' : 'Diario emocional'}
           </h3>
-          <div className="w-5" />
+          {vista === 'listaNotas' ? (
+            <button onClick={() => setVista('configuracion')} className="p-2 -mr-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors" title="Configuración">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.767c-.293.224-.438.613-.431.983.001.066.002.132.002.198 0 .066-.001.132-.002.198-.007.37.138.76.431.983l1.003.767a1.125 1.125 0 0 1 .26 1.43l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.216-.456a1.125 1.125 0 0 0-1.076.124 6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281a1.125 1.125 0 0 0-.644-.87 6.52 6.52 0 0 1-.22-.127 1.125 1.125 0 0 0-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.43l1.003-.767c.293-.224.438-.613.431-.983a6.53 6.53 0 0 1-.002-.198c0-.066.001-.132.002-.198.007-.37-.138-.76-.431-.983l-1.003-.767a1.125 1.125 0 0 1-.26-1.43l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
+          ) : (
+            <div className="w-9" />
+          )}
         </div>
 
-        {/* Contenido */}
-        <div className="flex-1 overflow-y-auto px-6 py-2 relative">
+        <div className="relative z-10 flex-1 overflow-y-auto px-6 py-2">
 
-          {/* ── Bienvenida ──────────────────────────────────────────── */}
           {vista === 'bienvenida' && (
-            <div className="text-center pt-10 space-y-6">
-              <div className="w-40 h-40 bg-purple-50 rounded-full mx-auto flex items-center justify-center text-6xl">📓</div>
-              <h2 className="text-xl font-bold">Diario emocional</h2>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto">Tu espacio seguro para escribir lo que sientes, sin filtros.</p>
-              <button onClick={() => setVista('bloqueo')} className="w-full py-4 bg-[#6B66B2] text-white rounded-xl font-bold text-sm shadow-md hover:bg-[#5a5596]">
+            <div className="pt-6 space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-[#2A3B50]">Diario emocional</h2>
+                <p className="text-xs text-slate-400 mt-1">Escribe, expresa y organiza tus pensamientos.</p>
+              </div>
+
+              <div className="flex justify-center py-2">
+                <div className="w-32 h-32 bg-purple-50 rounded-[32px] flex items-center justify-center text-6xl shadow-sm border border-purple-100/60">
+                  📓
+                </div>
+              </div>
+
+              <div className="bg-white/90 backdrop-blur-sm border border-slate-100 rounded-2xl p-4 space-y-3.5 shadow-sm">
+                {[
+                  { icono: '✅', titulo: 'Escribe como en tus notas', desc: 'Crea entradas rápidas y detalladas.' },
+                  { icono: '🗂️', titulo: 'Organiza tus ideas', desc: 'Busca, edita y elimina cuando quieras.' },
+                  { icono: '🔒', titulo: 'Privado y seguro', desc: 'Solo tú puedes acceder a tus notas.' },
+                  { icono: '💜', titulo: 'Inspirado en notas', desc: 'Simple, limpio y hecho para ti.' },
+                ].map((item) => (
+                  <div key={item.titulo} className="flex items-start gap-3">
+                    <span className="text-lg flex-shrink-0">{item.icono}</span>
+                    <div>
+                      <p className="text-xs font-bold text-[#334155]">{item.titulo}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => setVista('bloqueo')} className="w-full py-4 bg-[#6B66B2] text-white rounded-2xl font-bold text-sm shadow-md shadow-purple-100 hover:bg-[#5a5596] transition-colors">
                 Abrir mi diario
               </button>
             </div>
           )}
 
-          {/* ── Bloqueo (patrón real, conectado a Supabase) ──────────────── */}
           {vista === 'bloqueo' && (
             <div className="flex flex-col items-center pt-10 space-y-5 px-2">
+              <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center text-2xl">🔒</div>
               <h2 className="text-lg font-bold text-center">
                 {modoBloqueo === 'crear_dibujar' && 'Crea tu patrón de seguridad'}
                 {modoBloqueo === 'crear_confirmar' && 'Confirma tu patrón'}
@@ -403,9 +436,9 @@ export default function DiarioPage() {
                 {modoBloqueo === 'cargando' && 'Cargando...'}
               </h2>
               <p className="text-xs text-slate-400 text-center max-w-xs">
-                {modoBloqueo === 'crear_dibujar' && `Toca al menos ${MIN_PUNTOS_PATRON} puntos, en el orden que quieras usar como tu patrón.`}
+                {modoBloqueo === 'crear_dibujar' && `Dibuja tu patrón para acceder. Toca al menos ${MIN_PUNTOS_PATRON} puntos.`}
                 {modoBloqueo === 'crear_confirmar' && 'Vuelve a tocar los mismos puntos en el mismo orden para confirmar.'}
-                {modoBloqueo === 'verificar' && 'Toca tu patrón para desbloquear tu diario.'}
+                {modoBloqueo === 'verificar' && 'Dibuja tu patrón para acceder.'}
               </p>
 
               <div className={`grid grid-cols-3 gap-8 p-4 ${shake ? 'animate-shake' : ''}`}>
@@ -453,29 +486,32 @@ export default function DiarioPage() {
               </div>
 
               {modoBloqueo === 'verificar' && (
-                <button
-                  onClick={manejarRestablecerPatron}
-                  className="text-[11px] text-slate-400 underline hover:text-slate-600"
-                >
-                  Olvidé mi patrón
+                <button onClick={manejarRestablecerPatron} className="text-[11px] text-slate-400 underline hover:text-slate-600">
+                  ¿Olvidaste tu patrón?
                 </button>
               )}
             </div>
           )}
 
-          {/* ── Lista de notas ───────────────────────────────────────── */}
           {vista === 'listaNotas' && (
-            <div className="space-y-4 pt-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Notas guardadas</p>
+            <div className="space-y-4 pt-2">
+              <div className="relative">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+                <input
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar en mis notas..."
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:border-[#6B66B2] transition-colors"
+                />
+              </div>
 
-              {/* NUEVO: filtro por etiqueta/emoji */}
               <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                 <button
                   onClick={() => setFiltroEtiqueta(null)}
                   className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
-                    filtroEtiqueta === null
-                      ? 'bg-[#6B66B2] text-white border-[#6B66B2]'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-[#6B66B2]/50'
+                    filtroEtiqueta === null ? 'bg-[#6B66B2] text-white border-[#6B66B2]' : 'bg-white text-slate-500 border-slate-200'
                   }`}
                 >
                   Todas
@@ -485,193 +521,223 @@ export default function DiarioPage() {
                     key={op.label}
                     onClick={() => setFiltroEtiqueta(op.label)}
                     className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
-                      filtroEtiqueta === op.label
-                        ? 'bg-[#6B66B2] text-white border-[#6B66B2]'
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-[#6B66B2]/50'
+                      filtroEtiqueta === op.label ? 'bg-[#6B66B2] text-white border-[#6B66B2]' : 'bg-white text-slate-500 border-slate-200'
                     }`}
                   >
-                    <span>{op.emoji}</span>
-                    <span>{op.label}</span>
+                    <span>{op.emoji}</span><span>{op.label}</span>
                   </button>
                 ))}
               </div>
 
-              {cargando && (
-                <p className="text-xs text-slate-400 text-center py-6 animate-pulse">Cargando notas...</p>
-              )}
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pt-1">Notas recientes</p>
 
-              {!cargando && notasFiltradas.length === 0 && listaNotas.length > 0 && (
-                <p className="text-xs text-slate-400 text-center py-6">No tienes notas con esta etiqueta todavía.</p>
-              )}
-
-              {!cargando && listaNotas.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-6">Aún no tienes notas. ¡Crea la primera!</p>
+              {cargando && <p className="text-xs text-slate-400 text-center py-6 animate-pulse">Cargando notas...</p>}
+              {!cargando && notasFiltradas.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-6">
+                  {listaNotas.length === 0 ? 'Aún no tienes notas. ¡Crea la primera!' : 'No se encontraron notas.'}
+                </p>
               )}
 
               {notasFiltradas.map((nota) => (
-                <div key={nota.id} className="p-4 bg-white border border-slate-100 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:border-[#6B66B2]"
-                  onClick={() => abrirNota(nota)}>
-                  <div>
-                    <p className="text-xs font-bold">{nota.titulo}</p>
-                    <p className="text-[10px] text-slate-400">{formatearFechaNota(nota.fecha)}</p>
+                <div
+                  key={nota.id}
+                  onClick={() => abrirNota(nota)}
+                  className="p-4 bg-white/90 backdrop-blur-sm border border-slate-100 rounded-2xl shadow-sm flex items-start gap-3 cursor-pointer hover:border-[#6B66B2]/40 hover:shadow-md transition-all"
+                >
+                  <span
+                    className="w-1.5 self-stretch rounded-full flex-shrink-0"
+                    style={{ backgroundColor: colorDeEtiqueta(nota.label_dia) }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-slate-400 font-semibold">{formatearFechaNota(nota.fecha)}</p>
+                      <span className="text-base flex-shrink-0">{nota.emoji_dia ?? ''}</span>
+                    </div>
+                    <p className="text-xs font-bold text-[#2A3B50] mt-0.5">{nota.titulo}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 truncate">{extraerTextoPlano(nota.contenido)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{nota.emoji_dia ?? ''}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); eliminarNota(nota.id); }}
-                      className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
-                      title="Eliminar nota"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                      </svg>
-                    </button>
-                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); eliminarNota(nota.id); }}
+                    className="p-1 text-slate-300 hover:text-rose-500 transition-colors flex-shrink-0"
+                    title="Eliminar nota"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
           )}
 
-          {/* ── Ver nota ─────────────────────────────────────────────── */}
           {vista === 'verNota' && notaActiva && (
             <div className="pt-4 space-y-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-slate-400 font-semibold">{formatearFechaNota(notaActiva.fecha)}</p>
                 <span className="text-2xl">{notaActiva.emoji_dia ?? ''}</span>
-                <h2 className="text-lg font-bold text-[#6B66B2]">{notaActiva.titulo}</h2>
               </div>
-              <p className="text-[10px] text-slate-400">{formatearFechaNota(notaActiva.fecha)} · {notaActiva.label_dia ?? ''}</p>
+              <h2 className="text-lg font-bold text-[#2A3B50]">{notaActiva.titulo}</h2>
+
               <div
                 className="text-xs text-slate-600 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_audio]:w-full [&_audio]:my-2"
-                dangerouslySetInnerHTML={{
-                  __html: notaActiva.contenido.replace(/<button[^>]*>×<\/button>/g, ''),
-                }}
+                dangerouslySetInnerHTML={{ __html: notaActiva.contenido.replace(/<button[^>]*>×<\/button>/g, '') }}
               />
+
+              {notaActiva.label_dia && (
+                <div className="pt-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Etiqueta</p>
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-white"
+                    style={{ backgroundColor: colorDeEtiqueta(notaActiva.label_dia) }}
+                  >
+                    {notaActiva.emoji_dia} {notaActiva.label_dia}
+                  </span>
+                </div>
+              )}
+
               <button
                 onClick={() => eliminarNota(notaActiva.id)}
-                className="mt-4 w-full py-3 border border-rose-100 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors"
+                className="mt-4 w-full py-3 border border-rose-100 bg-rose-50 text-rose-600 rounded-2xl text-xs font-bold hover:bg-rose-100 transition-colors"
               >
                 Eliminar nota
               </button>
             </div>
           )}
 
-          {/* ── Crear nota ───────────────────────────────────────────── */}
           {vista === 'crearNota' && (
             <div className="h-full flex flex-col pt-2">
-              <input
-                value={titulo}
-                onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Título de tu nota"
-                className="w-full text-sm font-bold p-3 focus:outline-none bg-slate-50 rounded-2xl mb-3 placeholder:text-slate-300"
-              />
-
-              {/* Barra de herramientas del editor */}
-              <div className="flex items-center gap-1.5 p-2 bg-slate-50 rounded-2xl mb-3">
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => document.execCommand('bold')}
-                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-xs font-black flex items-center justify-center transition-colors shadow-sm"
-                  title="Negrita"
-                >
-                  B
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => document.execCommand('italic')}
-                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-xs italic flex items-center justify-center transition-colors shadow-sm"
-                  title="Cursiva"
-                >
-                  I
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => document.execCommand('insertUnorderedList')}
-                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-sm flex items-center justify-center transition-colors shadow-sm"
-                  title="Lista con viñetas"
-                >
-                  •≡
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => document.execCommand('insertOrderedList')}
-                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm"
-                  title="Lista numerada"
-                >
-                  1≡
-                </button>
-
-                <span className="w-px h-6 bg-slate-200 mx-0.5" />
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => imagenInputRef.current?.click()}
-                  className="w-8 h-8 rounded-xl bg-white hover:bg-[#6B66B2]/10 text-slate-600 text-sm flex items-center justify-center transition-colors shadow-sm"
-                  title="Insertar imagen"
-                >
-                  🖼️
-                </button>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Título</label>
                 <input
-                  ref={imagenInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={manejarInsertarImagen}
+                  value={titulo}
+                  onChange={(e) => setTitulo(e.target.value)}
+                  placeholder="Escribe un título..."
+                  className="w-full text-sm font-bold p-3 mt-1 focus:outline-none bg-slate-50 rounded-2xl mb-3 placeholder:text-slate-300 placeholder:font-medium"
                 />
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => (grabando ? detenerGrabacion() : iniciarGrabacion())}
-                  className={`h-8 rounded-xl flex items-center justify-center transition-colors px-2.5 gap-1.5 shadow-sm ${
-                    grabando ? 'bg-rose-500 text-white' : 'bg-white hover:bg-[#6B66B2]/10 text-slate-600'
-                  }`}
-                  title={grabando ? 'Detener grabación' : 'Grabar audio'}
-                >
-                  <span className={grabando ? 'animate-pulse' : ''}>🎙️</span>
-                  {grabando && (
-                    <span className="text-[10px] font-bold tabular-nums">{formatearTiempoGrabacion(tiempoGrabacion)}</span>
-                  )}
-                </button>
               </div>
 
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Escribe tu nota</label>
               <div
                 key={editorKey}
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setContenido((e.target as HTMLDivElement).innerHTML)}
-                onClick={() => {
-                  // Sincroniza el estado si se eliminó una imagen/audio con el botón "×"
-                  if (editorRef.current) setContenido(editorRef.current.innerHTML);
-                }}
-                data-placeholder="¿Qué tienes en mente hoy?"
-                className="w-full flex-1 p-3 text-xs text-slate-600 focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_audio]:w-full [&_audio]:my-2"
+                onClick={() => { if (editorRef.current) setContenido(editorRef.current.innerHTML); }}
+                data-placeholder="¿Qué está en tu mente hoy?"
+                className="w-full flex-1 p-3 mt-1 text-xs text-slate-600 bg-slate-50 rounded-2xl focus:outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_audio]:w-full [&_audio]:my-2"
               />
+
+              {grabando && (
+                <div className="mt-2 flex items-center justify-center gap-2 bg-rose-50 border border-rose-100 rounded-xl py-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-[11px] font-bold text-rose-600">Grabando... {formatearTiempoGrabacion(tiempoGrabacion)}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-4 gap-2 mt-3 p-2 bg-slate-50 rounded-2xl">
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => document.execCommand('bold')}
+                  className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-white transition-colors"
+                >
+                  <span className="text-sm font-black text-slate-600">Aa</span>
+                  <span className="text-[9px] font-bold text-slate-400">Texto</span>
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => imagenInputRef.current?.click()}
+                  className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-white transition-colors"
+                >
+                  <span className="text-base">🖼️</span>
+                  <span className="text-[9px] font-bold text-slate-400">Imagen</span>
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => document.execCommand('insertUnorderedList')}
+                  className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-white transition-colors"
+                >
+                  <span className="text-sm text-slate-600">•≡</span>
+                  <span className="text-[9px] font-bold text-slate-400">Lista</span>
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => (grabando ? detenerGrabacion() : iniciarGrabacion())}
+                  className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-white transition-colors"
+                >
+                  <span className={`text-base ${grabando ? 'animate-pulse' : ''}`}>🎙️</span>
+                  <span className="text-[9px] font-bold text-slate-400">{grabando ? 'Detener' : 'Audio'}</span>
+                </button>
+              </div>
+              <input ref={imagenInputRef} type="file" accept="image/*" className="hidden" onChange={manejarInsertarImagen} />
 
               <button
                 onClick={() => setPanelAbierto(true)}
-                className="mb-4 mt-3 p-4 rounded-2xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full hover:bg-purple-100/70 transition-colors"
+                className="mt-3 p-4 rounded-2xl bg-purple-50 flex items-center justify-between border border-purple-100 w-full hover:bg-purple-100/70 transition-colors"
               >
-                <span className="text-xs font-bold text-purple-700">{estadoDia ? `Día ${estadoDia.label}` : 'Definir mi día'}</span>
+                <span className="text-xs font-bold text-purple-700">{estadoDia ? `Día ${estadoDia.label}` : 'Definir mi día (etiqueta)'}</span>
                 <span className="text-xl">{estadoDia?.emoji ?? '💜'}</span>
               </button>
 
               <button
                 onClick={guardarNota}
                 disabled={cargando || !contenido.trim()}
-                className="w-full py-3.5 bg-[#6B66B2] disabled:bg-slate-300 text-white rounded-2xl font-bold text-xs shadow-md mb-6 hover:bg-[#5a5596] transition-colors"
+                className="w-full py-3.5 bg-[#6B66B2] disabled:bg-slate-300 text-white rounded-2xl font-bold text-xs shadow-md mt-3 mb-6 hover:bg-[#5a5596] transition-colors"
               >
                 {cargando ? 'Guardando...' : 'Guardar nota'}
               </button>
             </div>
           )}
+
+          {vista === 'configuracion' && (
+            <div className="pt-4 space-y-5">
+              <div>
+                <h4 className="text-sm font-bold text-[#2A3B50]">Etiquetas de tus notas</h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Estas son las etiquetas de color con las que marcas cómo fue tu día. Se usan para organizar y filtrar tus notas.
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                {opcionesEstado.map((op) => (
+                  <div key={op.label} className="flex items-center gap-3 p-3.5 bg-white/90 border border-slate-100 rounded-2xl shadow-sm">
+                    <span
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                      style={{ backgroundColor: `${op.color}20` }}
+                    >
+                      {op.emoji}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-[#2A3B50]">{op.label}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {listaNotas.filter((n) => n.label_dia === op.label).length} notas con esta etiqueta
+                      </p>
+                    </div>
+                    <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: op.color }} />
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2">
+                <h4 className="text-sm font-bold text-[#2A3B50]">Seguridad</h4>
+                <button
+                  onClick={manejarRestablecerPatron}
+                  className="w-full mt-2 p-3.5 bg-white/90 border border-slate-100 rounded-2xl shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors"
+                >
+                  <span className="text-xs font-bold text-[#2A3B50]">Cambiar patrón de seguridad</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 text-slate-300">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Panel de estados del día */}
         {panelAbierto && (
           <div className="absolute inset-0 z-50 flex items-end bg-black/20" onClick={() => setPanelAbierto(false)}>
             <div className="w-full bg-white rounded-t-3xl p-6" onClick={(e) => e.stopPropagation()}>
@@ -692,7 +758,6 @@ export default function DiarioPage() {
           </div>
         )}
 
-        {/* FAB para crear nota */}
         {vista === 'listaNotas' && (
           <button
             onClick={() => setVista('crearNota')}
