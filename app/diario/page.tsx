@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
 import {
@@ -90,6 +90,15 @@ export default function DiarioPage() {
   const gridContainerRef = React.useRef<HTMLDivElement>(null);
   const dotRefs = React.useRef<(HTMLDivElement | null)[]>([]);
 
+  // Coordenadas de las líneas del patrón, calculadas en un efecto (NO durante
+  // el render). Leer refs directamente en el cuerpo del render es un
+  // antipatrón de React: puede dar posiciones desincronizadas o romper con
+  // versiones más estrictas de React. Aquí se recalculan cada vez que
+  // cambian los puntos seleccionados o la posición del puntero, y el JSX
+  // solo lee este estado ya resuelto.
+  const [lineasPatron, setLineasPatron] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+  const [lineaViva, setLineaViva] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
   const centroDelPunto = (idx: number) => {
     const el = dotRefs.current[idx];
     const cont = gridContainerRef.current;
@@ -98,6 +107,24 @@ export default function DiarioPage() {
     const c = cont.getBoundingClientRect();
     return { x: r.left - c.left + r.width / 2, y: r.top - c.top + r.height / 2 };
   };
+
+  useLayoutEffect(() => {
+    const nuevasLineas = puntosSeleccionados.slice(1).map((idx, i) => {
+      const desde = centroDelPunto(puntosSeleccionados[i]);
+      const hasta = centroDelPunto(idx);
+      return { x1: desde.x, y1: desde.y, x2: hasta.x, y2: hasta.y };
+    });
+    setLineasPatron(nuevasLineas);
+
+    if (arrastrando && posicionPuntero && puntosSeleccionados.length > 0) {
+      const desde = centroDelPunto(puntosSeleccionados[puntosSeleccionados.length - 1]);
+      setLineaViva({ x1: desde.x, y1: desde.y, x2: posicionPuntero.x, y2: posicionPuntero.y });
+    } else {
+      setLineaViva(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puntosSeleccionados, arrastrando, posicionPuntero]);
+
 
   const posicionRelativa = (clientX: number, clientY: number) => {
     const cont = gridContainerRef.current;
@@ -715,22 +742,16 @@ export default function DiarioPage() {
               >
                 {/* Líneas conectando los puntos ya seleccionados + línea viva hacia el puntero */}
                 <svg className="absolute inset-0 pointer-events-none" width={232} height={232}>
-                  {puntosSeleccionados.slice(1).map((idx, i) => {
-                    const desde = centroDelPunto(puntosSeleccionados[i]);
-                    const hasta = centroDelPunto(idx);
-                    return (
-                      <line
-                        key={idx}
-                        x1={desde.x} y1={desde.y} x2={hasta.x} y2={hasta.y}
-                        stroke="#6B66B2" strokeWidth={4} strokeLinecap="round"
-                      />
-                    );
-                  })}
-                  {arrastrando && posicionPuntero && puntosSeleccionados.length > 0 && (
+                  {lineasPatron.map((l, i) => (
                     <line
-                      x1={centroDelPunto(puntosSeleccionados[puntosSeleccionados.length - 1]).x}
-                      y1={centroDelPunto(puntosSeleccionados[puntosSeleccionados.length - 1]).y}
-                      x2={posicionPuntero.x} y2={posicionPuntero.y}
+                      key={i}
+                      x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+                      stroke="#6B66B2" strokeWidth={4} strokeLinecap="round"
+                    />
+                  ))}
+                  {lineaViva && (
+                    <line
+                      x1={lineaViva.x1} y1={lineaViva.y1} x2={lineaViva.x2} y2={lineaViva.y2}
                       stroke="#6B66B2" strokeWidth={4} strokeLinecap="round" opacity={0.5}
                     />
                   )}
