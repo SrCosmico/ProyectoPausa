@@ -66,7 +66,7 @@ export default function DiarioPage() {
   const [shake, setShake] = useState(false);
   const [verificandoPatron, setVerificandoPatron] = useState(false);
 
-  // NUEVO: patrón tipo celular — se dibuja arrastrando, con líneas conectando los puntos
+  // Patrón tipo celular — se dibuja arrastrando, con líneas conectando los puntos
   const puntosRef = React.useRef<number[]>([]);
   const [arrastrando, setArrastrando] = useState(false);
   const [posicionPuntero, setPosicionPuntero] = useState<{ x: number; y: number } | null>(null);
@@ -154,6 +154,13 @@ export default function DiarioPage() {
       if (!user) { router.push('/login'); return; }
       setUserId(user.id);
       await cargarNotas(user.id);
+
+      // Si el usuario ya tiene un patrón guardado, no es su primera vez:
+      // saltamos la pantalla de bienvenida y vamos directo al bloqueo.
+      const hash = await obtenerPatronGuardado(user.id);
+      if (hash) {
+        setVista('bloqueo');
+      }
     };
     init();
   }, [router, cargarNotas]);
@@ -387,7 +394,7 @@ export default function DiarioPage() {
     setCargando(false);
   };
 
-  // ── NUEVO: iniciar edición de una nota existente ─────────────────────────
+  // ── Iniciar edición de una nota existente ─────────────────────────
   const iniciarEdicionNota = (nota: NotaDiario) => {
     setNotaEditandoId(nota.id);
     setTitulo(nota.titulo);
@@ -496,8 +503,13 @@ export default function DiarioPage() {
               </div>
 
               <div className="flex justify-center py-2">
-                <div className="w-32 h-32 bg-purple-50 rounded-[32px] flex items-center justify-center text-6xl shadow-sm border border-purple-100/60">
-                  📓
+                <div
+                  className="w-32 h-32 rounded-[32px] flex items-center justify-center shadow-sm border border-purple-100/60"
+                  style={{ background: 'linear-gradient(135deg, #EDE9FE 0%, #F5F3FF 100%)' }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#6B66B2" className="w-14 h-14">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+                  </svg>
                 </div>
               </div>
 
