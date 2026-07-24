@@ -286,9 +286,13 @@ export default function HomePage() {
       setUsuarioNombre(nombreFinal);
 
       // ─── Carga de foto de perfil ───────────────────────────────────────────
-
-      const avatarLocal =
-        localStorage.getItem("userAvatar");
+      // La caché ahora se guarda por usuario (`userAvatar_<id>`), no con una
+      // clave global compartida entre cualquier cuenta que haya iniciado
+      // sesión en este navegador — eso era lo que hacía que una cuenta
+      // nueva sin foto propia mostrara la foto de la última persona que
+      // usó el dispositivo.
+      const claveAvatar = `userAvatar_${user.id}`;
+      const avatarLocal = localStorage.getItem(claveAvatar);
 
       if (avatarLocal) {
         setUsuarioAvatar(avatarLocal);
@@ -305,11 +309,16 @@ export default function HomePage() {
 
         setUsuarioAvatar(avatarUrl);
 
-        localStorage.setItem(
-          "userAvatar",
-          avatarUrl
-        );
+        localStorage.setItem(claveAvatar, avatarUrl);
+      } else {
+        // Sin foto en la base de datos: no dejar ninguna imagen mostrada,
+        // ni una caché vieja de este mismo usuario.
+        setUsuarioAvatar(null);
+        localStorage.removeItem(claveAvatar);
       }
+
+      // Limpieza defensiva de la clave global vieja.
+      localStorage.removeItem("userAvatar");
 
       if (
         localStorage.getItem(
