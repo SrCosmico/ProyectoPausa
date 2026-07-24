@@ -66,14 +66,28 @@ export default function PerfilPage() {
         'Estudiante';
 
       setNombre(nombreReal);
-      
+
+      // La caché de avatar en localStorage ahora se guarda por usuario
+      // (`userAvatar_<id>`), no con una clave global. Antes, la clave era
+      // la misma para cualquier cuenta que hubiera iniciado sesión en ese
+      // navegador — así que una cuenta nueva sin foto propia terminaba
+      // mostrando la foto de la última persona que usó el dispositivo.
+      const claveAvatar = `userAvatar_${user.id}`;
+
       if (perfil.avatar) {
         setFoto(perfil.avatar);
-        localStorage.setItem('userAvatar', perfil.avatar);
+        localStorage.setItem(claveAvatar, perfil.avatar);
       } else {
-        const avatarLocal = localStorage.getItem('userAvatar');
-        if (avatarLocal) setFoto(avatarLocal);
+        // Sin foto en la base de datos: NO hay que mostrar nada, ni
+        // siquiera una caché vieja de este mismo usuario (pudo haberla
+        // borrado desde otro dispositivo). `foto` se queda en null.
+        setFoto(null);
+        localStorage.removeItem(claveAvatar);
       }
+
+      // Limpieza defensiva de la clave global vieja, para que ninguna
+      // pantalla vuelva a leerla por error en el futuro.
+      localStorage.removeItem('userAvatar');
 
       // Cargar preferencias de notificaciones guardadas localmente
       const prefsGuardadas = localStorage.getItem('preferenciasNotificaciones');
@@ -111,7 +125,7 @@ export default function PerfilPage() {
         reader.readAsDataURL(file);
       });
 
-      localStorage.setItem('userAvatar', base64);
+      localStorage.setItem(`userAvatar_${userId}`, base64);
       setFoto(base64);
 
       await actualizarPerfil(userId, { avatar_url: base64 });
